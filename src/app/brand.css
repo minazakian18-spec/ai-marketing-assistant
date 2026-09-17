@@ -1,0 +1,47 @@
+.mavix-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+.mavix-mark {
+  display: block;
+  width: 35px;
+  height: 35px;
+  flex-shrink: 0;
+}
+.mavix-wordmark {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 25px;
+  font-weight: 750;
+  letter-spacing: -1px;
+  line-height: 1.2;
+}
+.brand .mavix-brand {
+  gap: 10px;
+}
+.mobile-toggle .mavix-brand {
+  gap: 8px;
+}
+.mobile-toggle .mavix-mark {
+  width: 29px;
+  height: 29px;
+}
+.mobile-toggle .mavix-wordmark {
+  font-size: 22px;
+  letter-spacing: -0.8px;
+}
+.signed-out-page .mavix-brand {
+  margin: 0 auto 25px;
+}
+.signed-out-page .mavix-mark {
+  width: 42px;
+  height: 42px;
+}
+.signed-out-page .mavix-wordmark {
+  font-size: 30px;
+}
+
+.mavix-brand { color: var(--color-primary-dark); }

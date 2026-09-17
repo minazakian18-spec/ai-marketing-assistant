@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Building2, Check, Save } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { PageHeading } from "@/components/ui";
+import { BrandAssets } from "@/components/instagram/brand-assets";
 export default function ProfilePage() {
   const { data, ready, save } = useWorkspace();
   const [form, setForm] = useState(data.profile);
@@ -14,8 +15,8 @@ export default function ProfilePage() {
     <>
       <PageHeading
         eyebrow="DE BASIS VAN JE MERK"
-        title="Bedrijfsprofiel"
-        description="Geef je content een herkenbare stem. Begin bij jouw bedrijf."
+        title="Brand Hub"
+        description="Het marketinggeheugen van je bedrijf. Geef je content een herkenbare stem."
       />
       <div className="profile-layout">
         <form
@@ -125,8 +126,20 @@ export default function ProfilePage() {
             boodschap een stuk persoonlijker.
           </p>
           <span className="badge draft">Lokale werkruimte</span>
+          <hr />
+          <strong>Later in Brand Hub</strong>
+          <ul className="brand-future">
+            <li>Logo en huisstijlkleuren</li>
+            <li>Producten en diensten</li>
+            <li>Foto’s en media</li>
+          </ul>
+          <p>
+            Je doelgroep, tone of voice en bedrijfsomschrijving beheer je nu al
+            hier.
+          </p>
         </aside>
       </div>
+      <BrandAssets />
     </>
   );
 }

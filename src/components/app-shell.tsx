@@ -1,34 +1,93 @@
 "use client";
 import Link from "next/link";
+import { Brand } from "@/components/brand";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Sparkles,
-  CalendarDays,
-  Building2,
-  ArrowUpRight,
-  PanelLeftClose,
-  Menu,
-} from "lucide-react";
-import { useState, type ReactNode } from "react";
-const links = [
-  ["/", "Dashboard", LayoutDashboard],
-  ["/ai-content", "AI Content", Sparkles],
-  ["/contentkalender", "Contentkalender", CalendarDays],
-  ["/bedrijfsprofiel", "Bedrijfsprofiel", Building2],
-] as const;
+import { ArrowUpRight, PanelLeftClose, Menu, X } from "lucide-react";
+import { Suspense, useState, useEffect, useRef, type ReactNode } from "react";
+import { AccountMenu } from "@/components/account/account-menu";
+import { accountLinks } from "@/components/account/account-nav";
+import { useWorkspace } from "@/components/workspace-provider";
+import { navigationGroups, navigationPath } from "@/lib/navigation";
+import { SidebarNavigation } from "@/components/sidebar-navigation";
+const links = navigationGroups.flatMap((group) => group.items);
 export function AppShell({ children }: { children: ReactNode }) {
-  const path = usePathname();
+  const path = navigationPath(usePathname());
   const [open, setOpen] = useState(false);
+  const [mobile, setMobile] = useState(false);
+  const drawer = useRef<HTMLElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 650px)");
+    const update = () => {
+      setMobile(media.matches);
+      if (!media.matches) setOpen(false);
+    };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    if (!open || !mobile) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    drawer.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    function keys(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Tab") {
+        const items = Array.from(
+          drawer.current?.querySelectorAll<HTMLElement>(
+            "a[href],button:not([disabled])",
+          ) || [],
+        );
+        const visible = items.filter(
+          (item) => !item.closest("[inert]") && item.getClientRects().length,
+        );
+        const first = visible[0],
+          last = visible[visible.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", keys);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener("keydown", keys);
+      toggle.current?.focus();
+    };
+  }, [open, mobile]);
+  const { signedOut, resume } = useWorkspace();
+  if (signedOut)
+    return (
+      <div className="signed-out-page">
+        <section className="panel">
+          <Brand />
+          <h1>Je bent uitgelogd</h1>
+          <p>Je lokale gegevens zijn bewaard in deze browser.</p>
+          <p className="muted">
+            Dit is een demo zonder echte accountbeveiliging.
+          </p>
+          <button className="button primary" onClick={resume}>
+            Terug naar mijn werkruimte
+          </button>
+        </section>
+      </div>
+    );
   return (
     <div className="app-shell">
       <button
+        ref={toggle}
         className="mobile-toggle"
+        aria-controls="main-sidebar"
         onClick={() => setOpen(!open)}
         aria-label="Navigatie openen of sluiten"
         aria-expanded={open}
       >
-        <Menu size={21} /> Marketing AI
+        <Menu size={21} /> <Brand />
       </button>
       {open && (
         <button
@@ -37,29 +96,25 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => setOpen(false)}
         />
       )}
-      <aside className={`sidebar ${open ? "open" : ""}`}>
+      <aside
+        id="main-sidebar"
+        ref={drawer}
+        inert={mobile && !open}
+        className={`sidebar ${open ? "open" : ""}`}
+      >
+        <button
+          className="sidebar-close"
+          aria-label="Navigatie sluiten"
+          onClick={() => setOpen(false)}
+        >
+          <X size={20} />
+        </button>
         <Link href="/" className="brand">
-          <span className="brand-icon">
-            <Sparkles size={22} />
-          </span>
-          Marketing<span className="brand-ai">AI</span>
+          <Brand />
         </Link>
-        <p className="nav-label">WERKRUIMTE</p>
-        <nav>
-          {links.map(([href, label, Icon]) => (
-            <Link
-              onClick={() => setOpen(false)}
-              key={href}
-              href={href}
-              aria-current={path === href ? "page" : undefined}
-              className={path === href ? "active" : ""}
-            >
-              <Icon size={19} />
-              {label}
-              {path === href && <span className="nav-dot" />}
-            </Link>
-          ))}
-        </nav>
+        <Suspense fallback={<p>Menu laden…</p>}>
+          <SidebarNavigation onNavigate={() => setOpen(false)} />
+        </Suspense>
         <div className="sidebar-bottom">
           <div className="local-card">
             <span className="live-dot" /> Jouw creatieve werkruimte
@@ -68,7 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <br />
               sterk verhaal.
             </p>
-            <Link href="/ai-content" onClick={() => setOpen(false)}>
+            <Link href="/instagram-ai" onClick={() => setOpen(false)}>
               Aan de slag <ArrowUpRight size={16} />
             </Link>
           </div>
@@ -82,24 +137,30 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </aside>
-      <div className="main-shell">
+      <div className="main-shell" inert={mobile && open}>
         <div className="topbar">
           <span>
             Werkruimte <span className="slash">/</span>{" "}
             <strong>
-              {links.find(([href]) => href === path)?.[1] || "Marketing AI"}
+              {links.find((item) => item.href === path)?.label ||
+                accountLinks.find(([href]) => href === path)?.[1] ||
+                "Mavix"}
             </strong>
           </span>
           <div className="topbar-right">
             <span className="local-pill">
               <span className="live-dot" /> Lokaal opgeslagen
             </span>
-            <span className="avatar small">M</span>
+            <AccountMenu />
           </div>
         </div>
-        <main>{children}</main>
+        <main>
+          <div className="page-content-enter" key={path}>
+            {children}
+          </div>
+        </main>
         <footer>
-          Marketing AI <span>Meer ruimte voor jouw ideeën.</span>
+          Mavix <span>Meer ruimte voor jouw ideeën.</span>
           <span className="footer-right">MVP · Geen externe koppelingen</span>
         </footer>
       </div>

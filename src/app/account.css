@@ -1,0 +1,622 @@
+/* Account additions are scoped to preserve the existing workspace design. */
+.account-menu {
+  position: relative;
+  z-index: 24;
+}
+.account-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  border-radius: 24px;
+  padding: 5px;
+  color: var(--muted);
+  min-height: 44px;
+}
+.account-trigger:hover {
+  background: #f5f3fc;
+}
+.account-trigger .avatar {
+  display: grid;
+}
+.account-trigger img,
+.account-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 255px;
+  max-width: calc(100vw - 32px);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px #24203d19;
+  padding: 8px;
+}
+.account-menu-heading {
+  padding: 12px 13px 15px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 7px;
+}
+.account-menu-heading strong {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.account-menu-heading span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.account-dropdown nav {
+  gap: 2px;
+}
+.account-dropdown nav a {
+  padding: 11px 13px;
+  font-size: 14px;
+  gap: 11px;
+}
+.account-dropdown nav a[aria-current="page"] {
+  background: var(--color-bg-soft-purple);
+  color: var(--primary);
+}
+.logout-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #a34b59;
+  padding: 12px 13px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 44px;
+}
+.logout-button:hover {
+  background: #fff3f3;
+}
+.account-dropdown > .logout-button {
+  width: 100%;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 7px 7px;
+  margin-top: 7px;
+}
+.account-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 22px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--border);
+}
+.account-tabs a {
+  padding: 10px 12px;
+  font-size: 14px;
+  gap: 7px;
+}
+.account-tabs a[aria-current="page"] {
+  background: var(--color-bg-soft-purple);
+  color: var(--primary);
+}
+.account-settings {
+  max-width: 1100px;
+  margin: auto;
+}
+.account-settings .page-heading {
+  margin-bottom: 25px;
+}
+.account-settings .page-heading .muted {
+  font-size: 14px;
+}
+.account-panel {
+  margin-bottom: 22px;
+}
+.account-panel .section-heading {
+  border-bottom: 1px solid var(--border);
+  padding: 22px 25px;
+}
+.account-panel .section-heading h2 {
+  font-size: 17px;
+}
+.account-panel .section-heading p {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.account-panel-body {
+  padding: 24px 25px;
+}
+.account-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 24px;
+}
+.account-fields label {
+  font-size: 14px;
+}
+.account-fields input {
+  font-size: 15px;
+}
+.account-save {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 5px 0 30px;
+}
+.account-save .success-message {
+  margin: 0;
+}
+.account-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  margin-top: 36px;
+  padding-top: 15px;
+  gap: 16px;
+}
+.account-footer > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.photo-editor {
+  display: flex;
+  align-items: center;
+  gap: 21px;
+  margin-bottom: 18px;
+}
+.account-photo {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--color-bg-soft-purple);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+}
+.photo-upload {
+  font-size: 14px;
+}
+.photo-upload input {
+  margin: 8px 0;
+  font-size: 13px;
+  padding: 0;
+  border: 0;
+  max-width: 100%;
+  background: transparent;
+}
+.photo-upload input::file-selector-button {
+  border: 1px solid #e3e4ed;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: white;
+  color: var(--color-text);
+  margin-right: 10px;
+  cursor: pointer;
+}
+.field-note {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.field-error {
+  font-size: 14px;
+  color: #b24f5d;
+  margin-bottom: 12px;
+}
+.demo-notice {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 17px;
+  border: 1px solid #e5e0f7;
+  background: #f3f1fc;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+.demo-notice .badge {
+  font-size: 12px;
+}
+.billing-grid,
+.integration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 23px;
+}
+.plan-name {
+  font-size: 20px;
+  color: var(--color-text-secondary);
+}
+.plan-price {
+  font-size: 37px;
+  font-weight: 650;
+  letter-spacing: -1px;
+  margin: 8px 0 20px;
+}
+.plan-price span {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.settings-details {
+  margin: 0 0 17px;
+}
+.settings-details > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f1f6;
+  font-size: 14px;
+}
+.settings-details dt {
+  color: var(--muted);
+}
+.settings-details dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  max-width: 62%;
+}
+.billing-address-note {
+  margin-top: 12px;
+}
+.account-settings progress {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 7px;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 18px 0 9px;
+  background: #efedf7;
+}
+.account-settings progress::-webkit-progress-bar {
+  background: #efedf7;
+}
+.account-settings progress::-webkit-progress-value {
+  background: #8c79db;
+  border-radius: 8px;
+}
+.account-settings progress::-moz-progress-bar {
+  background: #8c79db;
+  border-radius: 8px;
+}
+.invoice-scroll {
+  overflow-x: auto;
+}
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.invoice-table th {
+  background: #fcfcfe;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.invoice-table th,
+.invoice-table td {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.invoice-table tr:last-child td {
+  border-bottom: 0;
+}
+.invoice-table .button {
+  font-size: 12px;
+  min-height: 38px;
+}
+.integration-card {
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.integration-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+}
+.integration-icon,
+.privacy-icon {
+  display: grid;
+  place-items: center;
+  width: 49px;
+  height: 49px;
+  border-radius: 12px;
+  background: #f2edfc;
+  color: var(--color-primary);
+}
+.integration-icon.email {
+  background: #edf2fc;
+  color: var(--color-primary);
+}
+.integration-card h2 {
+  font-size: 19px;
+}
+.integration-card p {
+  font-size: 15px;
+  color: var(--muted);
+}
+.integration-card > .button {
+  align-self: flex-start;
+  margin-top: auto;
+}
+.notification-row {
+  padding: 23px 25px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.notification-row:last-child {
+  border-bottom: 0;
+}
+.notification-row h3 {
+  font-size: 15px;
+}
+.notification-row p {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.notification-toggle {
+  width: 48px;
+  min-width: 48px;
+  height: 28px;
+  padding: 3px;
+  border: 1px solid #cccdd9;
+  background: #dbdce5;
+  border-radius: 20px;
+  position: relative;
+}
+.notification-toggle:after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.notification-toggle span {
+  display: block;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px #25204422;
+  transition: transform 0.15s;
+}
+.notification-toggle[aria-checked="true"] {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.notification-toggle[aria-checked="true"] span {
+  transform: translateX(20px);
+}
+.privacy-card {
+  padding: 26px;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+.privacy-card > div {
+  max-width: 610px;
+}
+.privacy-card h2 {
+  font-size: 18px;
+  margin: 16px 0 8px;
+}
+.privacy-card p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.75;
+}
+.danger-panel {
+  border-color: #efdfe3;
+}
+.danger-panel .privacy-icon {
+  background: #fcf0f2;
+  color: #b46d7a;
+}
+.button.danger-outline {
+  border-color: #e8cbd1;
+  background: white;
+  color: #a44759;
+}
+.button.danger-outline:hover {
+  background: #fff4f5;
+}
+.button.danger {
+  background: #b74e62;
+  color: white;
+}
+.account-dialog {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  color: var(--ink);
+  box-shadow: 0 20px 80px #29223830;
+}
+.account-dialog::backdrop {
+  background: #25213766;
+}
+.account-dialog > div {
+  padding: 27px;
+}
+.account-dialog h2 {
+  font-size: 21px;
+  margin-bottom: 15px;
+}
+.account-dialog p {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 12px 0;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 25px;
+}
+.signed-out-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 25px;
+}
+.signed-out-page .panel {
+  padding: 42px;
+  max-width: 490px;
+  text-align: center;
+}
+.signed-out-page .brand-icon {
+  margin: 0 auto 25px;
+  width: 48px;
+  height: 48px;
+}
+.signed-out-page h1 {
+  font-size: 28px;
+}
+.signed-out-page p {
+  margin-top: 16px;
+  font-size: 15px;
+}
+.signed-out-page .button {
+  margin-top: 26px;
+}
+.deletion-success {
+  padding: 38px;
+  text-align: center;
+}
+.deletion-success svg {
+  color: #689a7e;
+  margin: 0 auto 17px;
+}
+.deletion-success p {
+  font-size: 15px;
+  color: var(--muted);
+  margin: 14px 0 23px;
+}
+@media (max-width: 1100px) {
+  .billing-grid {
+    grid-template-columns: 1fr;
+  }
+  .privacy-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 650px) {
+  .topbar-right .account-trigger .avatar {
+    display: grid;
+  }
+  .account-tabs {
+    gap: 4px;
+    margin-bottom: 24px;
+    padding-bottom: 18px;
+  }
+  .account-tabs a {
+    font-size: 12px;
+    padding: 9px 8px;
+    gap: 6px;
+  }
+  .account-tabs a svg {
+    width: 14px;
+  }
+  .account-fields,
+  .integration-grid {
+    grid-template-columns: 1fr;
+  }
+  .account-panel .section-heading {
+    padding: 20px;
+  }
+  .account-panel-body {
+    padding: 20px;
+  }
+  .photo-editor {
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .photo-editor > div {
+    min-width: 0;
+  }
+  .account-photo {
+    width: 60px;
+    height: 60px;
+  }
+  .account-save {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .account-footer {
+    align-items: flex-start;
+  }
+  .account-footer > span {
+    max-width: 180px;
+  }
+  .demo-notice {
+    align-items: flex-start;
+    flex-direction: column;
+    font-size: 13px;
+  }
+  .settings-details > div {
+    font-size: 13px;
+  }
+  .invoice-table th,
+  .invoice-table td {
+    padding: 13px 17px;
+  }
+  .notification-row {
+    padding: 21px 19px;
+  }
+  .privacy-card {
+    padding: 22px;
+  }
+  .privacy-card > .button {
+    width: 100%;
+  }
+  .account-dialog > div {
+    padding: 23px;
+  }
+  .dialog-actions {
+    flex-direction: column-reverse;
+  }
+  .signed-out-page .panel {
+    padding: 28px;
+  }
+  .topbar > span {
+    min-width: 0;
+  }
+  .topbar-right {
+    flex-shrink: 0;
+  }
+}

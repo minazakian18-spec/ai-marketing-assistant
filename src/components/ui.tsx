@@ -23,13 +23,22 @@ export function PageHeading({
   );
 }
 export function Status({ status }: { status: Post["status"] }) {
+  const labels = {
+    draft: "Concept",
+    approved: "Goedgekeurd",
+    scheduled: "Ingepland",
+    rejected: "Afgewezen",
+    blocked: "Geblokkeerd",
+    failed: "Mislukt",
+    published: "Demo gepubliceerd",
+  };
   return (
-    <span className={`badge ${status}`}>
-      {status === "scheduled"
-        ? "Ingepland"
-        : status === "approved"
-          ? "Goedgekeurd"
-          : "Concept"}
+    <span
+      key={status}
+      data-status={status}
+      className={`badge ${status === "published" ? "approved" : status === "rejected" || status === "blocked" || status === "failed" ? "draft" : status}`}
+    >
+      {labels[status]}
     </span>
   );
 }
