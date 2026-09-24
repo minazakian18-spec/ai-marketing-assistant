@@ -3,11 +3,18 @@
   --motion-fast: 160ms;
   --motion-base: 220ms;
   --motion-ease: cubic-bezier(0.2, 0.65, 0.3, 1);
-  --surface-shadow: 0 1px 2px #29204403, 0 4px 14px #29204403;
-  --hover-shadow: 0 3px 7px #33264d06, 0 10px 24px #33264d0a;
+  --surface-shadow: var(--shadow-sm, 0 1px 2px #29204408, 0 4px 14px #29204406);
+  --hover-shadow: var(--shadow-md, 0 3px 7px #33264d10, 0 10px 24px #33264d14);
 }
 .panel {
   box-shadow: var(--surface-shadow);
+  border-color: #ecebf3;
+  transition:
+    box-shadow var(--motion-base) var(--motion-ease),
+    border-color var(--motion-base) var(--motion-ease);
+}
+.panel:focus-within {
+  box-shadow: var(--hover-shadow);
 }
 button,
 a,
@@ -31,6 +38,27 @@ select {
 }
 .button {
   transform: translateY(0);
+}
+.button.primary {
+  position: relative;
+  overflow: hidden;
+}
+.button.primary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.28) 46%,
+    transparent 62%
+  );
+  transform: translateX(-130%);
+  transition: transform 550ms var(--motion-ease);
+  pointer-events: none;
+}
+.button.primary:hover::before {
+  transform: translateX(130%);
 }
 .button svg,
 .text-link svg,
@@ -339,6 +367,13 @@ select {
     background: #fcfaff;
     box-shadow: 0 4px 10px #39265e06;
   }
+  .command-kpi:hover,
+  .channel-kpis > article:hover,
+  .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--hover-shadow);
+    border-color: #ded7f3;
+  }
   .dash-recent-row:hover .artwork,
   .dash-recent-row:hover .email-thumbnail {
     transform: scale(1.025);
@@ -462,7 +497,13 @@ select {
   .dash-recent-row:hover .artwork,
   .dash-recent-row:hover .email-thumbnail,
   .text-link:hover svg,
-  .dash-card-link:hover svg {
+  .dash-card-link:hover svg,
+  .command-kpi:hover,
+  .channel-kpis > article:hover,
+  .stat-card:hover,
+  .home-business:hover,
+  .home-composer:focus-within,
+  .home-composer button:hover:not(:disabled) {
     transform: none !important;
   }
 }
@@ -603,7 +644,7 @@ select {
 }
 .channel-mode-cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 28px;
 }

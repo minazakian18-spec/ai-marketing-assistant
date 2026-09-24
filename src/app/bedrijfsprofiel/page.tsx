@@ -4,6 +4,11 @@ import { Building2, Check, Save } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { PageHeading } from "@/components/ui";
 import { BrandAssets } from "@/components/instagram/brand-assets";
+import { SegmentsManager } from "@/components/brand/segments-manager";
+import { ProductsManager } from "@/components/brand/products-manager";
+import { WebsiteImport } from "@/components/brand/website-import";
+import { BrandVoiceForm } from "@/components/brand/brand-voice";
+import "../brand-hub.css";
 export default function ProfilePage() {
   const { data, ready, save } = useWorkspace();
   const [form, setForm] = useState(data.profile);
@@ -127,19 +132,23 @@ export default function ProfilePage() {
           </p>
           <span className="badge draft">Lokale werkruimte</span>
           <hr />
-          <strong>Later in Brand Hub</strong>
+          <strong>Verder in Brand Hub</strong>
           <ul className="brand-future">
-            <li>Logo en huisstijlkleuren</li>
+            <li>Doelgroepsegmenten</li>
             <li>Producten en diensten</li>
-            <li>Foto’s en media</li>
+            <li>Merkkleuren en tone of voice</li>
           </ul>
           <p>
-            Je doelgroep, tone of voice en bedrijfsomschrijving beheer je nu al
-            hier.
+            Hoe vollediger dit is, hoe beter Mavix AI content op jouw merk kan
+            afstemmen.
           </p>
         </aside>
       </div>
       <BrandAssets />
+      <BrandVoiceForm />
+      <SegmentsManager />
+      <ProductsManager />
+      <WebsiteImport />
     </>
   );
 }

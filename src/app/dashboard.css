@@ -88,7 +88,11 @@
   padding: 18px 20px;
   background: white;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md, 10px);
+  box-shadow: var(--shadow-xs);
+  transition:
+    transform 200ms var(--ease-premium, ease),
+    box-shadow 200ms;
 }
 .command-kpi > div {
   display: flex;
@@ -213,13 +217,30 @@
   font-weight: 500;
 }
 .ai-advice {
-  background: linear-gradient(110deg, #f0edff, #eeeafb);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(120deg, #f2effe, #ece6fc 55%, #e6ddfa);
   border: 1px solid #e4def6;
-  border-radius: 11px;
+  border-radius: var(--radius-md, 11px);
   padding: 22px 25px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  box-shadow: var(--shadow-xs);
+}
+.ai-advice::after {
+  content: "";
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  right: -70px;
+  top: -90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.18), transparent 70%);
+  pointer-events: none;
+}
+.ai-advice > * {
+  position: relative;
 }
 .advice-header {
   display: flex;

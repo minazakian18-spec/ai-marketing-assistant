@@ -1,47 +1,142 @@
 "use client";
 import { useState } from "react";
-import { Instagram, Mail, Plug, Check } from "lucide-react";
+import {
+  Instagram,
+  Mail,
+  Inbox,
+  MapPin,
+  Globe,
+  Store,
+  ShoppingCart,
+  Plug,
+  Check,
+} from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { PageHeading } from "@/components/ui";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
 import type { Integrations } from "@/lib/types";
+
+type Category = "social" | "google" | "email" | "web";
 const integrations = [
   {
     key: "instagram",
-    name: "Instagram",
+    name: "Instagram / Meta",
+    category: "social" as Category,
     Icon: Instagram,
+    iconClass: "instagram",
     description: "Geef je Instagram-content een plek in je werkruimte.",
   },
   {
-    key: "email",
-    name: "E-mail",
-    Icon: Mail,
-    description: "Bereid je werkruimte voor op e-mailcampagnes.",
+    key: "googleBusiness",
+    name: "Google Business Profile",
+    category: "google" as Category,
+    Icon: MapPin,
+    iconClass: "google",
+    description: "Beheer en beantwoord je Google-reviews vanuit Mavix.",
   },
-] as const;
+  {
+    key: "email",
+    name: "Gmail",
+    category: "email" as Category,
+    Icon: Mail,
+    iconClass: "email",
+    description: "Verstuur en beheer e-mailcampagnes via Gmail.",
+  },
+  {
+    key: "outlook",
+    name: "Outlook",
+    category: "email" as Category,
+    Icon: Inbox,
+    iconClass: "outlook",
+    description: "Verstuur en beheer e-mailcampagnes via Outlook.",
+  },
+  {
+    key: "website",
+    name: "Website",
+    category: "web" as Category,
+    Icon: Globe,
+    iconClass: "website",
+    description: "Gebruik informatie van je website in je content.",
+  },
+  {
+    key: "shopify",
+    name: "Shopify",
+    category: "web" as Category,
+    Icon: Store,
+    iconClass: "shopify",
+    description: "Haal producten en aanbiedingen op uit je Shopify-winkel.",
+  },
+  {
+    key: "woocommerce",
+    name: "WooCommerce",
+    category: "web" as Category,
+    Icon: ShoppingCart,
+    iconClass: "woocommerce",
+    description:
+      "Haal producten en aanbiedingen op uit je WooCommerce-winkel.",
+  },
+] satisfies {
+  key: keyof Integrations;
+  name: string;
+  category: Category;
+  Icon: typeof Mail;
+  iconClass: string;
+  description: string;
+}[];
+
+const categoryFilters: [Category | "all", string][] = [
+  ["all", "Alle"],
+  ["social", "Social media"],
+  ["email", "E-mail"],
+  ["google", "Google"],
+  ["web", "Website & e-commerce"],
+];
+
 export default function IntegrationsPage() {
   const { data, save } = useWorkspace();
+  const [filter, setFilter] = useState<Category | "all">("all");
   const [selected, setSelected] = useState<keyof Integrations | null>(null);
   const [message, setMessage] = useState("");
   const selectedIntegration = integrations.find((i) => i.key === selected);
   const connected = selected ? data.integrations[selected] : false;
+  const visible =
+    filter === "all"
+      ? integrations
+      : integrations.filter((i) => i.category === filter);
   return (
     <>
       <PageHeading
-        eyebrow="JOUW KANALEN"
+        eyebrow="WORKSPACE"
         title="Integraties"
-        description="Beheer de kanalen voor je marketing."
+        description="Verbind de tools die je al gebruikt met je Mavix-werkruimte."
       />
       <div className="demo-notice">
         <span className="badge draft">Demomodus</span>Je kunt de
         verbindingsstatus uitproberen. Er worden geen accounts gekoppeld of
         gegevens verstuurd.
       </div>
+      <div
+        className="lib-toolbar"
+        role="group"
+        aria-label="Filter op categorie"
+      >
+        {categoryFilters.map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className="lib-filter-pill"
+            aria-pressed={filter === key}
+            onClick={() => setFilter(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="integration-grid">
-        {integrations.map(({ key, name, Icon, description }) => (
+        {visible.map(({ key, name, Icon, iconClass, description }) => (
           <section className="panel integration-card" key={key}>
             <div className="integration-card-top">
-              <span className={"integration-icon " + key}>
+              <span className={"integration-icon " + iconClass}>
                 <Icon size={27} />
               </span>
               <span
@@ -49,6 +144,7 @@ export default function IntegrationsPage() {
                   "badge " + (data.integrations[key] ? "approved" : "draft")
                 }
               >
+                {data.integrations[key] && <span className="live-dot" />}
                 {data.integrations[key] ? "Gekoppeld" : "Niet gekoppeld"}
               </span>
             </div>

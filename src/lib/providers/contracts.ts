@@ -10,6 +10,12 @@ export type GenerationRequest = {
   duration: 5 | 10;
   videoMode: string;
   variant: number;
+  // Structured AI-instruction fields (see src/lib/ai/instagram-instruction.ts).
+  // Optional so existing calls keep working; the mock provider falls back to
+  // sensible defaults when they're missing.
+  goal?: string;
+  segmentId?: string;
+  cta?: string;
 };
 export interface TextProvider {
   generate(

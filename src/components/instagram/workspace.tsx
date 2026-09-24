@@ -42,11 +42,7 @@ function Workspace() {
 
   const editPost = data.posts.find((p) => p.id === search.get("post"));
   const settings = data.instagram || defaultInstagram;
-  const tab = workspaceView(
-    search.get("tab"),
-    !!search.get("post"),
-    settings.mode,
-  );
+  const tab = workspaceView(search.get("tab"), !!search.get("post"));
   const items = data.posts.map((p) => ({
     id: p.id,
     title: p.prompt,
@@ -219,7 +215,7 @@ function Workspace() {
             <div className="channel-assist-intro">
               <p>
                 AI doet alleen iets wanneer jij een opdracht geeft. Automatische
-                instellingen vind je bij Auto Create en Full Autopilot.
+                instellingen vind je bij Auto Create.
               </p>
               {settings.mode !== "assist" && (
                 <button
@@ -248,6 +244,8 @@ function Workspace() {
             <CreateStudio
               key={editPost?.id || "new"}
               editPost={editPost}
+              initialDate={search.get("date") || undefined}
+              initialType={search.get("type") || undefined}
               profile={data.profile}
               onPersist={persist}
             />
@@ -266,15 +264,14 @@ function Workspace() {
         ) : (
           <>
             <AutopilotSettings
-              pageMode={tab}
-              key={tab + settings.mode + settings.enabled}
+              key={settings.mode + settings.enabled}
               settings={settings}
               profile={data.profile}
               onSave={(s) => save({ ...data, instagram: s })}
               onRun={simulate}
               busy={busy}
             />
-            {tab === "auto" ? (
+            {settings.requireApproval ? (
               <div className="channel-queue-section">
                 <ApprovalQueue
                   posts={data.posts}

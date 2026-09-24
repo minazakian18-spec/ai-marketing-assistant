@@ -193,8 +193,8 @@ export default function Dashboard() {
               ? "Je e-mailplanning staat klaar. Houd je onderwerpregel kort en kies één duidelijke CTA."
               : "Plan ook een nieuwsbrief voor je ingeschreven contacten. Een korte update met één duidelijke CTA is een goede start."}
           </p>
-          <Link className="button primary" href="/campagnes">
-            Campagne maken
+          <Link className="button primary" href="/contentkalender">
+            Content plannen
             <ArrowUpRight size={16} />
           </Link>
           <small className="advice-footnote">

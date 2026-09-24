@@ -19,7 +19,7 @@ import {
   Monitor,
   Smartphone,
 } from "lucide-react";
-import { generateEmail } from "@/lib/providers/email-mock";
+import { generateEmailCampaign } from "@/lib/api-client";
 import {
   emailKinds,
   campaignError,
@@ -27,6 +27,8 @@ import {
   type EmailKind,
 } from "@/lib/email-model";
 import { segments, recipients } from "@/lib/contact-data";
+import { emailLengths, type EmailLength } from "@/lib/ai/email-instruction";
+import { formalityOptions, type Formality } from "@/lib/brand-model";
 import type { Profile } from "@/lib/types";
 import { Toggle } from "@/components/instagram/shared";
 import { EmailStatus, EmailPerformance } from "./shared";
@@ -52,10 +54,14 @@ const quickDescriptions = [
 export function EmailCreate({
   profile,
   initial,
+  initialDate,
+  initialAudience,
   onSave,
 }: {
   profile: Profile;
   initial?: EmailCampaign;
+  initialDate?: string;
+  initialAudience?: string;
   onSave: (c: EmailCampaign) => boolean;
 }) {
   const [prompt, setPrompt] = useState(initial?.prompt || "");
@@ -63,10 +69,13 @@ export function EmailCreate({
     initial?.kind || "Create Campaign",
   );
   const [audience, setAudience] = useState(
-    initial?.audience || "Nieuwsbriefabonnees",
+    initial?.audience || initialAudience || "Nieuwsbriefabonnees",
   );
   const [product, setProduct] = useState("");
   const [offer, setOffer] = useState("");
+  const [tone, setTone] = useState<Formality | "">("");
+  const [length, setLength] = useState<EmailLength>("gemiddeld");
+  const [cta, setCta] = useState("");
   const [website, setWebsite] = useState(false);
   const [campaign, setCampaign] = useState<EmailCampaign | undefined>(initial);
   const [editing, setEditing] = useState(!!initial);
@@ -74,6 +83,12 @@ export function EmailCreate({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [scheduling, setScheduling] = useState(false);
+  const products = profile.productList?.length
+    ? profile.productList.filter((p) => p.active).map((p) => p.name)
+    : (profile.products || "")
+        .split("\n")
+        .map((p) => p.trim())
+        .filter(Boolean);
   const patch = (part: Partial<EmailCampaign>) => {
     if (campaign)
       setCampaign({ ...campaign, ...part, status: "draft", reason: "" });
@@ -85,7 +100,7 @@ export function EmailCreate({
     setBusy(true);
     try {
       const next = await previewMock(
-        generateEmail({
+        generateEmailCampaign({
           prompt,
           kind,
           profile,
@@ -94,11 +109,16 @@ export function EmailCreate({
           offer,
           useWebsite: website,
           variant: campaign ? campaign.variant + 1 : 0,
+          tone: tone || undefined,
+          length,
+          cta: cta.trim() || undefined,
         }),
       );
       if (regenerate && campaign) next.id = campaign.id;
-      if (onSave(next)) {
-        setCampaign(next);
+      const withDate =
+        !regenerate && initialDate ? { ...next, date: initialDate } : next;
+      if (onSave(withDate)) {
+        setCampaign(withDate);
         setEditing(false);
         setScheduling(false);
         setMessage(
@@ -195,12 +215,9 @@ export function EmailCreate({
                 onChange={(e) => setProduct(e.target.value)}
               >
                 <option value="">Geen product geselecteerd</option>
-                {(profile.products || "")
-                  .split("\n")
-                  .filter(Boolean)
-                  .map((p, i) => (
-                    <option key={i}>{p}</option>
-                  ))}
+                {products.map((p, i) => (
+                  <option key={i}>{p}</option>
+                ))}
               </select>
             </label>
           </div>
@@ -219,6 +236,44 @@ export function EmailCreate({
                   <option key={i}>{p}</option>
                 ))}
             </select>
+          </label>
+          <div className="ig-two-fields">
+            <label>
+              Gewenste toon (optioneel)
+              <select
+                value={tone}
+                onChange={(e) => setTone(e.target.value as Formality | "")}
+              >
+                <option value="">Standaard merkstem gebruiken</option>
+                {formalityOptions.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Gewenste lengte
+              <select
+                value={length}
+                onChange={(e) => setLength(e.target.value as EmailLength)}
+              >
+                {emailLengths.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label>
+            Call-to-action (optioneel)
+            <input
+              value={cta}
+              maxLength={120}
+              placeholder="Bijvoorbeeld: Bekijk de collectie"
+              onChange={(e) => setCta(e.target.value)}
+            />
           </label>
           <Toggle
             label="Website-informatie gebruiken"

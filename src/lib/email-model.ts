@@ -44,13 +44,7 @@ export const emailModes = [
     id: "auto",
     title: "Auto Create",
     description:
-      "Mavix bedenkt en maakt automatisch e-mails volgens jouw schema. Jij keurt goed vóór verzending.",
-  },
-  {
-    id: "full",
-    title: "Full Autopilot",
-    description:
-      "Mavix bedenkt, maakt, plant en verstuurt zelfstandig e-mailcampagnes binnen jouw ingestelde regels.",
+      "Mavix bedenkt, maakt en plant zelfstandig e-mails volgens jouw schema. Met 'Vraag per item toestemming' bepaal je of Mavix eerst jouw goedkeuring vraagt of direct verstuurt.",
   },
 ] as const;
 export const emailMix = {
@@ -91,8 +85,9 @@ export type Workflow = {
   approval: boolean;
 };
 export type EmailSettings = {
-  mode: "assist" | "auto" | "full";
+  mode: "assist" | "auto";
   enabled: boolean;
+  requireApproval: boolean;
   newsletters: number;
   newsletterPeriod?: "week" | "month";
   notify?: boolean;
@@ -122,6 +117,7 @@ export type EmailSettings = {
 export const defaultEmail: EmailSettings = {
   mode: "assist",
   enabled: false,
+  requireApproval: true,
   newsletters: 1,
   promotions: 2,
   reengagement: 1,
@@ -174,7 +170,8 @@ export function emailSettingsError(s: EmailSettings): string {
   if (
     !s ||
     !emailModes.some((m) => m.id === s.mode) ||
-    typeof s.enabled !== "boolean"
+    typeof s.enabled !== "boolean" ||
+    typeof s.requireApproval !== "boolean"
   )
     return "Kies een geldige modus.";
   if (![s.newsletters, s.promotions, s.reengagement].every(countValid))
@@ -263,8 +260,9 @@ export function emailPolicy(s: EmailSettings, date: Date) {
     away,
     automatic:
       s.enabled &&
-      s.mode === "full" &&
-      (away ? s.vacation.automatic && !s.vacation.approval : s.mode === "full"),
+      s.mode === "auto" &&
+      !s.requireApproval &&
+      (away ? s.vacation.automatic && !s.vacation.approval : true),
     weekly: away ? s.vacation.campaigns : s.newsletters,
   };
 }

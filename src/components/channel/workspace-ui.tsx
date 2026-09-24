@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   PenLine,
   Layers,
-  Orbit,
   ArrowUpRight,
   Plus,
   CalendarDays,
@@ -25,7 +24,6 @@ export function WorkspaceNav({
     overview: "Overzicht",
     assist: "Assist",
     auto: "Auto Create",
-    full: "Full Autopilot",
   };
   return (
     <div className="channel-breadcrumb">
@@ -94,6 +92,7 @@ export function ChannelOverview({
   root,
   mode,
   enabled,
+  requireApproval,
   items,
   contacts,
 }: {
@@ -101,6 +100,7 @@ export function ChannelOverview({
   root: string;
   mode: string;
   enabled: boolean;
+  requireApproval: boolean;
   items: ChannelItem[];
   contacts?: number;
 }) {
@@ -128,6 +128,7 @@ export function ChannelOverview({
   const email = channel === "Email";
   const Icon = email ? Mail : Instagram;
   const active = enabled && mode !== "assist";
+  const autoPublishing = active && !requireApproval;
   return (
     <>
       <section className="panel channel-summary">
@@ -138,9 +139,7 @@ export function ChannelOverview({
           <div>
             <small>Huidige modus</small>
             <h2>{modeName(mode)}</h2>
-            <p
-              data-autopilot={active && mode === "full" ? "active" : undefined}
-            >
+            <p data-autopilot={autoPublishing ? "active" : undefined}>
               Autopilot {active ? "actief · lokale simulatie" : "uitgeschakeld"}
             </p>
           </div>
@@ -235,16 +234,9 @@ export function ChannelOverview({
               [
                 "auto",
                 email
-                  ? "Mavix maakt automatisch e-mails, jij keurt goed."
-                  : "Mavix maakt automatisch content, jij keurt goed.",
+                  ? "Mavix maakt automatisch e-mails. Jij kiest of dat met of zonder jouw goedkeuring gebeurt."
+                  : "Mavix maakt automatisch content. Jij kiest of dat met of zonder jouw goedkeuring gebeurt.",
                 Layers,
-              ],
-              [
-                "full",
-                email
-                  ? "Mavix maakt, plant en verstuurt zelfstandig."
-                  : "Mavix maakt, plant en publiceert zelfstandig.",
-                Orbit,
               ],
             ] as const
           ).map(([m, description, Icon]) => (

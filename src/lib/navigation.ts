@@ -2,11 +2,12 @@ import {
   LayoutDashboard,
   Instagram,
   Mail,
-  Megaphone,
   CalendarDays,
   Users,
   ChartNoAxesCombined,
   Palette,
+  Star,
+  Images,
 } from "lucide-react";
 export const navigationGroups = [
   {
@@ -18,7 +19,7 @@ export const navigationGroups = [
     items: [
       { href: "/instagram-ai", label: "Instagram AI", icon: Instagram },
       { href: "/email-ai", label: "Email AI", icon: Mail },
-      { href: "/campagnes", label: "Campagnes", icon: Megaphone },
+      { href: "/review-ai", label: "Review AI", icon: Star },
     ],
   },
   {
@@ -40,7 +41,10 @@ export const navigationGroups = [
   },
   {
     label: "MERK",
-    items: [{ href: "/brand-hub", label: "Brand Hub", icon: Palette }],
+    items: [
+      { href: "/brand-hub", label: "Brand Hub", icon: Palette },
+      { href: "/library", label: "Library", icon: Images },
+    ],
   },
 ];
 export function navigationPath(path: string) {

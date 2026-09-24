@@ -1,20 +1,14 @@
-export type WorkspaceView = "overview" | "assist" | "auto" | "full";
+export type WorkspaceView = "overview" | "assist" | "auto";
 export function workspaceView(
   tab: string | null,
   editing: boolean,
-  mode: string,
 ): WorkspaceView {
   if (editing) return "assist";
   if (tab === "create") return "assist";
-  if (tab === "autopilot") return mode === "full" ? "full" : "auto";
-  if (tab === "approvals") return "auto";
-  return tab === "assist" || tab === "auto" || tab === "full"
-    ? tab
-    : "overview";
+  // "full" is a legacy tab value (from the old Full Autopilot mode) kept so old links still work.
+  if (tab === "autopilot" || tab === "approvals" || tab === "full")
+    return "auto";
+  return tab === "assist" || tab === "auto" ? tab : "overview";
 }
 export const modeName = (mode: string) =>
-  mode === "full"
-    ? "Full Autopilot"
-    : mode === "auto"
-      ? "Auto Create"
-      : "Assist";
+  mode === "auto" ? "Auto Create" : "Assist";

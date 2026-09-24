@@ -55,14 +55,12 @@ function Frequencies({
 }
 export function AutopilotSettings({
   settings,
-  pageMode,
   profile,
   onSave,
   onRun,
   busy,
 }: {
   settings: InstagramSettings;
-  pageMode: "auto" | "full";
   profile: Profile;
   onSave: (s: InstagramSettings) => boolean;
   onRun: (s: InstagramSettings) => Promise<void>;
@@ -70,8 +68,8 @@ export function AutopilotSettings({
 }) {
   const [form, setForm] = useState<InstagramSettings>(() => ({
     ...structuredClone(settings),
-    mode: pageMode,
-    enabled: settings.mode === pageMode && settings.enabled,
+    mode: "auto",
+    enabled: settings.mode === "auto" && settings.enabled,
   }));
   const [message, setMessage] = useState("");
   const ref = useRef<HTMLFormElement>(null);
@@ -105,7 +103,7 @@ export function AutopilotSettings({
         <section className="panel ig-settings-card">
           <div className="ig-card-head">
             <div>
-              <h2>{pageMode === "full" ? "Full Autopilot" : "Auto Create"}</h2>
+              <h2>Auto Create</h2>
               <p>Jouw ritme. Jouw regels.</p>
             </div>
             <span
@@ -129,11 +127,17 @@ export function AutopilotSettings({
             onChange={(enabled) =>
               update({
                 enabled,
-                mode: pageMode,
+                mode: "auto",
               })
             }
           />
-          {pageMode === "full" && (
+          <Toggle
+            label="Vraag per item toestemming"
+            description="Aan: elk item komt eerst in de goedkeuringswachtrij. Uit: Mavix publiceert direct binnen je regels."
+            checked={form.requireApproval}
+            onChange={(requireApproval) => update({ requireApproval })}
+          />
+          {!form.requireApproval && (
             <p className="channel-publication-status">
               Automatisch publiceren:{" "}
               <strong>{form.enabled ? "AAN" : "UIT"}</strong>{" "}
@@ -141,7 +145,7 @@ export function AutopilotSettings({
             </p>
           )}
           <p className="field-note">
-            {pageMode === "auto"
+            {form.requireApproval
               ? "Mavix maakt automatisch Instagram-content volgens jouw schema. Jij keurt goed voordat iets wordt gepubliceerd."
               : "Mavix bedenkt, maakt, plant en publiceert zelfstandig binnen jouw ingestelde regels."}
           </p>
@@ -420,9 +424,10 @@ export function AutopilotSettings({
         <section className="panel ig-simulate">
           <h2>Probeer je Autopilot</h2>
           <p>
-            Simuleer één week met de instellingen hiernaast. Auto Create maakt
-            concepten voor de goedkeuringswachtrij. Full Autopilot plant
-            mockcontent in, tenzij informatie ontbreekt.
+            Simuleer één week met de instellingen hiernaast. Met &apos;Vraag
+            per item toestemming&apos; aan komt nieuwe content in de
+            goedkeuringswachtrij; staat de toggle uit, dan plant Mavix
+            mockcontent direct in, tenzij informatie ontbreekt.
           </p>
           <button
             disabled={busy || !form.enabled || form.mode === "assist"}

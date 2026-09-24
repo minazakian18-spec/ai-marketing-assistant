@@ -1,5 +1,5 @@
 import type { Profile, Post } from "./types";
-export type InstagramMode = "assist" | "auto" | "full";
+export type InstagramMode = "assist" | "auto";
 export type ContentType =
   | "Post"
   | "Carousel"
@@ -14,6 +14,7 @@ export type Frequency = { posts: number; stories: number; reels: number };
 export type InstagramSettings = {
   mode: InstagramMode;
   enabled: boolean;
+  requireApproval: boolean;
   frequency: Frequency;
   days: number[];
   times: Record<string, string>;
@@ -42,13 +43,7 @@ export const modes = [
     id: "auto",
     title: "Auto Create",
     description:
-      "AI maakt zelfstandig content volgens jouw schema. Jij keurt goed voordat iets wordt gepubliceerd.",
-  },
-  {
-    id: "full",
-    title: "Full Autopilot",
-    description:
-      "AI bedenkt, maakt, plant en publiceert zelfstandig binnen jouw ingestelde regels.",
+      "AI bedenkt, maakt en plant zelfstandig content volgens jouw schema. Met 'Vraag per item toestemming' bepaal je of Mavix eerst jouw goedkeuring vraagt of direct publiceert.",
   },
 ] as const;
 export const mixLabels = {
@@ -76,6 +71,7 @@ export const forbiddenLabels = {
 export const defaultInstagram: InstagramSettings = {
   mode: "assist",
   enabled: false,
+  requireApproval: true,
   frequency: { posts: 3, stories: 4, reels: 1 },
   days: [1, 3, 5],
   times: {
@@ -118,8 +114,9 @@ export const defaultInstagram: InstagramSettings = {
 export function settingsError(s: InstagramSettings): string {
   if (
     !s ||
-    !["assist", "auto", "full"].includes(s.mode) ||
-    typeof s.enabled !== "boolean"
+    !["assist", "auto"].includes(s.mode) ||
+    typeof s.enabled !== "boolean" ||
+    typeof s.requireApproval !== "boolean"
   )
     return "Ongeldige modus.";
   const freq = (f: Frequency) =>
@@ -237,7 +234,8 @@ export function effectivePolicy(s: InstagramSettings, at: Date) {
     frequency: away ? v.frequency : s.frequency,
     automatic:
       s.enabled &&
-      s.mode === "full" &&
+      s.mode === "auto" &&
+      !s.requireApproval &&
       (!away || v.publication === "automatic"),
     away,
   };
@@ -263,9 +261,9 @@ export function localDateTime(d: Date) {
 export function autopilotLabel(s: InstagramSettings) {
   return !s.enabled || s.mode === "assist"
     ? "Autopilot uit"
-    : s.mode === "auto"
+    : s.requireApproval
       ? "Auto Create actief"
-      : "Full Autopilot actief";
+      : "Auto Create actief · automatische publicatie";
 }
 export function simulationSlots(s: InstagramSettings, now: Date) {
   if (!s.enabled || s.mode === "assist") return [];

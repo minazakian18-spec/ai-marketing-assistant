@@ -26,7 +26,6 @@ import { Toggle } from "@/components/instagram/shared";
 import { EmailReadiness } from "./shared";
 export function EmailAutopilot({
   settings,
-  pageMode,
   profile,
   campaigns,
   onSave,
@@ -34,7 +33,6 @@ export function EmailAutopilot({
   busy,
 }: {
   settings: EmailSettings;
-  pageMode: "auto" | "full";
   profile: Profile;
   campaigns: EmailCampaign[];
   onSave: (s: EmailSettings) => boolean;
@@ -43,8 +41,8 @@ export function EmailAutopilot({
 }) {
   const [form, setForm] = useState<EmailSettings>(() => ({
     ...structuredClone(settings),
-    mode: pageMode,
-    enabled: settings.mode === pageMode && settings.enabled,
+    mode: "auto",
+    enabled: settings.mode === "auto" && settings.enabled,
   }));
   const [message, setMessage] = useState("");
   const ref = useRef<HTMLFormElement>(null);
@@ -81,7 +79,7 @@ export function EmailAutopilot({
         <section className="panel ig-settings-card">
           <div className="ig-card-head">
             <div>
-              <h2>{pageMode === "full" ? "Full Autopilot" : "Auto Create"}</h2>
+              <h2>Auto Create</h2>
               <p>Een relevant bericht. Op het juiste moment.</p>
             </div>
             <span
@@ -105,11 +103,17 @@ export function EmailAutopilot({
             onChange={(enabled) =>
               update({
                 enabled,
-                mode: pageMode,
+                mode: "auto",
               })
             }
           />
-          {pageMode === "full" && (
+          <Toggle
+            label="Vraag per item toestemming"
+            description="Aan: elke e-mail komt eerst in de goedkeuringswachtrij. Uit: Mavix verstuurt direct binnen je regels."
+            checked={form.requireApproval}
+            onChange={(requireApproval) => update({ requireApproval })}
+          />
+          {!form.requireApproval && (
             <p className="channel-publication-status">
               Automatisch verzenden:{" "}
               <strong>{form.enabled ? "AAN" : "UIT"}</strong>{" "}
@@ -117,11 +121,11 @@ export function EmailAutopilot({
             </p>
           )}
           <p className="field-note">
-            {pageMode === "auto"
+            {form.requireApproval
               ? "Mavix maakt automatisch e-mails volgens jouw schema. Jij keurt goed voordat iets wordt verzonden."
               : "Mavix bedenkt, maakt, plant en verstuurt zelfstandig binnen jouw ingestelde regels."}
           </p>
-          {pageMode === "full" && (
+          {!form.requireApproval && (
             <Toggle
               label="Notificatie na verzending"
               description="Opgeslagen voorkeur; in dit prototype worden geen notificaties verstuurd."
@@ -436,8 +440,9 @@ export function EmailAutopilot({
               })}
             </div>
             <p className="field-note">
-              Auto Create vraagt altijd goedkeuring, ook als die bij een
-              workflow uitstaat. Full Autopilot volgt de workflowregel.
+              Staat &apos;Vraag per item toestemming&apos; aan, dan vraagt
+              Mavix altijd goedkeuring, ook als die bij een workflow uitstaat.
+              Staat de toggle uit, dan volgt Mavix de workflowregel per type.
             </p>
           </section>
         </SettingsGroup>
@@ -538,8 +543,10 @@ export function EmailAutopilot({
           <h2>Probeer je Email Autopilot</h2>
           <p>
             Simuleer vier weken. Maandfrequenties gelden één keer binnen deze
-            periode. Auto Create maakt concepten; Full Autopilot plant campagnes
-            als brongegevens en doelgroep beschikbaar zijn.
+            periode. Met &apos;Vraag per item toestemming&apos; aan maakt
+            Mavix concepten voor je goedkeuring; staat de toggle uit, dan plant
+            Mavix campagnes direct als brongegevens en doelgroep beschikbaar
+            zijn.
           </p>
           <button
             className="button primary full"

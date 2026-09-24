@@ -21,8 +21,9 @@ import {
 import Link from "next/link";
 import type { Post, Profile } from "@/lib/types";
 import type { ContentType } from "@/lib/instagram-model";
-import { generateContent } from "@/lib/providers/mock";
+import { generateInstagramContent } from "@/lib/api-client";
 import { readImages } from "@/lib/local-images";
+import { instagramGoals, type InstagramGoal } from "@/lib/ai/instagram-instruction";
 import { PostVisual } from "./shared";
 const quick = [
   ["Post", "Create Post", ImageIcon],
@@ -33,26 +34,38 @@ const quick = [
   ["Animate Image", "Animate Image", Sparkles],
   ["Photos to Reel", "Photos to Reel", Layers],
 ] as const;
+const contentTypes = quick.map(([id]) => id) as ContentType[];
 export function CreateStudio({
   profile,
   editPost,
+  initialDate,
+  initialType,
   onPersist,
 }: {
   profile: Profile;
   editPost?: Post;
+  initialDate?: string;
+  initialType?: string;
   onPersist: (post: Post) => boolean;
 }) {
-  const [type, setType] = useState<ContentType>("Post");
+  const [type, setType] = useState<ContentType>(
+    (initialType && contentTypes.includes(initialType as ContentType)
+      ? (initialType as ContentType)
+      : "Post"),
+  );
   const [prompt, setPrompt] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [product, setProduct] = useState("");
+  const [goal, setGoal] = useState<InstagramGoal>("merkbekendheid");
+  const [segmentId, setSegmentId] = useState("");
+  const [cta, setCta] = useState("");
   const [website, setWebsite] = useState(false);
   const [videoMode, setVideoMode] = useState("Short AI Reel");
   const [duration, setDuration] = useState<5 | 10>(5);
   const [post, setPost] = useState<Post | null>(null);
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(initialDate || "");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -69,10 +82,12 @@ export function CreateStudio({
     }
   }, [editPost]);
   const video = ["Reel", "Animate Image", "Photos to Reel"].includes(type);
-  const products = (profile.products || "")
-    .split("\n")
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const products = profile.productList?.length
+    ? profile.productList.filter((p) => p.active).map((p) => p.name)
+    : (profile.products || "")
+        .split("\n")
+        .map((p) => p.trim())
+        .filter(Boolean);
   async function generate(again = false) {
     setMessage("");
     if (!prompt.trim()) {
@@ -91,7 +106,7 @@ export function CreateStudio({
     setBusy(true);
     try {
       const next = await previewMock(
-        generateContent({
+        generateInstagramContent({
           prompt: prompt.trim(),
           type,
           profile,
@@ -101,6 +116,9 @@ export function CreateStudio({
           duration,
           videoMode: mode,
           variant: again && post ? post.variant + 1 : 0,
+          goal,
+          segmentId: segmentId || undefined,
+          cta: cta.trim() || undefined,
         }),
       );
       if (again && post) next.id = post.id;
@@ -108,7 +126,7 @@ export function CreateStudio({
         setPost(next);
         setCaption(next.caption);
         setHashtags(next.hashtags);
-        setDate("");
+        setDate(initialDate || "");
         setMessage(
           "Mockconcept opgeslagen. Je vindt het in de goedkeuringswachtrij.",
         );
@@ -254,6 +272,44 @@ export function CreateStudio({
                 Website-informatie gebruiken
               </label>
             </div>
+            <div className="ig-two-fields">
+              <label>
+                Doel van deze post
+                <select
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value as InstagramGoal)}
+                >
+                  {instagramGoals.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Doelgroepsegment (optioneel)
+                <select
+                  value={segmentId}
+                  onChange={(e) => setSegmentId(e.target.value)}
+                >
+                  <option value="">Geen specifiek segment</option>
+                  {(profile.segments || []).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label>
+              Call-to-action (optioneel)
+              <input
+                value={cta}
+                maxLength={120}
+                placeholder="Bijvoorbeeld: Shop nu via de link in bio"
+                onChange={(e) => setCta(e.target.value)}
+              />
+            </label>
             <p className="field-note">
               {products.length ? "" : "Voeg producten toe in Brand Hub. "}
               Websitegebruik neemt alleen de opgeslagen bedrijfsomschrijving

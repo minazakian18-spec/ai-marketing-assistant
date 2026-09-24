@@ -1,232 +1,411 @@
 "use client";
-import { useState } from "react";
-import Link from "next/link";
-import { CalendarDays, Plus, ArrowUpRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
-import { Artwork, PageHeading, Status } from "@/components/ui";
-import { EmailQueue } from "@/components/email/queues";
-import { useRouter } from "next/navigation";
+import { PageHeading } from "@/components/ui";
+import {
+  toCalendarItems,
+  type CalendarItem,
+  type CalendarStatus,
+} from "@/lib/calendar-data";
 import type { Post } from "@/lib/types";
-function ScheduleForm({
-  post,
-  onSave,
-}: {
-  post: Post;
-  onSave: (date: string) => boolean;
-}) {
-  const [date, setDate] = useState(post.date);
-  const [message, setMessage] = useState("");
-  return (
-    <form
-      className="schedule-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (new Date(date).getTime() <= Date.now()) {
-          setMessage("Kies een tijdstip in de toekomst.");
-          return;
-        }
-        if (onSave(date)) setMessage("Planning opgeslagen.");
-      }}
-    >
-      <label>
-        Datum en tijd
-        <input
-          aria-label={`Datum en tijd voor ${post.prompt}`}
-          type="datetime-local"
-          required
-          value={date}
-          onChange={(e) => {
-            setDate(e.target.value);
-            setMessage("");
-          }}
-        />
-      </label>
-      <button className="button secondary">
-        {post.status === "scheduled" ? "Bijwerken" : "Inplannen"}
-      </button>
-      <span role="status">{message}</span>
-    </form>
-  );
+import { campaignError, type EmailCampaign } from "@/lib/email-model";
+import { MonthView } from "@/components/calendar/month-view";
+import { WeekView } from "@/components/calendar/week-view";
+import { ListView } from "@/components/calendar/list-view";
+import { CalendarDetailPanel } from "@/components/calendar/detail-panel";
+import { AddContentMenu } from "@/components/calendar/add-content-menu";
+import "../calendar.css";
+// "Campagnes" is not a separate content model in Mavix: an EmailCampaign with
+// kind "Create Campaign" already carries this meaning (see email-model.ts).
+// Rather than inventing a parallel campaign entity, this pill filters the
+// existing e-mail data on that content type.
+const CHANNELS = ["all", "Instagram", "E-mail", "Campagnes"] as const;
+type ChannelFilter = (typeof CHANNELS)[number];
+const STATUS_FILTERS: { id: "all" | CalendarStatus; label: string }[] = [
+  { id: "all", label: "Alle statussen" },
+  { id: "review", label: "Wacht op goedkeuring" },
+  { id: "approved", label: "Goedgekeurd" },
+  { id: "scheduled", label: "Ingepland" },
+  { id: "published", label: "Gepubliceerd" },
+  { id: "rejected", label: "Afgewezen" },
+  { id: "blocked", label: "Geblokkeerd" },
+  { id: "failed", label: "Mislukt" },
+];
+function periodLabel(view: "month" | "week" | "list", anchor: Date) {
+  if (view === "week") {
+    const start = new Date(anchor);
+    start.setDate(anchor.getDate() - ((anchor.getDay() + 6) % 7));
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const sameMonth = start.getMonth() === end.getMonth();
+    const startStr = start.toLocaleDateString("nl-NL", {
+      day: "numeric",
+      month: sameMonth ? undefined : "short",
+    });
+    const endStr = end.toLocaleDateString("nl-NL", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    return startStr + " – " + endStr;
+  }
+  return anchor.toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
 }
 export default function CalendarPage() {
   const { data, ready, save } = useWorkspace();
-  const router = useRouter();
-  const [view, setView] = useState("calendar");
-  const [filter, setFilter] = useState("all");
-  const posts = [...data.posts]
-    .filter((p) => filter === "all" || p.status === filter)
-    .sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
+  const [view, setView] = useState<"month" | "week" | "list">("month");
+  const [anchor, setAnchor] = useState(() => new Date());
+  const [channel, setChannel] = useState<ChannelFilter>("all");
+  const [status, setStatus] = useState<"all" | CalendarStatus>("all");
+  const [selected, setSelected] = useState<CalendarItem | null>(null);
+  const [feedback, setFeedback] = useState("");
+  const [focusDate, setFocusDate] = useState<string | null>(null);
+  const today = new Date();
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 650px)").matches) setView("list");
+  }, []);
+  useEffect(() => setFeedback(""), [selected?.id]);
+  const items = toCalendarItems(data);
+  const byChannel = items.filter((i) => {
+    if (channel === "all") return true;
+    if (channel === "Campagnes")
+      return i.channel === "E-mail" && i.contentType === "Campaign";
+    return i.channel === channel;
+  });
+  const filtered =
+    status === "all" ? byChannel : byChannel.filter((i) => i.status === status);
+  const scheduledCount = filtered.filter((i) => i.status === "scheduled").length;
+  const reviewCount = filtered.filter((i) => i.status === "review").length;
+  function switchView(next: "month" | "week" | "list") {
+    setView(next);
+    if (next !== "list") setFocusDate(null);
+  }
+  function shiftPeriod(dir: 1 | -1) {
+    const next = new Date(anchor);
+    if (view === "week") next.setDate(next.getDate() + dir * 7);
+    else next.setMonth(next.getMonth() + dir);
+    setAnchor(next);
+  }
+  function handleMore(dateKey: string) {
+    setFocusDate(dateKey);
+    setView("list");
+  }
+  function moveItem(item: CalendarItem, dateKey: string, timeStr: string) {
+    const dateValue = dateKey + "T" + (timeStr || "18:00");
+    const message =
+      "Content verplaatst naar " +
+      new Date(dateKey + "T00:00").toLocaleDateString("nl-NL", {
+        day: "numeric",
+        month: "long",
+      });
+    if (item.source.kind === "post") {
+      save(
+        {
+          ...data,
+          posts: data.posts.map((p) =>
+            p.id === item.source.id ? { ...p, date: dateValue } : p,
+          ),
+        },
+        message,
+      );
+    } else {
+      const campaigns = data.email?.campaigns || [];
+      save(
+        {
+          ...data,
+          email: {
+            settings: data.email!.settings,
+            campaigns: campaigns.map((c) =>
+              c.id === item.source.id ? { ...c, date: dateValue } : c,
+            ),
+          },
+        },
+        message,
+      );
+    }
+    setSelected(null);
+  }
+  function handleDrop(item: CalendarItem, dateKey: string) {
+    if (item.date === dateKey) return;
+    moveItem(item, dateKey, item.time || "18:00");
+  }
+  function approveItem(item: CalendarItem) {
+    const future =
+      !!item.date &&
+      new Date(item.date + "T" + (item.time || "00:00")) > new Date();
+    if (item.source.kind === "post") {
+      const post = data.posts.find((p) => p.id === item.source.id);
+      if (!post) return;
+      const next: Post = {
+        ...post,
+        status: future ? "scheduled" : "approved",
+        date: future ? post.date : "",
+      };
+      save(
+        { ...data, posts: data.posts.map((p) => (p.id === post.id ? next : p)) },
+        "Content goedgekeurd",
+      );
+    } else {
+      const campaigns = data.email?.campaigns || [];
+      const c = campaigns.find((c) => c.id === item.source.id);
+      if (!c) return;
+      const error = campaignError(c, future);
+      if (error) {
+        setFeedback(error);
+        return;
+      }
+      const next: EmailCampaign = {
+        ...c,
+        status: future ? "scheduled" : "approved",
+        date: future ? c.date : "",
+        reason: "",
+      };
+      save(
+        {
+          ...data,
+          email: {
+            settings: data.email!.settings,
+            campaigns: campaigns.map((x) => (x.id === c.id ? next : x)),
+          },
+        },
+        "Content goedgekeurd",
+      );
+    }
+    setSelected(null);
+  }
+  function rejectItem(item: CalendarItem) {
+    if (item.source.kind === "post") {
+      save(
+        {
+          ...data,
+          posts: data.posts.map((p) =>
+            p.id === item.source.id ? { ...p, status: "rejected", date: "" } : p,
+          ),
+        },
+        "Concept afgewezen",
+      );
+    } else {
+      const campaigns = data.email?.campaigns || [];
+      save(
+        {
+          ...data,
+          email: {
+            settings: data.email!.settings,
+            campaigns: campaigns.map((c) =>
+              c.id === item.source.id
+                ? { ...c, status: "rejected", date: "", reason: "" }
+                : c,
+            ),
+          },
+        },
+        "Concept afgewezen",
+      );
+    }
+    setSelected(null);
+  }
+  function duplicateItem(item: CalendarItem) {
+    const id = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    if (item.source.kind === "post") {
+      const post = data.posts.find((p) => p.id === item.source.id);
+      if (!post) return;
+      const next: Post = { ...post, id, createdAt, status: "draft", date: "" };
+      save({ ...data, posts: [next, ...data.posts] }, "Concept gedupliceerd");
+    } else {
+      const campaigns = data.email?.campaigns || [];
+      const c = campaigns.find((c) => c.id === item.source.id);
+      if (!c) return;
+      const next: EmailCampaign = {
+        ...c,
+        id,
+        createdAt,
+        status: "draft",
+        date: "",
+        reason: "",
+      };
+      save(
+        {
+          ...data,
+          email: { settings: data.email!.settings, campaigns: [next, ...campaigns] },
+        },
+        "Concept gedupliceerd",
+      );
+    }
+    setSelected(null);
+  }
+  function deleteItem(item: CalendarItem) {
+    if (item.source.kind === "post") {
+      save(
+        { ...data, posts: data.posts.filter((p) => p.id !== item.source.id) },
+        "Content verwijderd",
+      );
+    } else {
+      const campaigns = (data.email?.campaigns || []).filter(
+        (c) => c.id !== item.source.id,
+      );
+      save(
+        { ...data, email: { settings: data.email!.settings, campaigns } },
+        "Content verwijderd",
+      );
+    }
+    setSelected(null);
+  }
   return (
     <>
       <PageHeading
         eyebrow="VOORUITKIJKEN"
         title="Contentkalender"
         description="Geef je ideeën een plek in de planning."
-        action={
-          <Link className="button primary" href="/instagram-ai?tab=assist">
-            <Plus size={18} />
-            Nieuwe content maken
-          </Link>
-        }
       />
-      <div
-        className="tabs calendar-view-tabs"
-        role="group"
-        aria-label="Planningweergave"
-      >
-        <button
-          aria-pressed={view === "calendar"}
-          className={view === "calendar" ? "selected" : ""}
-          onClick={() => setView("calendar")}
-        >
-          Kalender
-        </button>
-        <button
-          aria-pressed={view === "automations"}
-          className={view === "automations" ? "selected" : ""}
-          onClick={() => setView("automations")}
-        >
-          Automatiseringen
-        </button>
+      <div className="cal-toolbar">
+        <div className="cal-toolbar-left">
+          {view === "list" ? (
+            <span className="cal-period-label">Alle content</span>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => setAnchor(new Date())}
+              >
+                Vandaag
+              </button>
+              <button
+                type="button"
+                className="cal-nav-btn"
+                aria-label="Vorige periode"
+                onClick={() => shiftPeriod(-1)}
+              >
+                <ChevronLeft size={17} />
+              </button>
+              <button
+                type="button"
+                className="cal-nav-btn"
+                aria-label="Volgende periode"
+                onClick={() => shiftPeriod(1)}
+              >
+                <ChevronRight size={17} />
+              </button>
+              <span className="cal-period-label">
+                {periodLabel(view, anchor)}
+              </span>
+            </>
+          )}
+        </div>
+        <div className="cal-toolbar-right">
+          <div className="tabs" role="group" aria-label="Weergave">
+            <button
+              aria-pressed={view === "month"}
+              className={view === "month" ? "selected" : ""}
+              onClick={() => switchView("month")}
+            >
+              Maand
+            </button>
+            <button
+              aria-pressed={view === "week"}
+              className={view === "week" ? "selected" : ""}
+              onClick={() => switchView("week")}
+            >
+              Week
+            </button>
+            <button
+              aria-pressed={view === "list"}
+              className={view === "list" ? "selected" : ""}
+              onClick={() => switchView("list")}
+            >
+              Lijst
+            </button>
+          </div>
+          <AddContentMenu />
+        </div>
       </div>
-      {view === "automations" ? (
-        <section className="panel automation-placeholder">
-          <span className="badge draft">Binnenkort</span>
-          <h2>Geef terugkerende ideeën een ritme</h2>
-          <p>Hier kun je later regels instellen voor je content.</p>
-          <blockquote>
-            “Maak iedere vrijdag automatisch een Instagram-concept.”
-          </blockquote>
-          <p className="field-note">
-            Dit is een voorbeeld. Er zijn geen automatiseringen actief.
-          </p>
-        </section>
+      <div className="cal-filters" role="group" aria-label="Filter op kanaal">
+        {CHANNELS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className="cal-pill"
+            aria-pressed={channel === c}
+            onClick={() => setChannel(c)}
+          >
+            {c === "all" ? "Alles" : c}
+          </button>
+        ))}
+      </div>
+      <div
+        className="cal-filters cal-filters-compact"
+        role="group"
+        aria-label="Filter op status"
+      >
+        {STATUS_FILTERS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            className="cal-pill cal-pill-compact"
+            aria-pressed={status === s.id}
+            onClick={() => setStatus(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <div className="cal-summary">
+        <span>
+          <strong>{scheduledCount}</strong> gepland
+        </span>
+        <span>
+          <strong>{reviewCount}</strong> wacht op goedkeuring
+        </span>
+        <span>
+          <strong>{filtered.length}</strong> totaal
+        </span>
+      </div>
+      {!ready ? (
+        <p role="status">Kalender laden…</p>
+      ) : view === "month" ? (
+        <MonthView
+          anchor={anchor}
+          items={filtered}
+          today={today}
+          onSelect={setSelected}
+          onMore={handleMore}
+          onDrop={handleDrop}
+        />
+      ) : view === "week" ? (
+        <WeekView
+          anchor={anchor}
+          items={filtered}
+          today={today}
+          onSelect={setSelected}
+          onDrop={handleDrop}
+        />
       ) : (
-        <>
-          <div className="calendar-toolbar">
-            <div className="tabs" role="group" aria-label="Filter content">
-              {[
-                ["all", "Alle content"],
-                ["scheduled", "Ingepland"],
-                ["draft", "Concepten"],
-                ["approved", "Goedgekeurd"],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  aria-pressed={filter === key}
-                  className={filter === key ? "selected" : ""}
-                  onClick={() => setFilter(key)}
-                >
-                  {label}{" "}
-                  <span>
-                    {
-                      data.posts.filter(
-                        (p) => key === "all" || p.status === key,
-                      ).length
-                    }
-                  </span>
-                </button>
-              ))}
-            </div>
-            <span className="muted calendar-zone">
-              Tijden in je lokale tijdzone
-            </span>
-          </div>
-          <section className="panel calendar-panel">
-            {!ready ? (
-              <p>Kalender laden…</p>
-            ) : posts.length ? (
-              posts.map((post) => (
-                <article className="calendar-post" key={post.id}>
-                  <div className="calendar-post-main">
-                    <Artwork small variant={post.variant} />
-                    <div>
-                      <div className="post-title">
-                        <h3>{post.prompt}</h3>
-                        <Status status={post.status} />
-                      </div>
-                      <p>
-                        {post.status === "scheduled"
-                          ? new Date(post.date).toLocaleString("nl-NL", {
-                              dateStyle: "long",
-                              timeStyle: "short",
-                            })
-                          : "Nog niet ingepland"}{" "}
-                        · Instagram {post.contentType || "Post"}
-                      </p>
-                      <Link
-                        href={`/instagram-ai?post=${post.id}`}
-                        className="text-link"
-                      >
-                        Concept openen <ArrowUpRight size={15} />
-                      </Link>
-                    </div>
-                  </div>
-                  {["draft", "rejected", "blocked", "failed"].includes(
-                    post.status,
-                  ) ? (
-                    <p className="schedule-hint">
-                      Open dit concept om het te controleren, te bewerken en
-                      goed te keuren.
-                    </p>
-                  ) : post.status === "published" ? (
-                    <p className="schedule-hint">Publicatie gesimuleerd.</p>
-                  ) : (
-                    <ScheduleForm
-                      post={post}
-                      onSave={(date) =>
-                        save({
-                          ...data,
-                          posts: data.posts.map((p) =>
-                            p.id === post.id
-                              ? { ...p, date, status: "scheduled" }
-                              : p,
-                          ),
-                        })
-                      }
-                    />
-                  )}
-                </article>
-              ))
-            ) : (
-              <div className="empty-state calendar-empty">
-                <span className="empty-icon">
-                  <CalendarDays size={28} />
-                </span>
-                <h2>
-                  {filter === "all"
-                    ? "Je kalender ligt nog open"
-                    : "Nog geen content in deze categorie"}
-                </h2>
-                <p>
-                  Maak een concept, keur het goed en kies een publicatiemoment.
-                </p>
-                <Link
-                  href="/instagram-ai?tab=assist"
-                  className="button primary"
-                >
-                  <Plus size={17} />
-                  Maak een concept
-                </Link>
-              </div>
-            )}
-          </section>
-          <div className="email-calendar-section">
-            <EmailQueue
-              campaigns={data.email?.campaigns || []}
-              scheduled={true}
-              onEdit={(c) =>
-                router.push("/email-ai?campaign=" + encodeURIComponent(c.id))
-              }
-              onSave={() => false}
-              onExamples={() => {}}
-            />
-          </div>
-          <p className="calendar-disclaimer">
-            De planning is lokaal. Posts worden niet automatisch op Instagram
-            gepubliceerd.
-          </p>
-        </>
+        <ListView
+          items={filtered}
+          today={today}
+          focusDate={focusDate}
+          onClearFocus={() => setFocusDate(null)}
+          onSelect={setSelected}
+        />
+      )}
+      <p className="calendar-disclaimer">
+        De planning is lokaal. Posts en e-mails worden niet automatisch
+        gepubliceerd of verstuurd.
+      </p>
+      <CalendarDetailPanel
+        item={selected}
+        onClose={() => setSelected(null)}
+        onApprove={approveItem}
+        onReject={rejectItem}
+        onDuplicate={duplicateItem}
+        onDelete={deleteItem}
+        onMove={(item, date, time) => moveItem(item, date, time)}
+      />
+      {feedback && (
+        <p role="alert" className="storage-error">
+          {feedback}
+        </p>
       )}
     </>
   );

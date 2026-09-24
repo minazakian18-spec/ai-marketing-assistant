@@ -13,12 +13,13 @@ import {
   writeWorkspace,
   removeWorkspace,
 } from "@/lib/storage";
+import { syncContacts } from "@/lib/contact-data";
 import { Toast } from "@/components/toast";
 import type { Workspace } from "@/lib/types";
 const Context = createContext<{
   data: Workspace;
   ready: boolean;
-  save: (data: Workspace) => boolean;
+  save: (data: Workspace, message?: string) => boolean;
   signedOut: boolean;
   logout: () => void;
   resume: () => void;
@@ -42,6 +43,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
   const closeToast = useCallback(() => setToast(null), []);
   const [signedOut, setSignedOut] = useState(false);
+  // Keep contact-data.ts's live bridge in sync before children render (not in
+  // an effect, which would run one tick too late and leave the first render
+  // after any data change reading stale contacts).
+  syncContacts(data.contacts);
   useEffect(() => {
     try {
       setSignedOut(localStorage.getItem(SESSION_KEY) === "true");
@@ -53,7 +58,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
     setReady(true);
   }, []);
-  function save(next: Workspace) {
+  function save(next: Workspace, message?: string) {
     try {
       writeWorkspace(next);
       const changedPost = next.posts.find(
@@ -70,7 +75,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           next.email.settings.mode !== data.email?.settings.mode) ||
         (next.instagram?.enabled &&
           next.instagram.mode !== data.instagram?.mode);
-      const message =
+      const autoMessage =
         changed?.status === "scheduled"
           ? "Content ingepland"
           : changed?.status === "approved"
@@ -84,7 +89,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                     ? "Campagne opgeslagen"
                     : "Autopilot-instellingen opgeslagen"
                   : "Wijzigingen opgeslagen";
-      setToast({ id: Date.now(), message });
+      setToast({ id: Date.now(), message: message || autoMessage });
       setData(next);
       setError("");
       return true;

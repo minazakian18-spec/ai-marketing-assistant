@@ -29,6 +29,7 @@ import {
 } from "@/lib/email-model";
 import { generateEmail, simulateEmail } from "@/lib/providers/email-mock";
 import { localDateTime } from "@/lib/instagram-model";
+import { ContactsManager } from "@/components/contacts/contacts-manager";
 import { EmailCreate } from "./create";
 import { EmailAutopilot } from "./autopilot";
 import { EmailQueue } from "./queues";
@@ -41,11 +42,7 @@ function Workspace() {
   const settings = data.email?.settings || defaultEmail;
   const campaigns = data.email?.campaigns || [];
   const initial = campaigns.find((c) => c.id === search.get("campaign"));
-  const tab = workspaceView(
-    search.get("tab"),
-    !!search.get("campaign"),
-    settings.mode,
-  );
+  const tab = workspaceView(search.get("tab"), !!search.get("campaign"));
   const items = campaigns.map((c) => ({
     id: c.id,
     title: c.title,
@@ -183,9 +180,17 @@ function Workspace() {
               root="/email-ai"
               mode={settings.mode}
               enabled={settings.enabled}
+              requireApproval={settings.requireApproval}
               items={items}
               contacts={recipients("Alle contacten").length}
             />
+            <SettingsGroup
+              title="Email Contacts"
+              description="Voeg contacten toe of importeer ze via Excel voordat je een campagne verstuurt."
+              open
+            >
+              <ContactsManager />
+            </SettingsGroup>
             <SettingsGroup
               title="Wacht op goedkeuring"
               description="Bekijk en beoordeel je concepten."
@@ -222,7 +227,7 @@ function Workspace() {
             <div className="channel-assist-intro">
               <p>
                 AI doet alleen iets wanneer jij een opdracht geeft. Automatische
-                instellingen vind je bij Auto Create en Full Autopilot.
+                instellingen vind je bij Auto Create.
               </p>
               {settings.mode !== "assist" && (
                 <button
@@ -254,6 +259,8 @@ function Workspace() {
             <EmailCreate
               key={initial?.id || "new"}
               initial={initial}
+              initialDate={search.get("date") || undefined}
+              initialAudience={search.get("audience") || undefined}
               profile={data.profile}
               onSave={persist}
             />
@@ -275,8 +282,7 @@ function Workspace() {
         ) : (
           <>
             <EmailAutopilot
-              pageMode={tab}
-              key={tab + settings.mode + settings.enabled}
+              key={settings.mode + settings.enabled}
               settings={settings}
               profile={data.profile}
               campaigns={campaigns}
@@ -286,7 +292,7 @@ function Workspace() {
               onRun={run}
               busy={busy}
             />
-            {tab === "auto" ? (
+            {settings.requireApproval ? (
               <div className="channel-queue-section">
                 <EmailQueue
                   campaigns={campaigns}

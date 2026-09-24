@@ -11,7 +11,6 @@ import {
   Building2,
   CheckCheck,
   Orbit,
-  Megaphone,
 } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { readiness } from "@/lib/instagram-model";
@@ -28,7 +27,6 @@ const actions = [
     Icon: Instagram,
   },
   { label: "E-mail maken", href: "/email-ai?tab=assist", Icon: Mail },
-  { label: "Campagne starten", href: "/campagnes", Icon: Megaphone },
   { label: "Content plannen", href: "/contentkalender", Icon: CalendarDays },
   { label: "Autopilot instellen", href: "/instagram-ai?tab=auto", Icon: Orbit },
 ];
@@ -47,14 +45,12 @@ function AiCommandBox() {
           if (!prompt.trim()) return;
           const text = prompt.toLowerCase();
           const action = /autopilot|automatisch/.test(text)
-            ? actions[4]
+            ? actions[3]
             : /plan|kalender/.test(text)
-              ? actions[3]
-              : /campagne/.test(text)
-                ? actions[2]
-                : /mail|nieuwsbrief/.test(text)
-                  ? actions[1]
-                  : actions[0];
+              ? actions[2]
+              : /mail|nieuwsbrief/.test(text)
+                ? actions[1]
+                : actions[0];
           setResponse(action);
         }}
       >

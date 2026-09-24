@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePresence } from "@/components/use-presence";
 import { useEffect, useRef, useState } from "react";
-import { Plus, ChevronDown, Instagram, Mail, Megaphone } from "lucide-react";
+import { Plus, ChevronDown, Instagram, Mail } from "lucide-react";
 export function NewContentMenu() {
   const [open, setOpen] = useState(false);
   const present = usePresence(open);
@@ -57,7 +57,6 @@ export function NewContentMenu() {
           {[
             ["/instagram-ai?tab=assist", "Instagram content", Instagram],
             ["/email-ai?tab=assist", "E-mail maken", Mail],
-            ["/campagnes", "Campagne maken", Megaphone],
           ].map(([href, label, Icon]) => {
             const I = Icon as typeof Plus;
             return (

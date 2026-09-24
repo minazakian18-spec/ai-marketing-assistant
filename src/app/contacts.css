@@ -1,0 +1,188 @@
+/* Email Contacts: manual add + Excel import, styled to match the rest of Mavix. */
+.contacts-panel {
+  margin-bottom: 22px;
+}
+.contacts-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.contacts-count {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.contacts-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.contacts-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 0 23px 18px;
+}
+.contacts-search {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+}
+.contacts-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+}
+.contacts-search input {
+  margin: 0;
+  padding-left: 36px;
+}
+.contacts-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.contacts-bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 23px;
+  background: var(--gradient-soft);
+  border-top: 1px solid #ece6fa;
+  border-bottom: 1px solid #ece6fa;
+  font-size: 13px;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+.contacts-bulk-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.contacts-bulk-actions .button {
+  font-size: 12px;
+  padding: 8px 12px;
+  min-height: 34px;
+}
+.contacts-table th:first-child,
+.contacts-table td:first-child {
+  padding-right: 0;
+  width: 36px;
+}
+.contacts-table td:last-child,
+.contacts-table th:last-child {
+  width: 40px;
+  text-align: right;
+}
+.contacts-name-cell strong {
+  display: block;
+}
+.contacts-name-cell span {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+.contacts-empty {
+  padding: 55px 24px;
+}
+.contacts-group-chip {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: #f5f4fc;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.import-mapping-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: center;
+  margin: 14px 0;
+}
+.import-mapping-table .import-mapping-head {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+.import-mapping-column {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 12px;
+  background: #faf9fd;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  overflow-wrap: anywhere;
+}
+.import-mapping-table select {
+  margin: 0;
+}
+.import-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.import-stat {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm, 8px);
+  background: #faf9fd;
+  border: 1px solid var(--border);
+}
+.import-stat strong {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+}
+.import-stat span {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.import-stat.valid strong {
+  color: #448563;
+}
+.import-stat.invalid strong {
+  color: #a44759;
+}
+.import-stat.duplicate strong {
+  color: #89723a;
+}
+@media (max-width: 650px) {
+  .contacts-toolbar {
+    padding: 0 17px 16px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .contacts-search {
+    max-width: none;
+  }
+  .contacts-bulk-bar {
+    padding: 12px 17px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .import-mapping-table {
+    grid-template-columns: 1fr;
+  }
+  .import-mapping-table .import-mapping-head:nth-child(2),
+  .import-mapping-table > svg {
+    display: none;
+  }
+  .import-stats {
+    grid-template-columns: 1fr;
+  }
+}

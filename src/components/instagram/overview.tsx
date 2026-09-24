@@ -216,7 +216,7 @@ export function InstagramOverview({
           </div>
           <span
             data-autopilot={
-              active && settings.mode === "full" ? "active" : undefined
+              active && !settings.requireApproval ? "active" : undefined
             }
             className={"badge " + (active ? "approved" : "draft")}
           >

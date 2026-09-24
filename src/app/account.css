@@ -35,8 +35,8 @@
   max-width: calc(100vw - 32px);
   background: white;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 12px 40px #24203d19;
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-lg, 0 12px 40px #24203d19);
   padding: 8px;
 }
 .account-menu-heading {
@@ -231,10 +231,14 @@
 .demo-notice .badge {
   font-size: 12px;
 }
-.billing-grid,
-.integration-grid {
+.billing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 23px;
+}
+.integration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 23px;
 }
 .plan-name {
@@ -344,13 +348,34 @@
   place-items: center;
   width: 49px;
   height: 49px;
-  border-radius: 12px;
-  background: #f2edfc;
+  border-radius: var(--radius-md, 12px);
+  background: var(--gradient-soft, #f2edfc);
   color: var(--color-primary);
 }
-.integration-icon.email {
+.integration-icon.email,
+.integration-icon.outlook {
   background: #edf2fc;
   color: var(--color-primary);
+}
+.integration-icon.instagram {
+  background: #fdf0f6;
+  color: #b6488e;
+}
+.integration-icon.google {
+  background: #fef6e7;
+  color: #b8860b;
+}
+.integration-icon.website {
+  background: var(--gradient-soft, #f2edfc);
+  color: var(--color-primary);
+}
+.integration-icon.shopify {
+  background: #eef8f1;
+  color: #3f8f5c;
+}
+.integration-icon.woocommerce {
+  background: #f5ecfb;
+  color: #86489c;
 }
 .integration-card h2 {
   font-size: 19px;
@@ -407,7 +432,7 @@
   transition: transform 0.15s;
 }
 .notification-toggle[aria-checked="true"] {
-  background: var(--primary);
+  background: var(--gradient-primary, var(--primary));
   border-color: var(--primary);
 }
 .notification-toggle[aria-checked="true"] span {
@@ -454,7 +479,7 @@
 }
 .account-dialog {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg, 14px);
   padding: 0;
   width: 480px;
   max-width: calc(100vw - 32px);
@@ -526,12 +551,18 @@
   margin: 14px 0 23px;
 }
 @media (max-width: 1100px) {
-  .billing-grid {
+  .billing-grid,
+  .integration-grid {
     grid-template-columns: 1fr;
   }
   .privacy-card {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+@media (min-width: 1101px) and (max-width: 1350px) {
+  .integration-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 650px) {

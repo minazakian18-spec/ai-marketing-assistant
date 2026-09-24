@@ -82,6 +82,73 @@ test("bestaande MVP-opslag migreert zonder profiel of posts te verliezen", () =>
   // Merely loading the new UI does not overwrite the existing stored version.
   assert.equal(memory.get(STORAGE_KEY), JSON.stringify(legacy));
 });
+test("oude Full Autopilot-instellingen migreren naar Auto Create met een toestemming-toggle", async () => {
+  const { defaultInstagram } = await import("../src/lib/instagram-model.ts");
+  const { defaultEmail } = await import("../src/lib/email-model.ts");
+  const memory = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => memory.get(key) ?? null,
+    setItem: (key, value) => memory.set(key, value),
+  };
+  const legacyInstagram = { ...defaultInstagram, mode: "full", enabled: true };
+  delete legacyInstagram.requireApproval;
+  const legacyEmailSettings = { ...defaultEmail, mode: "auto", enabled: true };
+  delete legacyEmailSettings.requireApproval;
+  memory.set(
+    STORAGE_KEY,
+    JSON.stringify({
+      ...emptyWorkspace,
+      instagram: legacyInstagram,
+      email: { settings: legacyEmailSettings, campaigns: [] },
+    }),
+  );
+  const migrated = readWorkspace();
+  assert.equal(migrated.instagram.mode, "auto");
+  assert.equal(migrated.instagram.requireApproval, false);
+  assert.equal(migrated.email.settings.mode, "auto");
+  // Old Auto Create always required approval, so a missing flag defaults to true.
+  assert.equal(migrated.email.settings.requireApproval, true);
+});
+test("contacten migreren met voorbeelddata en valideren nieuwe/gewijzigde gegevens", async () => {
+  const { contactValid } = await import("../src/lib/contact-data.ts");
+  const memory = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => memory.get(key) ?? null,
+    setItem: (key, value) => memory.set(key, value),
+  };
+  const legacy = {
+    profile: emptyWorkspace.profile,
+    posts: [],
+  };
+  memory.set(STORAGE_KEY, JSON.stringify(legacy));
+  const migrated = readWorkspace();
+  assert.equal(migrated.contacts.length, emptyWorkspace.contacts.length);
+  assert.ok(migrated.contacts.every(contactValid));
+  const withContact = {
+    ...structuredClone(emptyWorkspace),
+    contacts: [
+      {
+        id: "c1",
+        firstName: "Test",
+        lastName: "Persoon",
+        email: "test@example.test",
+        status: "Ingeschreven",
+        source: "manual",
+        createdAt: new Date().toISOString(),
+      },
+    ],
+  };
+  writeWorkspace(withContact);
+  assert.deepEqual(readWorkspace().contacts, withContact.contacts);
+  memory.set(
+    STORAGE_KEY,
+    JSON.stringify({
+      ...withContact,
+      contacts: [{ ...withContact.contacts[0], email: "geen-emailadres" }],
+    }),
+  );
+  assert.throws(() => readWorkspace(), /Ongeldige contactgegevens/);
+});
 test("account, meldingen en integraties blijven bewaard en delen bedrijfsgegevens", () => {
   const memory = new Map();
   globalThis.localStorage = {
@@ -216,7 +283,8 @@ test("Instagram-instellingen bewaren mix, regels en vakantie zonder bestaande da
   config.days = [];
   assert.match(settingsError(config), /dag/);
   config.days = [1, 3, 5];
-  config.mode = "full";
+  config.mode = "auto";
+  config.requireApproval = false;
   config.enabled = true;
   config.vacation = {
     enabled: true,
@@ -348,7 +416,7 @@ test("Email Autopilot respecteert modus, bronnen, segmenten, mix en workflowgoed
       (c) => c.status === "draft",
     ),
   );
-  s.mode = "full";
+  s.requireApproval = false;
   assert.ok(
     (await simulateEmail(s, p, now)).campaigns.every(
       (c) => c.status === "scheduled",
@@ -400,7 +468,8 @@ test("Email vakantie herstelt ritme en voorkomt verzending in Auto Create", asyn
     await import("../src/lib/email-model.ts");
   const s = structuredClone(defaultEmail);
   s.enabled = true;
-  s.mode = "full";
+  s.mode = "auto";
+  s.requireApproval = false;
   s.vacation = {
     enabled: true,
     from: "2026-09-10",
@@ -414,7 +483,7 @@ test("Email vakantie herstelt ritme en voorkomt verzending in Auto Create", asyn
   assert.equal(emailPolicy(s, new Date(2026, 8, 12)).weekly, 2);
   assert.equal(emailPolicy(s, new Date(2026, 8, 16)).automatic, true);
   assert.equal(emailPolicy(s, new Date(2026, 8, 16)).weekly, 1);
-  s.mode = "auto";
+  s.requireApproval = true;
   s.vacation.automatic = true;
   s.vacation.approval = false;
   assert.equal(emailPolicy(s, new Date(2026, 8, 12)).automatic, false);
@@ -428,13 +497,15 @@ test("Email vakantie herstelt ritme en voorkomt verzending in Auto Create", asyn
 
 test("nieuwe werkruimtenavigatie behoudt oude tab- en bewerklinks", async () => {
   const { workspaceView } = await import("../src/lib/workspace-navigation.ts");
-  assert.equal(workspaceView(null, false, "full"), "overview");
-  assert.equal(workspaceView("create", false, "auto"), "assist");
-  assert.equal(workspaceView(null, true, "full"), "assist");
-  assert.equal(workspaceView("autopilot", false, "full"), "full");
-  assert.equal(workspaceView("approvals", false, "full"), "auto");
-  assert.equal(workspaceView("scheduled", false, "auto"), "overview");
-  assert.equal(workspaceView("ongeldig", false, "assist"), "overview");
+  assert.equal(workspaceView(null, false), "overview");
+  assert.equal(workspaceView("create", false), "assist");
+  assert.equal(workspaceView(null, true), "assist");
+  assert.equal(workspaceView("autopilot", false), "auto");
+  assert.equal(workspaceView("approvals", false), "auto");
+  // "full" is a legacy tab value from the retired Full Autopilot mode.
+  assert.equal(workspaceView("full", false), "auto");
+  assert.equal(workspaceView("scheduled", false), "overview");
+  assert.equal(workspaceView("ongeldig", false), "overview");
 });
 test("Auto Create kan ook met automatische vakantie-instelling niet publiceren", async () => {
   const { defaultInstagram, effectivePolicy } =
@@ -450,7 +521,7 @@ test("Auto Create kan ook met automatische vakantie-instelling niet publiceren",
     publication: "automatic",
   };
   assert.equal(effectivePolicy(s, new Date(2026, 8, 12)).automatic, false);
-  s.mode = "full";
+  s.requireApproval = false;
   assert.equal(effectivePolicy(s, new Date(2026, 8, 12)).automatic, true);
 });
 test("e-mailnieuwsbrieven ondersteunen maandritme zonder bestaande weekinstellingen te migreren", async () => {
@@ -470,4 +541,265 @@ test("e-mailnieuwsbrieven ondersteunen maandritme zonder bestaande weekinstellin
   s.notify = false;
   assert.equal(emailSettingsError(s), "");
   assert.equal(emailSlots(s, now).length, 2);
+});
+
+test("Library-content blijft bewaard en wordt gevalideerd bij opslaan", async () => {
+  const { libraryAssetValid } = await import("../src/lib/library-model.ts");
+  const memory = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => memory.get(key) ?? null,
+    setItem: (key, value) => memory.set(key, value),
+  };
+  assert.ok(emptyWorkspace.library.length > 0);
+  assert.ok(emptyWorkspace.library.every(libraryAssetValid));
+  const withAsset = {
+    ...structuredClone(emptyWorkspace),
+    library: [
+      {
+        id: "lib-1",
+        name: "Testafbeelding",
+        type: "image",
+        dateAdded: new Date().toISOString(),
+      },
+    ],
+  };
+  writeWorkspace(withAsset);
+  assert.deepEqual(readWorkspace().library, withAsset.library);
+  memory.set(
+    STORAGE_KEY,
+    JSON.stringify({
+      ...withAsset,
+      library: [{ ...withAsset.library[0], type: "onbekend" }],
+    }),
+  );
+  assert.throws(() => readWorkspace(), /Ongeldige library-gegevens/);
+});
+
+test("Reviews en instellingen blijven bewaard en worden per categorie beantwoord", async () => {
+  const {
+    regenerateResponse,
+    categorize,
+    reviewSettingsError,
+    reviewValid,
+    defaultReviewSettings,
+  } = await import("../src/lib/review-model.ts");
+  const memory = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => memory.get(key) ?? null,
+    setItem: (key, value) => memory.set(key, value),
+  };
+  assert.ok(emptyWorkspace.review.reviews.length > 0);
+  assert.ok(emptyWorkspace.review.reviews.every(reviewValid));
+  assert.equal(reviewSettingsError(defaultReviewSettings), "");
+  assert.equal(
+    reviewSettingsError({ ...defaultReviewSettings, mode: "onbekend" }),
+    "Ongeldige modus.",
+  );
+
+  const base = {
+    id: "r1",
+    reviewer: "Anna Jansen",
+    initials: "AJ",
+    date: new Date().toISOString(),
+    aiResponse: "",
+    status: "new",
+  };
+  assert.equal(categorize({ rating: 5, text: "Top!" }), "positive");
+  assert.equal(categorize({ rating: 4, text: "Goed" }), "good");
+  assert.equal(categorize({ rating: 3, text: "Prima" }), "neutral");
+  assert.equal(categorize({ rating: 2, text: "Kon beter" }), "complaint");
+  assert.equal(categorize({ rating: 1, text: "Slecht" }), "seriousComplaint");
+  assert.equal(categorize({ rating: 5, text: "  " }), "noText");
+
+  const settings = { ...defaultReviewSettings, signature: "Team Bloom" };
+  const response = regenerateResponse({ ...base, rating: 1, text: "Nooit meer." }, settings);
+  assert.match(response, /Team Bloom/);
+  const noSignature = regenerateResponse(
+    { ...base, rating: 5, text: "Top!" },
+    { ...settings, signature: "" },
+  );
+  assert.ok(!noSignature.includes("– "));
+
+  const withReview = {
+    ...structuredClone(emptyWorkspace),
+    review: {
+      settings: defaultReviewSettings,
+      reviews: [{ ...base, rating: 5, text: "Fantastisch!" }],
+    },
+  };
+  writeWorkspace(withReview);
+  assert.deepEqual(readWorkspace().review, withReview.review);
+  memory.set(
+    STORAGE_KEY,
+    JSON.stringify({
+      ...withReview,
+      review: {
+        settings: defaultReviewSettings,
+        reviews: [{ ...withReview.review.reviews[0], rating: 9 }],
+      },
+    }),
+  );
+  assert.throws(() => readWorkspace(), /Ongeldige reviewgegevens/);
+});
+
+test("Brand Hub-segmenten, producten en merkstem worden bewaard en gevalideerd", async () => {
+  const {
+    segmentValid,
+    productValid,
+    brandVoiceValid,
+    newSegment,
+    newProduct,
+    defaultBrandVoice,
+  } = await import("../src/lib/brand-model.ts");
+  const memory = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => memory.get(key) ?? null,
+    setItem: (key, value) => memory.set(key, value),
+  };
+  const segment = { ...newSegment(), name: "Jonge professionals" };
+  const product = { ...newProduct(), name: "Zomercollectie tas" };
+  assert.ok(segmentValid(segment));
+  assert.ok(productValid(product));
+  assert.ok(brandVoiceValid(defaultBrandVoice));
+  assert.equal(segmentValid({ ...segment, type: "Onbekend" }), false);
+  assert.equal(productValid({ ...product, active: "ja" }), false);
+
+  const withBrand = {
+    ...structuredClone(emptyWorkspace),
+    profile: {
+      ...emptyWorkspace.profile,
+      segments: [segment],
+      productList: [product],
+      brandVoice: { ...defaultBrandVoice, formality: "informeel" },
+    },
+  };
+  writeWorkspace(withBrand);
+  const read = readWorkspace();
+  assert.deepEqual(read.profile.segments, withBrand.profile.segments);
+  assert.deepEqual(read.profile.productList, withBrand.profile.productList);
+  assert.deepEqual(read.profile.brandVoice, withBrand.profile.brandVoice);
+
+  memory.set(
+    STORAGE_KEY,
+    JSON.stringify({
+      ...withBrand,
+      profile: { ...withBrand.profile, productList: [{ ...product, active: "ja" }] },
+    }),
+  );
+  assert.throws(() => readWorkspace(), /Ongeldige productgegevens/);
+});
+
+test("AI-instructiearchitectuur combineert Brand Hub-gegevens tot gestructureerde context", async () => {
+  const { buildBrandContext } = await import("../src/lib/ai/brand-context.ts");
+  const {
+    buildInstagramInstruction,
+    buildImagePromptSpec,
+  } = await import("../src/lib/ai/instagram-instruction.ts");
+  const { buildEmailInstruction } = await import("../src/lib/ai/email-instruction.ts");
+  const { buildReviewInstruction } = await import("../src/lib/ai/review-instruction.ts");
+  const { newSegment, newProduct, defaultBrandVoice } = await import("../src/lib/brand-model.ts");
+
+  const segment = { ...newSegment(), name: "Jonge professionals" };
+  const product = { ...newProduct(), name: "Zomercollectie tas", description: "Handgemaakt leer" };
+  const profile = {
+    ...emptyWorkspace.profile,
+    name: "Studio Bloom",
+    segments: [segment],
+    productList: [product],
+    brandVoice: { ...defaultBrandVoice, colors: ["#6D28D9"] },
+  };
+
+  const brand = buildBrandContext(profile);
+  assert.equal(brand.name, "Studio Bloom");
+  assert.equal(brand.products.length, 1);
+  assert.equal(brand.segments.length, 1);
+
+  const igInstruction = buildInstagramInstruction({
+    profile,
+    prompt: "Laat de tas zien",
+    type: "Post",
+    goal: "product-promotie",
+    product: product.name,
+    segmentId: segment.id,
+    cta: "Shop nu",
+    useWebsite: false,
+  });
+  assert.equal(igInstruction.product?.name, product.name);
+  assert.equal(igInstruction.segment?.name, segment.name);
+  assert.equal(igInstruction.cta, "Shop nu");
+  const imagePrompt = buildImagePromptSpec(igInstruction);
+  assert.equal(imagePrompt.mainSubject, product.name);
+  assert.deepEqual(imagePrompt.brandColors, ["#6D28D9"]);
+
+  const emailInstruction = buildEmailInstruction({
+    profile,
+    prompt: "Nieuwe collectie",
+    kind: "Create Campaign",
+    audience: "Nieuwsbriefabonnees",
+    product: product.name,
+    tone: "informeel",
+    length: "kort",
+    cta: "Bekijk de collectie",
+    useWebsite: false,
+  });
+  assert.equal(emailInstruction.product?.name, product.name);
+  assert.equal(emailInstruction.length, "kort");
+
+  const review = {
+    id: "r1",
+    reviewer: "Anna",
+    initials: "A",
+    rating: 5,
+    text: "Top!",
+    date: new Date().toISOString(),
+    aiResponse: "",
+    status: "new",
+  };
+  const { defaultReviewSettings } = await import("../src/lib/review-model.ts");
+  const reviewInstruction = buildReviewInstruction(profile, review, defaultReviewSettings);
+  assert.equal(reviewInstruction.category, "positive");
+  assert.equal(reviewInstruction.brand.name, "Studio Bloom");
+});
+
+test("Instagram- en e-mailgeneratie gebruiken doel, segment en CTA uit de instructie", async () => {
+  const { generateContent } = await import("../src/lib/providers/mock.ts");
+  const { generateEmail } = await import("../src/lib/providers/email-mock.ts");
+  const { newSegment, defaultBrandVoice } = await import("../src/lib/brand-model.ts");
+  const segment = { ...newSegment(), name: "Jonge professionals" };
+  const profile = {
+    ...emptyWorkspace.profile,
+    name: "Studio Bloom",
+    segments: [segment],
+    brandVoice: { ...defaultBrandVoice, formality: "informeel" },
+  };
+  const post = await generateContent({
+    prompt: "Laat de tas zien",
+    type: "Post",
+    profile,
+    product: "",
+    useWebsite: false,
+    photos: [],
+    duration: 5,
+    videoMode: "",
+    variant: 0,
+    goal: "aanbieding",
+    segmentId: segment.id,
+    cta: "Shop nu",
+  });
+  assert.match(post.caption, /Shop nu/);
+  assert.match(post.caption, /Jonge professionals/);
+
+  const email = await generateEmail({
+    prompt: "Nieuwe collectie",
+    kind: "Create Campaign",
+    profile,
+    audience: "Nieuwsbriefabonnees",
+    product: "",
+    offer: "",
+    useWebsite: false,
+    variant: 0,
+    cta: "Bekijk de collectie",
+  });
+  assert.equal(email.cta, "Bekijk de collectie");
+  assert.match(email.body, /Hoi,/);
 });

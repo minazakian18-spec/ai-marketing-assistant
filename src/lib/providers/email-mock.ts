@@ -8,6 +8,7 @@ import type { Profile } from "../types";
 import { emailSlots, emailPolicy, campaignError } from "../email-model.ts";
 import { recipients } from "../contact-data.ts";
 import { localDateTime } from "../instagram-model.ts";
+import { buildEmailInstruction, type EmailLength } from "../ai/email-instruction.ts";
 export type EmailRequest = {
   prompt: string;
   kind: EmailKind;
@@ -17,6 +18,11 @@ export type EmailRequest = {
   offer: string;
   useWebsite: boolean;
   variant: number;
+  // Structured AI-instruction fields (see src/lib/ai/email-instruction.ts).
+  // Optional so existing calls keep working.
+  tone?: string;
+  length?: EmailLength;
+  cta?: string;
 };
 export interface EmailTextProvider {
   generate(
@@ -39,7 +45,19 @@ export const mockContacts: ContactRepository = {
 };
 export const mockEmailText: EmailTextProvider = {
   async generate(r) {
-    const topic = r.product || r.prompt.trim();
+    const instruction = buildEmailInstruction({
+      profile: r.profile,
+      prompt: r.prompt,
+      kind: r.kind,
+      audience: r.audience,
+      product: r.product,
+      offer: r.offer,
+      tone: r.tone,
+      length: r.length,
+      cta: r.cta,
+      useWebsite: r.useWebsite,
+    });
+    const topic = instruction.product?.name || r.product || r.prompt.trim();
     const intro =
       r.kind === "Create Welcome Email"
         ? "Welkom bij " +
@@ -50,6 +68,46 @@ export const mockEmailText: EmailTextProvider = {
           : r.kind === "Re-engagement Email"
             ? "Het is even geleden. We delen graag weer iets met je."
             : "";
+    const formality = ["formeel", "neutraal", "informeel"].includes(
+      instruction.tone,
+    )
+      ? (instruction.tone as "formeel" | "neutraal" | "informeel")
+      : instruction.brand.brandVoice.formality;
+    const greeting = formality === "informeel" ? "Hoi," : "Hallo,";
+    const closing =
+      formality === "informeel"
+        ? "Groetjes,\n"
+        : formality === "formeel"
+          ? "Met vriendelijke groet,\n"
+          : "Hartelijke groet,\n";
+    const coreLine = instruction.product
+      ? "In de spotlight: " +
+        instruction.product.name +
+        (instruction.product.description
+          ? " — " + instruction.product.description
+          : "") +
+        "."
+      : r.product
+        ? "In de spotlight: " + r.product + "."
+        : "Dit concept draait om jouw idee:\n“" + r.prompt.trim() + "”";
+    const middle = [
+      intro,
+      coreLine,
+      instruction.useWebsite && r.profile.description
+        ? r.profile.description
+        : "",
+      instruction.offer ? "Bestaande aanbieding: " + instruction.offer + "." : "",
+    ].filter(Boolean);
+    const cta = instruction.cta || (r.variant % 2 ? "Lees meer" : "Bekijk de details");
+    const closingParagraph =
+      instruction.length === "kort"
+        ? ""
+        : (instruction.length === "lang"
+            ? "Heb je vragen? Antwoord gerust op deze e-mail, we denken graag met je mee.\n\n"
+            : "") +
+          "Wil je meer weten? " +
+          cta +
+          " of neem contact met ons op.\n\n";
     return {
       subject:
         (r.variant % 2 ? "Een update voor jou: " : "Ontdek: ") +
@@ -59,19 +117,14 @@ export const mockEmailText: EmailTextProvider = {
         150,
       ),
       body:
-        "Hallo,\n\n" +
-        (intro ? intro + "\n\n" : "") +
-        (r.product
-          ? "In de spotlight: " + r.product + "."
-          : "Dit concept draait om jouw idee:\n“" + r.prompt.trim() + "”") +
+        greeting +
         "\n\n" +
-        (r.useWebsite && r.profile.description
-          ? r.profile.description + "\n\n"
-          : "") +
-        (r.offer ? "Bestaande aanbieding: " + r.offer + "\n\n" : "") +
-        "Wil je meer weten? Bekijk de details of neem contact met ons op.\n\nHartelijke groet,\n" +
+        middle.join("\n\n") +
+        "\n\n" +
+        closingParagraph +
+        closing +
         (r.profile.name || "Ons team"),
-      cta: r.variant % 2 ? "Lees meer" : "Bekijk de details",
+      cta,
     };
   },
 };

@@ -73,30 +73,6 @@
   margin: 10px 0 20px;
   line-height: 1.7;
 }
-.campaign-channel {
-  padding: 25px;
-}
-.campaign-channel svg {
-  color: var(--primary);
-  margin-bottom: 14px;
-}
-.campaign-channel p {
-  font-size: 14px;
-  color: var(--muted);
-  margin: 9px 0 20px;
-}
-.campaign-example .feature-grid {
-  gap: 0;
-}
-.campaign-channel + .campaign-channel {
-  border-left: 1px solid var(--border);
-}
-.placeholder-links {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 24px;
-}
 .contacts-filter {
   max-width: 260px;
 }
@@ -208,10 +184,6 @@
   .feature-grid {
     grid-template-columns: 1fr;
   }
-  .campaign-channel + .campaign-channel {
-    border-left: 0;
-    border-top: 1px solid var(--border);
-  }
 }
 @media (max-width: 650px) {
   .sidebar {
@@ -281,8 +253,9 @@
   transition: background-color 200ms;
 }
 .sidebar-item.is-active {
-  background: #eeebfb;
+  background: var(--gradient-soft, #eeebfb);
   color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px rgba(109, 40, 217, 0.08);
 }
 .grouped-navigation .sidebar-item a {
   flex: 1;
@@ -381,7 +354,12 @@
 }
 .topbar {
   border-bottom: 1px solid #eae7f1;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px) saturate(1.4);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  position: sticky;
+  top: 0;
+  z-index: 15;
 }
 @media (prefers-reduced-motion: reduce) {
   .sidebar-submenu,

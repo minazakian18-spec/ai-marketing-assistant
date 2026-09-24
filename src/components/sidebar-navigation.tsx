@@ -5,29 +5,23 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { navigationGroups, navigationPath } from "@/lib/navigation";
 import { workspaceView } from "@/lib/workspace-navigation";
-import { useWorkspace } from "@/components/workspace-provider";
 const key = "mavix.sidebar.open-section.v1";
 const sections = [
   ["overview", "Overzicht"],
   ["assist", "Assist"],
   ["auto", "Auto Create"],
-  ["full", "Full Autopilot"],
 ] as const;
 export function SidebarNavigation({ onNavigate }: { onNavigate: () => void }) {
   const path = navigationPath(usePathname());
   const search = useSearchParams();
-  const { data } = useWorkspace();
   const [expanded, setExpanded] = useState<string | null>(null);
   const initialized = useRef(false);
   const previous = useRef(path + search.toString());
   const channel =
     path === "/instagram-ai" || path === "/email-ai" ? path : null;
-  const mode =
-    path === "/email-ai" ? data.email?.settings.mode : data.instagram?.mode;
   const view = workspaceView(
     search.get("tab"),
     !!(search.get("post") || search.get("campaign")),
-    mode || "assist",
   );
   const change = (value: string | null) => {
     setExpanded(value);

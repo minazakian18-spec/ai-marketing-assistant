@@ -1,22 +1,62 @@
 import type { ContentProviders, GenerationRequest } from "./contracts";
 import type { Post } from "../types";
+import {
+  buildInstagramInstruction,
+  isInstagramGoal,
+  type InstagramGoal,
+} from "../ai/instagram-instruction.ts";
+
+const goalIntros: Record<InstagramGoal, string[]> = {
+  "product-promotie": [
+    "Ontdek wat dit voor jou kan betekenen. ✨",
+    "Hier is iets moois voor je. 💜",
+  ],
+  aanbieding: ["Tijdelijk extra voordelig. 🔥", "Mis dit niet. ⏰"],
+  merkbekendheid: [
+    "Dit zijn wij. ✨",
+    "Een kijkje in ons verhaal. 💜",
+    "Tijd voor een nieuw perspectief. ✨",
+  ],
+  informatief: ["Goed om te weten: 📌", "Even dit delen: 💡"],
+  educatief: ["Vandaag leggen we uit: 📚", "Zo werkt het: 💡"],
+  seizoensgebonden: ["Het seizoen is aangebroken. 🍂", "Helemaal klaar voor dit moment. ✨"],
+  evenement: ["Zet het in je agenda. 📅", "We zien je daar graag. ✨"],
+  "nieuw-product": ["Gloednieuw. ✨", "Voor het eerst te zien: 👀"],
+  testimonial: ["In de woorden van een klant: 💬", "Dit raakte ons echt. 💜"],
+  engagement: ["Wij zijn benieuwd: 💬", "Vertel het ons: 👇"],
+};
+
 export const mockProviders: ContentProviders = {
   text: {
     async generate(r) {
-      const intro = [
-        "Een nieuw verhaal begint hier. ✨",
-        "Een kijkje in ons verhaal. 💜",
-        "Tijd voor een nieuw perspectief. ✨",
-      ][r.variant % 3];
+      const goal = isInstagramGoal(r.goal || "") ? (r.goal as InstagramGoal) : "merkbekendheid";
+      const instruction = buildInstagramInstruction({
+        profile: r.profile,
+        prompt: r.prompt,
+        type: r.type,
+        goal,
+        product: r.product,
+        segmentId: r.segmentId,
+        cta: r.cta,
+        useWebsite: r.useWebsite,
+      });
+      const intros = goalIntros[instruction.goal];
+      const intro = intros[r.variant % intros.length];
       const context = [
-        r.product ? "Product/dienst: " + r.product : "",
-        r.useWebsite
+        instruction.product
+          ? "Product/dienst: " + instruction.product.name
+          : r.product
+            ? "Product/dienst: " + r.product
+            : "",
+        instruction.segment ? "Specifiek voor: " + instruction.segment.name : "",
+        instruction.useWebsite
           ? "Opgeslagen bedrijfsomschrijving: " +
             (r.profile.description || "Nog niet ingevuld")
           : "",
       ]
         .filter(Boolean)
         .join("\n");
+      const ctaLine = instruction.cta ? "\n\n" + instruction.cta : "";
       return {
         caption:
           r.type === "Content Ideas"
@@ -27,7 +67,8 @@ export const mockProviders: ContentProviders = {
               r.prompt +
               (context ? "\n\n" + context : "") +
               "\n\n" +
-              (r.profile.name || "Jouw bedrijf"),
+              (r.profile.name || "Jouw bedrijf") +
+              ctaLine,
         hashtags: "#jouwverhaal #inspiratie #achterdeschermen",
       };
     },

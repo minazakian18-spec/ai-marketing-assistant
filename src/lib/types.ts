@@ -1,5 +1,8 @@
 import type { EmailCampaign, EmailSettings } from "./email-model";
 import type { InstagramSettings, ContentType } from "./instagram-model";
+import type { Review, ReviewAutoReplySettings } from "./review-model";
+import type { LibraryAsset } from "./library-model";
+import type { AudienceSegment, Product, BrandVoice } from "./brand-model";
 export type Profile = {
   name: string;
   industry: string;
@@ -18,6 +21,9 @@ export type Profile = {
   logo?: string;
   media?: string[];
   contentPreferences?: string;
+  segments?: AudienceSegment[];
+  productList?: Product[];
+  brandVoice?: BrandVoice;
 };
 export type Post = {
   id: string;
@@ -42,6 +48,19 @@ export type Post = {
   createdAt: string;
   variant: number;
 };
+export type ContactStatus = "Ingeschreven" | "Niet bevestigd" | "Uitgeschreven";
+export type Contact = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  group?: string;
+  status: ContactStatus;
+  source: "manual" | "import" | "sample";
+  createdAt: string;
+};
 export type Account = {
   firstName: string;
   lastName: string;
@@ -56,12 +75,23 @@ export type Notifications = {
   billing: boolean;
   updates: boolean;
 };
-export type Integrations = { instagram: boolean; email: boolean };
+export type Integrations = {
+  instagram: boolean;
+  email: boolean;
+  outlook: boolean;
+  googleBusiness: boolean;
+  website: boolean;
+  shopify: boolean;
+  woocommerce: boolean;
+};
 export type Workspace = {
   instagram?: InstagramSettings;
   email?: { settings: EmailSettings; campaigns: EmailCampaign[] };
+  review: { settings: ReviewAutoReplySettings; reviews: Review[] };
+  library: LibraryAsset[];
   profile: Profile;
   posts: Post[];
+  contacts: Contact[];
   account: Account;
   notifications: Notifications;
   integrations: Integrations;
