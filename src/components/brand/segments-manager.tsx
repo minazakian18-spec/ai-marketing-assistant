@@ -14,8 +14,8 @@ export function SegmentsManager() {
   const [deleteTarget, setDeleteTarget] = useState<AudienceSegment | null>(null);
   const [message, setMessage] = useState("");
 
-  function persist(next: AudienceSegment[], text: string) {
-    if (save({ ...data, profile: { ...data.profile, segments: next } }))
+  async function persist(next: AudienceSegment[], text: string) {
+    if (await save({ ...data, profile: { ...data.profile, segments: next } }))
       setMessage(text);
   }
 
@@ -73,7 +73,7 @@ export function SegmentsManager() {
       {ready && segments.length === 0 && (
         <p className="field-note">
           Nog geen segmenten toegevoegd. Voeg er minimaal één toe, bijvoorbeeld
-          "Jonge professionals" of "Zakelijke klanten".
+          &quot;Jonge professionals&quot; of &quot;Zakelijke klanten&quot;.
         </p>
       )}
       <div className="ig-settings-footer">
@@ -122,7 +122,7 @@ export function SegmentsManager() {
         }}
       >
         <p>
-          Weet je zeker dat je "{deleteTarget?.name}" wilt verwijderen? Dit kan
+          Weet je zeker dat je &quot;{deleteTarget?.name}&quot; wilt verwijderen? Dit kan
           niet ongedaan worden gemaakt.
         </p>
       </ConfirmDialog>

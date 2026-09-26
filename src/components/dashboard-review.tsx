@@ -36,9 +36,9 @@ export function DashboardReview() {
                 </Link>
                 <button
                   className="button primary"
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      save({
+                      await save({
                         ...data,
                         posts: data.posts.map((p) =>
                           p.id === post.id ? { ...p, status: "approved" } : p,

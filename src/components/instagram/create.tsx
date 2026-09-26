@@ -46,7 +46,7 @@ export function CreateStudio({
   editPost?: Post;
   initialDate?: string;
   initialType?: string;
-  onPersist: (post: Post) => boolean;
+  onPersist: (post: Post) => Promise<boolean>;
 }) {
   const [type, setType] = useState<ContentType>(
     (initialType && contentTypes.includes(initialType as ContentType)
@@ -122,7 +122,7 @@ export function CreateStudio({
         }),
       );
       if (again && post) next.id = post.id;
-      if (onPersist(next)) {
+      if (await onPersist(next)) {
         setPost(next);
         setCaption(next.caption);
         setHashtags(next.hashtags);
@@ -137,7 +137,7 @@ export function CreateStudio({
       setBusy(false);
     }
   }
-  function persist(approve = false) {
+  async function persist(approve = false) {
     if (!post) return;
     if (!caption.trim()) {
       setMessage("Vul een caption in.");
@@ -155,7 +155,7 @@ export function CreateStudio({
       status: approve ? (date ? "scheduled" : "approved") : "draft",
       failureReason: undefined,
     };
-    if (onPersist(next)) {
+    if (await onPersist(next)) {
       setPost(next);
       setMessage(
         approve

@@ -1,0 +1,10 @@
+import {createClient} from '@supabase/supabase-js';
+const SUPABASE_URL=process.env.SUPABASE_URL||process.env.NEXT_PUBLIC_SUPABASE_URL;
+const {SUPABASE_SERVICE_ROLE_KEY,OWNER_EMAIL,OWNER_PASSWORD,OWNER_NAME,OWNER_BUSINESS_NAME}=process.env;
+if(!SUPABASE_URL||!SUPABASE_SERVICE_ROLE_KEY||!OWNER_EMAIL||!OWNER_PASSWORD||OWNER_PASSWORD.length<16)throw new Error('Set server-only Supabase credentials, OWNER_EMAIL and a temporary OWNER_PASSWORD of at least 16 characters.');
+const db=createClient(SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+const {data,error}=await db.auth.admin.createUser({email:OWNER_EMAIL,password:OWNER_PASSWORD,email_confirm:true,user_metadata:{full_name:OWNER_NAME||'Owner',business_name:OWNER_BUSINESS_NAME||'Mavix'}});
+if(error||!data.user)throw new Error('Owner creation failed. Check provider admin tooling. Existing users are never overwritten.');
+const {data:member,error:memberError}=await db.from('workspace_members').select('role').eq('user_id',data.user.id).eq('role','OWNER').limit(1).maybeSingle();
+if(memberError||!member)throw new Error('User exists but workspace provisioning failed. Inspect the migration before retrying.');
+console.log('Owner account created. Rotate the temporary password immediately through password reset. Remove OWNER_PASSWORD from the environment.');

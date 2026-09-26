@@ -49,12 +49,12 @@ export function SegmentFormDialog({
       onClose={onClose}
       title={segment ? "Doelgroepsegment bewerken" : "Doelgroepsegment toevoegen"}
       confirmLabel={segment ? "Wijzigingen opslaan" : "Segment toevoegen"}
-      onConfirm={() => {
+      onConfirm={async () => {
         if (!name.trim()) {
           setError("Geef dit segment een naam, bijvoorbeeld 'Jonge professionals'.");
           return;
         }
-        onSave({
+        await onSave({
           id: segment?.id || crypto.randomUUID(),
           name: name.trim(),
           type,

@@ -26,9 +26,9 @@ export function BrandVoiceForm() {
   return (
     <form
       className="panel brand-section"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
-        if (save({ ...data, profile: { ...data.profile, brandVoice: form } }))
+        if (await save({ ...data, profile: { ...data.profile, brandVoice: form } }))
           setMessage("Merkstem opgeslagen.");
       }}
     >

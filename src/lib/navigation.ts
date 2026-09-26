@@ -12,7 +12,7 @@ import {
 export const navigationGroups = [
   {
     label: "OVERZICHT",
-    items: [{ href: "/", label: "Dashboard", icon: LayoutDashboard }],
+    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
     label: "CONTENT",

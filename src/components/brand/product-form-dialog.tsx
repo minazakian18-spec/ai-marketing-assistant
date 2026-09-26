@@ -45,7 +45,7 @@ export function ProductFormDialog({
       onClose={onClose}
       title={product ? "Product bewerken" : "Product toevoegen"}
       confirmLabel={product ? "Wijzigingen opslaan" : "Product toevoegen"}
-      onConfirm={() => {
+      onConfirm={async () => {
         if (!name.trim()) {
           setError("Geef het product of de dienst een naam.");
           return;
@@ -54,7 +54,7 @@ export function ProductFormDialog({
           setError("Gebruik een volledige link (http:// of https://).");
           return;
         }
-        onSave({
+        await onSave({
           id: product?.id || crypto.randomUUID(),
           name: name.trim(),
           photo: photo || undefined,

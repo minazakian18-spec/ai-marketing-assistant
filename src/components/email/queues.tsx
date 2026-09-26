@@ -15,7 +15,7 @@ export function EmailQueue({
   campaigns: EmailCampaign[];
   scheduled: boolean;
   onEdit: (c: EmailCampaign) => void;
-  onSave: (c: EmailCampaign) => boolean;
+  onSave: (c: EmailCampaign) => Promise<boolean>;
   onExamples: () => void;
 }) {
   const [message, setMessage] = useState("");
@@ -31,7 +31,7 @@ export function EmailQueue({
     .sort((a, b) =>
       (a.date || a.createdAt).localeCompare(b.date || b.createdAt),
     );
-  function approve(c: EmailCampaign) {
+  async function approve(c: EmailCampaign) {
     const error = campaignError(c);
     if (error) {
       setMessage(error);
@@ -39,7 +39,7 @@ export function EmailQueue({
     }
     const future = c.date && new Date(c.date).getTime() > Date.now();
     if (
-      onSave({
+      await onSave({
         ...c,
         status: future ? "scheduled" : "approved",
         date: future ? c.date : "",
@@ -179,8 +179,8 @@ export function EmailQueue({
                   {c.status !== "rejected" && (
                     <button
                       className="button secondary"
-                      onClick={() => {
-                        if (onSave({ ...c, status: "rejected", date: "" }))
+                      onClick={async () => {
+                        if (await onSave({ ...c, status: "rejected", date: "" }))
                           setMessage("Campagne afgewezen.");
                       }}
                     >

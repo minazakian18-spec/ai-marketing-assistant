@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           <X size={20} />
         </button>
-        <Link href="/" className="brand">
+        <Link href="/dashboard" className="brand">
           <Brand />
         </Link>
         <Suspense fallback={<p>Menu laden…</p>}>

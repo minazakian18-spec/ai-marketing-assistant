@@ -17,11 +17,11 @@ export function BrandAssets() {
       </div>
       {ready && (
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             const fields = new FormData(e.currentTarget);
             if (
-              save({
+              await save({
                 ...data,
                 profile: {
                   ...data.profile,
@@ -93,7 +93,7 @@ export function BrandAssets() {
                     setBusy(true);
                     try {
                       const [logo] = await readImages(files, 1);
-                      if (save({ ...data, profile: { ...data.profile, logo } }))
+                      if (await save({ ...data, profile: { ...data.profile, logo } }))
                         setMessage("Logo opgeslagen.");
                     } catch (error) {
                       setMessage(String(error));
@@ -108,8 +108,8 @@ export function BrandAssets() {
                   <img src={data.profile.logo} alt="Bedrijfslogo" />
                   <button
                     type="button"
-                    onClick={() =>
-                      save({ ...data, profile: { ...data.profile, logo: "" } })
+                    onClick={async () =>
+                      await save({ ...data, profile: { ...data.profile, logo: "" } })
                     }
                   >
                     Verwijderen
@@ -133,7 +133,7 @@ export function BrandAssets() {
                     try {
                       const media = await readImages(files);
                       if (
-                        save({ ...data, profile: { ...data.profile, media } })
+                        await save({ ...data, profile: { ...data.profile, media } })
                       )
                         setMessage("Bedrijfsfoto’s opgeslagen.");
                     } catch (error) {
@@ -155,8 +155,8 @@ export function BrandAssets() {
                     <button
                       type="button"
                       aria-label={"Verwijder bedrijfsfoto " + (i + 1)}
-                      onClick={() =>
-                        save({
+                      onClick={async () =>
+                        await save({
                           ...data,
                           profile: {
                             ...data.profile,

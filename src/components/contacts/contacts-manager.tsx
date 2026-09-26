@@ -147,8 +147,8 @@ export function ContactsManager() {
     });
   }, [contacts, search, filter]);
 
-  function persistContacts(next: Contact[], msg: string) {
-    if (save({ ...data, contacts: next })) setMessage(msg);
+  async function persistContacts(next: Contact[], msg: string) {
+    if (await save({ ...data, contacts: next })) setMessage(msg);
   }
   function upsertContact(contact: Contact) {
     const exists = contacts.some((c) => c.id === contact.id);

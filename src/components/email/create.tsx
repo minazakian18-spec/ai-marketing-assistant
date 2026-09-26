@@ -62,7 +62,7 @@ export function EmailCreate({
   initial?: EmailCampaign;
   initialDate?: string;
   initialAudience?: string;
-  onSave: (c: EmailCampaign) => boolean;
+  onSave: (c: EmailCampaign) => Promise<boolean>;
 }) {
   const [prompt, setPrompt] = useState(initial?.prompt || "");
   const [kind, setKind] = useState<EmailKind>(
@@ -117,7 +117,7 @@ export function EmailCreate({
       if (regenerate && campaign) next.id = campaign.id;
       const withDate =
         !regenerate && initialDate ? { ...next, date: initialDate } : next;
-      if (onSave(withDate)) {
+      if (await onSave(withDate)) {
         setCampaign(withDate);
         setEditing(false);
         setScheduling(false);
@@ -131,7 +131,7 @@ export function EmailCreate({
       setBusy(false);
     }
   }
-  function persist(status: EmailCampaign["status"]) {
+  async function persist(status: EmailCampaign["status"]) {
     if (!campaign) return;
     const next = {
       ...campaign,
@@ -150,7 +150,7 @@ export function EmailCreate({
       setMessage(error);
       return;
     }
-    if (onSave(next)) {
+    if (await onSave(next)) {
       setCampaign(next);
       setEditing(false);
       setScheduling(false);

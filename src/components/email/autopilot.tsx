@@ -35,7 +35,7 @@ export function EmailAutopilot({
   settings: EmailSettings;
   profile: Profile;
   campaigns: EmailCampaign[];
-  onSave: (s: EmailSettings) => boolean;
+  onSave: (s: EmailSettings) => Promise<boolean>;
   onRun: (s: EmailSettings, workflow: boolean) => Promise<void>;
   busy: boolean;
 }) {
@@ -70,9 +70,9 @@ export function EmailAutopilot({
           }
         }}
         className="ig-settings"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (valid() && onSave(form))
+          if (valid() && await onSave(form))
             setMessage("Email Autopilot-instellingen opgeslagen.");
         }}
       >

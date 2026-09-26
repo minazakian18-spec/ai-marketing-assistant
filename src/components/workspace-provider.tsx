@@ -1,151 +1,23 @@
 "use client";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
-import {
-  emptyWorkspace,
-  readWorkspace,
-  writeWorkspace,
-  removeWorkspace,
-} from "@/lib/storage";
-import { syncContacts } from "@/lib/contact-data";
-import { Toast } from "@/components/toast";
-import type { Workspace } from "@/lib/types";
-const Context = createContext<{
-  data: Workspace;
-  ready: boolean;
-  save: (data: Workspace, message?: string) => boolean;
-  signedOut: boolean;
-  logout: () => void;
-  resume: () => void;
-  deleteAccount: () => boolean;
-}>({
-  data: emptyWorkspace,
-  ready: false,
-  save: () => false,
-  signedOut: false,
-  logout: () => {},
-  resume: () => {},
-  deleteAccount: () => false,
-});
-const SESSION_KEY = "marketing-ai.signed-out";
-export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState(emptyWorkspace);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState("");
-  const [toast, setToast] = useState<{ id: number; message: string } | null>(
-    null,
-  );
-  const closeToast = useCallback(() => setToast(null), []);
-  const [signedOut, setSignedOut] = useState(false);
-  // Keep contact-data.ts's live bridge in sync before children render (not in
-  // an effect, which would run one tick too late and leave the first render
-  // after any data change reading stale contacts).
-  syncContacts(data.contacts);
-  useEffect(() => {
-    try {
-      setSignedOut(localStorage.getItem(SESSION_KEY) === "true");
-      setData(readWorkspace());
-    } catch {
-      setError(
-        "Je lokale gegevens konden niet worden geladen. Controleer de browseropslag.",
-      );
-    }
-    setReady(true);
-  }, []);
-  function save(next: Workspace, message?: string) {
-    try {
-      writeWorkspace(next);
-      const changedPost = next.posts.find(
-        (p) => p.status !== data.posts.find((old) => old.id === p.id)?.status,
-      );
-      const changedEmail = next.email?.campaigns.find(
-        (c) =>
-          c.status !==
-          data.email?.campaigns.find((old) => old.id === c.id)?.status,
-      );
-      const changed = changedEmail || changedPost;
-      const activated =
-        (next.email?.settings.enabled &&
-          next.email.settings.mode !== data.email?.settings.mode) ||
-        (next.instagram?.enabled &&
-          next.instagram.mode !== data.instagram?.mode);
-      const autoMessage =
-        changed?.status === "scheduled"
-          ? "Content ingepland"
-          : changed?.status === "approved"
-            ? "Content goedgekeurd"
-            : changed?.status === "rejected"
-              ? "Concept afgewezen"
-              : activated
-                ? "Autopilot geactiveerd"
-                : next.email !== data.email
-                  ? next.email?.campaigns !== data.email?.campaigns
-                    ? "Campagne opgeslagen"
-                    : "Autopilot-instellingen opgeslagen"
-                  : "Wijzigingen opgeslagen";
-      setToast({ id: Date.now(), message: message || autoMessage });
-      setData(next);
-      setError("");
-      return true;
-    } catch {
-      setError(
-        "Opslaan is niet gelukt. Controleer of je browser lokale opslag toestaat en voldoende ruimte heeft.",
-      );
-      return false;
-    }
-  }
-  function changeSession(out: boolean) {
-    try {
-      localStorage.setItem(SESSION_KEY, String(out));
-      setSignedOut(out);
-      setError("");
-    } catch {
-      setError(
-        "De lokale sessie kon niet worden bijgewerkt. Controleer je browseropslag.",
-      );
-    }
-  }
-  function deleteAccount() {
-    try {
-      removeWorkspace();
-      setData(structuredClone(emptyWorkspace));
-      setError("");
-      return true;
-    } catch {
-      setError(
-        "Verwijderen is niet gelukt. Controleer je browseropslag en probeer opnieuw.",
-      );
-      return false;
-    }
-  }
-  return (
-    <Context.Provider
-      value={{
-        data,
-        ready,
-        save,
-        signedOut,
-        logout: () => changeSession(true),
-        resume: () => changeSession(false),
-        deleteAccount,
-      }}
-    >
-      {error && (
-        <div role="alert" className="storage-error">
-          {error}
-        </div>
-      )}
-      {children}
-      {toast && (
-        <Toast key={toast.id} message={toast.message} onClose={closeToast} />
-      )}
-    </Context.Provider>
-  );
+import {createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
+import {emptyWorkspace} from '@/lib/storage';
+import {syncContacts} from '@/lib/contact-data';
+import {Toast} from '@/components/toast';
+import {authRequest} from '@/lib/auth-client';
+import type {Workspace} from '@/lib/types';
+const Context=createContext<{data:Workspace;ready:boolean;save:(data:Workspace,message?:string)=>Promise<boolean>;signedOut:boolean;logout:()=>void;resume:()=>void;deleteAccount:()=>boolean}>({data:emptyWorkspace,ready:false,save:async()=>false,signedOut:false,logout:()=>{},resume:()=>{},deleteAccount:()=>false});
+export function WorkspaceProvider({children}:{children:ReactNode}){
+ const [data,setData]=useState<Workspace>(()=>({...structuredClone(emptyWorkspace),contacts:[],library:[],review:{...emptyWorkspace.review,reviews:[]}}));
+ const [ready,setReady]=useState(false),[error,setError]=useState(''),[toast,setToast]=useState('');
+ const version=useRef(0),busy=useRef(false),role=useRef('MEMBER');const close=useCallback(()=>setToast(''),[]);
+ syncContacts(data.contacts);
+ useEffect(()=>{let active=true;fetch('/api/workspace',{cache:'no-store'}).then(async r=>{const result=await r.json();if(!r.ok)throw new Error(result.error||'Laden mislukt.');if(active){setData(result.data);version.current=result.version;role.current=result.role;setReady(true);}}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[]);
+ async function save(next:Workspace,message='Wijzigingen opgeslagen'){
+ if(!ready||busy.current){setError('Wacht tot de vorige wijziging is opgeslagen.');return false;}
+ if(role.current==='MEMBER'){setError('Je hebt geen toestemming om deze werkruimte te wijzigen.');return false;}
+ busy.current=true;setError('');
+ try { const response=await fetch('/api/workspace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:next,version:version.current})}); const result=await response.json();if(!response.ok)throw new Error(result.error||'Opslaan mislukt.'); version.current=result.version;setData(next);setToast(message);return true; } catch(e) {setError(e instanceof Error?e.message:'Opslaan mislukt.');return false;} finally {busy.current=false;}
+ }
+ return <Context.Provider value={{data,ready,save,signedOut:false,logout:()=>{void authRequest('logout').catch(e=>setError(e.message));},resume:()=>window.location.assign('/login'),deleteAccount:()=>{setError('Gebruik de beveiligde verwijderprocedure. Er zijn geen gegevens verwijderd.');return false;}}}>{error&&<div className="storage-error" role="alert">{error}</div>}{ready?children:<p role="status">{error?'Werkruimte niet beschikbaar.':'Werkruimte laden…'}</p>}{toast&&<Toast message={toast} onClose={close}/>}</Context.Provider>;
 }
-export const useWorkspace = () => useContext(Context);
+export const useWorkspace=()=>useContext(Context);

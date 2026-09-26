@@ -1,0 +1,4 @@
+import {NextResponse} from 'next/server';
+import {z} from 'zod';
+import {identity,sameOrigin,limited,failure,HttpError} from '@/lib/server/access';
+export async function PUT(request:Request){try{sameOrigin(request);const {db,user}=await identity();await limited('profile:'+user.id,20);const input=z.object({firstName:z.string().trim().max(100),lastName:z.string().trim().max(100),phone:z.string().max(30),photo:z.string().max(1500000).refine(v=>!v||/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v))}).parse(await request.json());const {error}=await db.from('profiles').update({first_name:input.firstName,last_name:input.lastName,full_name:[input.firstName,input.lastName].filter(Boolean).join(' '),phone:input.phone,photo:input.photo}).eq('id',user.id);if(error)throw error;return NextResponse.json({ok:true});}catch(e){if(e instanceof z.ZodError)return failure(new HttpError(400,'Controleer je profielgegevens.'));return failure(e);}}

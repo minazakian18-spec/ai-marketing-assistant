@@ -1,8 +1,19 @@
 # Overdracht Mavix
 
-Datum: 23 september 2026.
+Datum: 25 september 2026.
 Repository: https://github.com/minazakian18-spec/ai-marketing-assistant
 Lokale werkmap: C:\Documents\AIMI
+Live (indien gekoppeld): https://mavix.webbo-solutions.nl/ — controleer of deze omgeving dezelfde broncode gebruikt als deze werkmap voordat je aannames doet over wat live staat.
+
+## Publieke website vs. applicatie (25 september 2026)
+Mavix heeft nu een routingstructuur met drie groepen onder `src/app/`:
+- `(marketing)`: publieke marketingsite. `/` (homepage), `/pricing`, `/legal/*`. Gebruikt `src/components/marketing/*` en `src/app/marketing.css`. Geen `WorkspaceProvider`/sidebar.
+- `(auth)`: `/login`, `/register`, `/forgot-password`, `/reset-password`. Eigen minimale layout (geen marketing-nav/footer). Formulieren zijn UI-only met echte clientvalidatie; er is bewust GEEN echte authenticatielogica — dat is expliciet werk voor de backend/"Codex"-kant. Submit-knoppen tonen eerlijke "nog niet aangesloten"-status in plaats van te doen alsof inloggen werkt.
+- `(app)`: alle bestaande, al werkende functionaliteit (Dashboard nu op `/dashboard` in plaats van `/`, Instagram AI, Email AI, Review AI, Contentkalender, Brand Hub, Contacten, Inzichten, Library, Account). Ongewijzigde URL's, alleen verplaatst in de bestandsstructuur — bestaande interne links blijven werken.
+
+Belangrijk: er is nog geen echte sessie/auth-gate. `(app)`-routes zijn technisch nog steeds direct benaderbaar zonder in te loggen (zoals voorheen); alleen de UI-navigatie stuurt een nieuwe bezoeker nu eerst naar de marketingsite in plaats van rechtstreeks de werkruimte in. Echte routebeveiliging is expliciet backend-werk.
+
+Nog niet opgepakt in deze stap (bewust uitgesteld, niet vergeten): onboarding-wizard, Billing-pagina-uitbreiding (betaalmethodes, facturen, upgrade/downgrade), Integraties-pagina-uitbreiding (beperken tot Google Business Profile/Instagram/Gmail met gedetailleerde OAuth-states), Notificaties-uitbreiding (kanalen/ontvangers/quiet hours), Team & Gebruikers (nieuw), Privacy & Data-uitbreiding, en een brede design-system-consistentiepas. Zie de conversatie voor de volledige oorspronkelijke opdracht.
 
 ## Huidige versie
 Mavix is nog geen productie-SaaS, maar heeft sinds 23 september 2026 wel een echte backend-laag (zie hieronder). Next.js, React, TypeScript, Tailwind en gewone CSS. De package-lock.json legt de geïnstalleerde versies vast.

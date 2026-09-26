@@ -44,7 +44,7 @@ export function ContactFormDialog({
       onClose={onClose}
       title={contact ? "Contact bewerken" : "Contact toevoegen"}
       confirmLabel={contact ? "Wijzigingen opslaan" : "Contact toevoegen"}
-      onConfirm={() => {
+      onConfirm={async () => {
         const trimmedEmail = email.trim();
         if (!EMAIL_RE.test(trimmedEmail)) {
           setError("Vul een geldig e-mailadres in.");
@@ -54,7 +54,7 @@ export function ContactFormDialog({
           setError("Dit e-mailadres staat al in je contacten.");
           return;
         }
-        onSave({
+        await onSave({
           id: contact?.id || crypto.randomUUID(),
           firstName: firstName.trim(),
           lastName: lastName.trim(),

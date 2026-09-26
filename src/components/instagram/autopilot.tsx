@@ -62,7 +62,7 @@ export function AutopilotSettings({
 }: {
   settings: InstagramSettings;
   profile: Profile;
-  onSave: (s: InstagramSettings) => boolean;
+  onSave: (s: InstagramSettings) => Promise<boolean>;
   onRun: (s: InstagramSettings) => Promise<void>;
   busy: boolean;
 }) {
@@ -90,14 +90,14 @@ export function AutopilotSettings({
           }
         }}
         className="ig-settings"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           const error = settingsError(form);
           if (error) {
             setMessage(error);
             return;
           }
-          if (onSave(form)) setMessage("Autopilot-instellingen opgeslagen.");
+          if (await onSave(form)) setMessage("Autopilot-instellingen opgeslagen.");
         }}
       >
         <section className="panel ig-settings-card">

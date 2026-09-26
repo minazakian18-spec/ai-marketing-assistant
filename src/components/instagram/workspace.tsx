@@ -61,19 +61,19 @@ function Workspace() {
     );
     setMessage("");
   }
-  function persist(post: Post) {
-    return save({
+  async function persist(post: Post) {
+    return await save({
       ...data,
       posts: data.posts.some((p) => p.id === post.id)
         ? data.posts.map((p) => (p.id === post.id ? post : p))
         : [post, ...data.posts],
     });
   }
-  function examples() {
+  async function examples() {
     const added = samplePosts(new Date()).filter(
       (p) => !data.posts.some((existing) => existing.id === p.id),
     );
-    if (save({ ...data, posts: [...added, ...data.posts] }))
+    if (await save({ ...data, posts: [...added, ...data.posts] }))
       setMessage(
         added.length
           ? added.length + " lokale voorbeelditems toegevoegd."
@@ -156,7 +156,7 @@ function Workspace() {
             : undefined,
         });
       }
-      if (save({ ...data, instagram: s, posts: [...posts, ...data.posts] }))
+      if (await save({ ...data, instagram: s, posts: [...posts, ...data.posts] }))
         setMessage(
           posts.length +
             " mockitems gemaakt: " +
@@ -220,8 +220,8 @@ function Workspace() {
               {settings.mode !== "assist" && (
                 <button
                   className="button secondary"
-                  onClick={() =>
-                    save({
+                  onClick={async () =>
+                    await save({
                       ...data,
                       instagram: {
                         ...settings,
@@ -267,7 +267,7 @@ function Workspace() {
               key={settings.mode + settings.enabled}
               settings={settings}
               profile={data.profile}
-              onSave={(s) => save({ ...data, instagram: s })}
+              onSave={async (s) => await save({ ...data, instagram: s })}
               onRun={simulate}
               busy={busy}
             />

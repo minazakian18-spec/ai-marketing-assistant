@@ -1,3 +1,4 @@
+import { workspace, sameOrigin, limited, failure } from "@/lib/server/access";
 import { NextResponse } from "next/server";
 import { generateContent } from "@/lib/providers/mock";
 import type { GenerationRequest } from "@/lib/providers/contracts";
@@ -8,6 +9,8 @@ import type { GenerationRequest } from "@/lib/providers/contracts";
 // read. Swapping in a real provider later only changes that file — this
 // route, and the client that calls it, do not need to change.
 export async function POST(request: Request) {
+  try { sameOrigin(request); const auth = await workspace(); await limited("ai:"+auth.user.id,10); } catch(error) { return failure(error); }
+  if(process.env.ENABLE_DEMO_AI !== "true" || process.env.NODE_ENV === "production") return NextResponse.json({error:"AI-generatie is nog niet geconfigureerd. Er is geen content gegenereerd."},{status:503});
   let body: GenerationRequest;
   try {
     body = await request.json();

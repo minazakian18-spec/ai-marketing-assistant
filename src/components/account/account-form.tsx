@@ -53,10 +53,11 @@ export function AccountForm() {
       />
       <form
         onChange={() => setMessage("")}
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
+          try { const response=await fetch("/api/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(account)});const result=await response.json();if(!response.ok)throw new Error(result.error); } catch(error) {setMessage(error instanceof Error?error.message:"Profiel opslaan mislukt.");return;}
           if (
-            save({
+            await save({
               ...data,
               account,
               profile: {
@@ -132,6 +133,7 @@ export function AccountForm() {
                 <label key={key}>
                   {label}
                   <input
+                    readOnly={key === "email"}
                     type={type}
                     autoComplete={autocomplete}
                     maxLength={250}

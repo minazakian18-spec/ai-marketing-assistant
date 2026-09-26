@@ -52,8 +52,8 @@ function Workspace() {
     createdAt: c.createdAt,
     href: "/email-ai?tab=assist&campaign=" + encodeURIComponent(c.id),
   }));
-  function persist(c: EmailCampaign) {
-    return save({
+  async function persist(c: EmailCampaign) {
+    return await save({
       ...data,
       email: {
         settings,
@@ -82,7 +82,7 @@ function Workspace() {
     try {
       const result = await simulateEmail(s, data.profile, new Date(), workflow);
       if (
-        save({
+        await save({
           ...data,
           email: {
             settings: s,
@@ -128,7 +128,7 @@ function Workspace() {
         added.push(c);
       }
       if (
-        save({
+        await save({
           ...data,
           email: { settings, campaigns: [...added, ...campaigns] },
         })
@@ -232,8 +232,8 @@ function Workspace() {
               {settings.mode !== "assist" && (
                 <button
                   className="button secondary"
-                  onClick={() =>
-                    save({
+                  onClick={async () =>
+                    await save({
                       ...data,
                       email: {
                         campaigns,
@@ -286,8 +286,8 @@ function Workspace() {
               settings={settings}
               profile={data.profile}
               campaigns={campaigns}
-              onSave={(s) =>
-                save({ ...data, email: { settings: s, campaigns } })
+              onSave={async (s) =>
+                await save({ ...data, email: { settings: s, campaigns } })
               }
               onRun={run}
               busy={busy}

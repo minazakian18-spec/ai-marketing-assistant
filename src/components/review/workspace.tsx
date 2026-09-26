@@ -61,8 +61,8 @@ function Workspace() {
     ? (raw as ReviewTab)
     : "overview";
 
-  function updateReview(id: string, patch: Partial<Review>) {
-    save({
+  async function updateReview(id: string, patch: Partial<Review>) {
+    await save({
       ...data,
       review: {
         settings,
@@ -87,17 +87,17 @@ function Workspace() {
   function saveResponse(id: string, text: string) {
     updateReview(id, { aiResponse: text, status: "drafted" });
   }
-  function updateSettings(next: typeof settings) {
+  async function updateSettings(next: typeof settings) {
     const error = reviewSettingsError(next);
     if (error) {
       setMessage(error);
       return;
     }
-    save({ ...data, review: { settings: next, reviews } });
+    await save({ ...data, review: { settings: next, reviews } });
   }
   function simulate() {
     setBusy(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       const pick =
         newReviewPool[Math.floor(Math.random() * newReviewPool.length)];
       const id = "review-sim-" + Date.now();
@@ -123,7 +123,7 @@ function Workspace() {
         ...shell,
         aiResponse: regenerateResponse(shell, settings),
       };
-      save({ ...data, review: { settings, reviews: [newReview, ...reviews] } });
+      await save({ ...data, review: { settings, reviews: [newReview, ...reviews] } });
       setBusy(false);
     }, 550);
   }

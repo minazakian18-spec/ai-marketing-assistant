@@ -14,8 +14,8 @@ export function ProductsManager() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [message, setMessage] = useState("");
 
-  function persist(next: Product[], text: string) {
-    if (save({ ...data, profile: { ...data.profile, productList: next } }))
+  async function persist(next: Product[], text: string) {
+    if (await save({ ...data, profile: { ...data.profile, productList: next } }))
       setMessage(text);
   }
 
@@ -130,7 +130,7 @@ export function ProductsManager() {
         }}
       >
         <p>
-          Weet je zeker dat je "{deleteTarget?.name}" wilt verwijderen? Dit kan
+          Weet je zeker dat je &quot;{deleteTarget?.name}&quot; wilt verwijderen? Dit kan
           niet ongedaan worden gemaakt.
         </p>
       </ConfirmDialog>
