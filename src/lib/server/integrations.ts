@@ -14,3 +14,10 @@ export async function listReviews(workspaceId:string,pageToken=''){const {c}=awa
 export async function fetchReview(workspaceId:string,id:string){if(!/^[\w-]+$/.test(id))throw new HttpError(400,'Ongeldige review.');const {c}=await connectionToken(workspaceId,'google_business');return googleRequest(workspaceId,'google_business',`https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews/${id}`);}
 export async function replyToReview(workspaceId:string,id:string,comment:string){if(!/^[\w-]+$/.test(id)||!comment.trim()||comment.length>4096)throw new HttpError(400,'Ongeldig antwoord.');const {c}=await connectionToken(workspaceId,'google_business');return googleRequest(workspaceId,'google_business',`https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews/${id}/reply`,{method:'PUT',body:JSON.stringify({comment})});}
 export async function sendGmail(workspaceId:string,raw:string){return googleRequest(workspaceId,'gmail','https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',body:JSON.stringify({raw})});}
+function encodeSubject(subject:string){return /^[\x20-\x7e]*$/.test(subject)?subject:'=?UTF-8?B?'+Buffer.from(subject,'utf8').toString('base64')+'?=';}
+// RFC 2822 message, base64url-encoded for the Gmail API's `raw` field. `to`
+// is validated by the caller; subject/body are user input so newlines are
+// stripped from the subject line to prevent header injection into the
+// message we hand to Gmail.
+function buildRawMessage(to:string,subject:string,body:string){const lines=[`To: ${to}`,`Subject: ${encodeSubject(subject.replace(/[\r\n]+/g,' '))}`,'MIME-Version: 1.0','Content-Type: text/plain; charset="UTF-8"','Content-Transfer-Encoding: 8bit','',body];return Buffer.from(lines.join('\r\n'),'utf8').toString('base64url');}
+export async function sendTestEmail(workspaceId:string,to:string,subject:string,body:string){return sendGmail(workspaceId,buildRawMessage(to,subject,body));}

@@ -388,6 +388,24 @@
   align-self: flex-start;
   margin-top: auto;
 }
+.gmail-test-email {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.gmail-test-email label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.gmail-test-email .button {
+  align-self: flex-start;
+}
 .notification-row {
   padding: 23px 25px;
   display: flex;
