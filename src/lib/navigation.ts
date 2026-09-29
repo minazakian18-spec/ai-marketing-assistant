@@ -8,6 +8,7 @@ import {
   Palette,
   Star,
   Images,
+  Plug,
 } from "lucide-react";
 export const navigationGroups = [
   {
@@ -43,6 +44,7 @@ export const navigationGroups = [
     label: "MERK",
     items: [
       { href: "/brand-hub", label: "Brand Hub", icon: Palette },
+      { href: "/account/integraties", label: "Integraties", icon: Plug },
       { href: "/library", label: "Library", icon: Images },
     ],
   },
