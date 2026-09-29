@@ -96,20 +96,16 @@ function LoginForm() {
       </form>
       <div className="mkt-auth-divider">of</div>
       <GoogleButton label="Doorgaan met Google" />
-      {process.env.NODE_ENV === "development" && (
-        <>
-          <div className="mkt-auth-divider">of probeer de demo</div>
-          <button
-            type="button"
-            className="mkt-btn mkt-btn-primary"
-            style={{ width: "100%" }}
-            onClick={startDemo}
-          >
-            Testen zonder account
-          </button>
-          <p>Met voorbeeldgegevens. Wijzigingen blijven in deze browser.</p>
-        </>
-      )}
+      <div className="mkt-auth-divider">of probeer de demo</div>
+      <button
+        type="button"
+        className="mkt-btn mkt-btn-primary"
+        style={{ width: "100%" }}
+        onClick={startDemo}
+      >
+        Testen zonder account
+      </button>
+      <p>Met voorbeeldgegevens. Wijzigingen blijven in deze browser.</p>
     </AuthShell>
   );
 }

@@ -1,10 +1,14 @@
 export const DEMO_COOKIE = "mavix-local-demo";
-// A demo session only unlocks local UI; it never authenticates backend requests.
+// A demo session only unlocks local UI; it never authenticates backend
+// requests (proxy.ts blocks every /api/* call while this cookie is set,
+// regardless of environment). Available in production on purpose so visitors
+// can try the app without registering; real workspace data is never touched.
 export function demoSession(
   value: string | undefined,
   environment: string | undefined,
 ) {
-  return environment === "development" && value === "1";
+  void environment;
+  return value === "1";
 }
 export function isBrowserDemo() {
   return (
@@ -19,7 +23,6 @@ export function isBrowserDemo() {
   );
 }
 export function startDemo() {
-  if (process.env.NODE_ENV !== "development") return;
   document.cookie = DEMO_COOKIE + "=1; Path=/; SameSite=Lax";
   window.location.assign("/dashboard");
 }
