@@ -186,3 +186,7 @@ De bestaande CSS-motionlaag is uitgebreid met 220 ms pagina-intro's (8 px), KPI-
 Accordions gebruiken native `details` en CSS `::details-content` met `interpolate-size` voor openen én sluiten. Browsers zonder ondersteuning houden de gewone, functionele details-weergave. Toasts sluiten na vier seconden of handmatig met een korte reverse-animatie; hover/focus pauzeert de timer. Reduced motion schakelt niet-essentiële beweging uit.
 
 Geen animatielibrary, nieuwe API's of veranderingen aan de opslagstructuur toegevoegd. Browsercontroles omvatten accordion-sluiten, grafiekintro, modal/media-interactie, skeleton/toast, reduced motion, stabiele omliggende layout bij hover en desktop/tablet/mobile.
+
+### Testen zonder account
+
+Start `npm run dev` en open `/login`. Kies **Testen zonder account**. De demo gebruikt voorbeeldgegevens en bewaart wijzigingen in de browser. AI-generatie is gesimuleerd; backendfuncties zoals koppelingen, accountbeheer en facturatie vereisen een echt account. Via **Testmodus verlaten** keer je terug naar de login. De testmodus is uitsluitend beschikbaar tijdens development, niet in een productiebuild.

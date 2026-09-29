@@ -1,5 +1,6 @@
 "use client";
 import { Suspense, useState } from "react";
+import { startDemo } from "@/lib/demo";
 import { authRequest } from "@/lib/auth-client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -9,7 +10,7 @@ import { GoogleButton } from "@/components/auth/google-button";
 
 function LoginForm() {
   const search = useSearchParams();
-  const [feedback,setFeedback]=useState("");
+  const [feedback, setFeedback] = useState("");
   const sessionExpired = search.get("session") === "expired";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +22,14 @@ function LoginForm() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("loading");
-    try { const result = await authRequest('login', {email,password}); setFeedback(result.message || ''); setStatus('idle'); } catch (error) { setFeedback(error instanceof Error ? error.message : 'Probeer opnieuw.'); setStatus('error'); }
+    try {
+      const result = await authRequest("login", { email, password });
+      setFeedback(result.message || "");
+      setStatus("idle");
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Probeer opnieuw.");
+      setStatus("error");
+    }
   }
 
   return (
@@ -88,6 +96,20 @@ function LoginForm() {
       </form>
       <div className="mkt-auth-divider">of</div>
       <GoogleButton label="Doorgaan met Google" />
+      {process.env.NODE_ENV === "development" && (
+        <>
+          <div className="mkt-auth-divider">of probeer de demo</div>
+          <button
+            type="button"
+            className="mkt-btn mkt-btn-primary"
+            style={{ width: "100%" }}
+            onClick={startDemo}
+          >
+            Testen zonder account
+          </button>
+          <p>Met voorbeeldgegevens. Wijzigingen blijven in deze browser.</p>
+        </>
+      )}
     </AuthShell>
   );
 }

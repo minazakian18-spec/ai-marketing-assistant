@@ -1,9 +1,15 @@
+import {DEMO_COOKIE, demoSession} from '@/lib/demo';
 import {supabaseUrl,supabasePublicKey} from '@/lib/supabase-config';
 import {requiresAuthentication} from '@/lib/security';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 export async function proxy(request:NextRequest) {
  let response=NextResponse.next({request});
+ if(demoSession(request.cookies.get(DEMO_COOKIE)?.value,process.env.NODE_ENV)) {
+  if(request.nextUrl.pathname.startsWith('/api/')) return NextResponse.json({error:'Deze functie vereist een echt account. In de testmodus worden alleen lokale voorbeeldgegevens gebruikt.'},{status:403});
+  response.headers.set('Cache-Control','private, no-store');
+  return response;
+ }
  if(!supabaseUrl()||!supabasePublicKey()){if(requiresAuthentication(request.nextUrl.pathname))return NextResponse.redirect(new URL('/login?setup=required',request.url));return response;}
  const db=createServerClient(supabaseUrl(),supabasePublicKey(),{cookieOptions:{httpOnly:true,secure:process.env.APP_URL?.startsWith('https:'),sameSite:'lax',path:'/'},cookies:{getAll:()=>request.cookies.getAll(),setAll:values=>{for(const c of values)request.cookies.set(c.name,c.value);response=NextResponse.next({request});for(const c of values)response.cookies.set(c.name,c.value,c.options);}}});
  const {data}=await db.auth.getUser();

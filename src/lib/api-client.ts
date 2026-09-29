@@ -1,3 +1,4 @@
+import { isBrowserDemo } from "./demo";
 import type { GenerationRequest } from "./providers/contracts";
 import type { EmailRequest } from "./providers/email-mock";
 import type { Post } from "./types";
@@ -9,7 +10,10 @@ import type { EmailCampaign } from "./email-model";
 // Autopilot simulation loops still call the local mock functions directly
 // for now — batching many AI calls per click needs a proper backend job
 // design, which is a separate, later step.
-async function postJson<TResponse>(url: string, body: unknown): Promise<TResponse> {
+async function postJson<TResponse>(
+  url: string,
+  body: unknown,
+): Promise<TResponse> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -22,10 +26,22 @@ async function postJson<TResponse>(url: string, body: unknown): Promise<TRespons
   return response.json();
 }
 
-export function generateInstagramContent(request: GenerationRequest): Promise<Post> {
+export function generateInstagramContent(
+  request: GenerationRequest,
+): Promise<Post> {
+  if (isBrowserDemo())
+    return import("./providers/mock").then((module) =>
+      module.generateContent(request),
+    );
   return postJson<Post>("/api/generate/instagram", request);
 }
 
-export function generateEmailCampaign(request: EmailRequest): Promise<EmailCampaign> {
+export function generateEmailCampaign(
+  request: EmailRequest,
+): Promise<EmailCampaign> {
+  if (isBrowserDemo())
+    return import("./providers/email-mock").then((module) =>
+      module.generateEmail(request),
+    );
   return postJson<EmailCampaign>("/api/generate/email", request);
 }
