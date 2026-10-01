@@ -179,6 +179,20 @@
   font-weight: 600;
   color: var(--color-text);
 }
+.mkt-nav-login-link {
+  display: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.mkt-nav-login-link:hover {
+  color: var(--color-text);
+}
+@media (min-width: 761px) {
+  .mkt-nav-login-link {
+    display: inline-flex;
+  }
+}
 .mkt-agent-btn {
   display: inline-flex;
   align-items: center;
@@ -233,6 +247,12 @@
   color: #fff;
 }
 .mkt-nav-dark .mkt-nav-toggle {
+  color: #fff;
+}
+.mkt-nav-dark .mkt-nav-login-link {
+  color: rgba(255, 255, 255, 0.78);
+}
+.mkt-nav-dark .mkt-nav-login-link:hover {
   color: #fff;
 }
 .mkt-nav-dark .mkt-agent-btn {

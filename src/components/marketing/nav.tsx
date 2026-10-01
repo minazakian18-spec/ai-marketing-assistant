@@ -28,6 +28,9 @@ export function MarketingNav() {
           ))}
         </nav>
         <div className="mkt-nav-actions">
+          <Link href="/login" className="mkt-nav-login-link">
+            Inloggen
+          </Link>
           <Link href="/register" className="mkt-agent-btn">
             <Sparkle size={15} />
             Agent
