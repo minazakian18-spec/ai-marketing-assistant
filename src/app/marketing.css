@@ -1355,6 +1355,148 @@
   }
 }
 
+/* Core products (homepage) */
+.mkt-core-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.mkt-core-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  background: #fff;
+}
+.mkt-core-visual {
+  background: var(--gradient-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.mkt-core-stars {
+  display: flex;
+  gap: 2px;
+  color: #f5b400;
+}
+.mkt-core-insta-art {
+  width: 100%;
+  height: 54px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #f6a53d 0%, #ec5f8e 50%, #8b5cf6 100%);
+}
+.mkt-core-visual-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.mkt-core-visual-subject {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.mkt-core-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  margin-bottom: 6px;
+}
+.mkt-core-desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+@media (max-width: 760px) {
+  .mkt-core-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* How it works (homepage) */
+.mkt-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
+}
+.mkt-step {
+  text-align: center;
+  padding: 0 12px;
+}
+.mkt-step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-bg-soft-purple);
+  color: var(--color-primary-dark);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.mkt-step-icon {
+  display: block;
+  margin: 0 auto 10px;
+  color: var(--color-primary);
+}
+.mkt-step h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--color-text);
+}
+.mkt-step p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+@media (max-width: 760px) {
+  .mkt-steps-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+/* Integrations strip (homepage) */
+.mkt-integrations-strip {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.mkt-integration-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 20px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.mkt-integration-chip svg {
+  color: var(--color-primary);
+}
+
 /* Footer */
 .mkt-footer {
   border-top: 1px solid var(--border);
