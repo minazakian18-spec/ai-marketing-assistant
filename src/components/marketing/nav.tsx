@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X, Sparkle } from "lucide-react";
 import { Brand } from "@/components/brand";
 
@@ -11,12 +12,21 @@ const menuLinks = [
 
 export function MarketingNav() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const isHome = pathname === "/";
   return (
-    <header className="mkt-nav">
+    <header className={"mkt-nav" + (isHome ? " mkt-nav-dark" : "")}>
       <div className="mkt-nav-inner">
         <Link href="/" aria-label="Mavix home">
           <Brand />
         </Link>
+        <nav className="mkt-nav-links" aria-label="Navigatie">
+          {menuLinks.map((l) => (
+            <Link key={l.href} href={l.href}>
+              {l.label}
+            </Link>
+          ))}
+        </nav>
         <div className="mkt-nav-actions">
           <Link href="/register" className="mkt-agent-btn">
             <Sparkle size={15} />
