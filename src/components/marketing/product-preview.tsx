@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Star, Sparkles, CheckCheck, Send } from "lucide-react";
+import { Star, Sparkles, Instagram, Mail, CalendarDays } from "lucide-react";
 
 const steps = [
   {
-    label: "1. Review komt binnen",
+    label: "Review komt binnen",
     icon: Star,
     card: {
       title: "★★★★★ Lotte V.",
@@ -12,27 +12,35 @@ const steps = [
     },
   },
   {
-    label: "2. Mavix stelt een reactie voor",
+    label: "Mavix schrijft een reactie",
     icon: Sparkles,
     card: {
-      title: "AI-concept klaar",
-      body: "“Wat fijn om te lezen, Lotte! Dankjewel voor je vertrouwen — we hopen je snel weer te mogen verwelkomen.”",
+      title: "Reactie klaar",
+      body: "“Wat fijn om te lezen, Lotte! Dankjewel voor je vertrouwen.”",
     },
   },
   {
-    label: "3. Jij keurt goed",
-    icon: CheckCheck,
+    label: "Instagram-post wordt gemaakt",
+    icon: Instagram,
     card: {
-      title: "Goedgekeurd",
-      body: "Eén klik en de reactie staat klaar om gepubliceerd te worden.",
+      title: "Nieuwe post",
+      body: "Caption, hashtags en beeldconcept staan klaar om te bekijken.",
     },
   },
   {
-    label: "4. Reactie wordt geplaatst",
-    icon: Send,
+    label: "E-mailcampagne wordt klaargezet",
+    icon: Mail,
     card: {
-      title: "Gepubliceerd op Google",
-      body: "Je klant krijgt binnen enkele seconden een persoonlijk antwoord.",
+      title: "Nieuwsbrief",
+      body: "Onderwerp en inhoud zijn geschreven, klaar voor goedkeuring.",
+    },
+  },
+  {
+    label: "Alles komt in de kalender",
+    icon: CalendarDays,
+    card: {
+      title: "Deze week",
+      body: "3 posts, 1 nieuwsbrief — allemaal op hun plek.",
     },
   },
 ];
@@ -43,7 +51,7 @@ export function ProductPreview() {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const id = window.setInterval(() => {
       setActive((n) => (n + 1) % steps.length);
-    }, 3200);
+    }, 3800);
     return () => window.clearInterval(id);
   }, []);
   return (
@@ -52,7 +60,7 @@ export function ProductPreview() {
         <span className="mkt-preview-dot" />
         <span className="mkt-preview-dot" />
         <span className="mkt-preview-dot" />
-        <span className="mkt-preview-title">Review AI · Mavix werkruimte</span>
+        <span className="mkt-preview-title">Mavix werkruimte</span>
       </div>
       <div className="mkt-preview-body">
         {steps.map((step, i) => (

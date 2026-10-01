@@ -1,46 +1,36 @@
 import { Reveal } from "./reveal";
 
-// Placeholder testimonials — replace with real, verified customer quotes
-// before this ever ships publicly with real traffic.
-const testimonials = [
-  {
-    quote:
-      "“Voorbeeldtekst: Mavix bespaart ons elke week uren aan reviewbeheer.”",
-    name: "Voorbeeldklant",
-    role: "Placeholder — nog geen echte klant",
-  },
-  {
-    quote:
-      "“Voorbeeldtekst: onze Instagram voelt eindelijk consistent, zonder dat ik er zelf achter zit.”",
-    name: "Voorbeeldklant",
-    role: "Placeholder — nog geen echte klant",
-  },
-  {
-    quote:
-      "“Voorbeeldtekst: de contentkalender gaf ons voor het eerst overzicht.”",
-    name: "Voorbeeldklant",
-    role: "Placeholder — nog geen echte klant",
-  },
-];
+export type Testimonial = {
+  quote: string;
+  name: string;
+  role: string;
+  rating?: number;
+};
+
+// No fabricated quotes. Pass real, verified testimonials in here once they
+// exist — until then this list stays empty and the section renders nothing.
+const realTestimonials: Testimonial[] = [];
 
 export function Testimonials() {
+  if (realTestimonials.length === 0) return null;
   return (
-    <section className="mkt-section mkt-section-tight">
+    <section className="mkt-section mkt-section-tight" id="reviews">
       <div className="mkt-container">
         <Reveal>
           <div className="mkt-section-head">
-            <span className="mkt-eyebrow">Wat klanten zeggen</span>
-            <h2 className="mkt-h2">Binnenkort echte verhalen</h2>
-            <p className="mkt-lede">
-              Deze kaarten zijn placeholders totdat we ze vervangen door
-              geverifieerde klantervaringen.
-            </p>
+            <span className="mkt-eyebrow">Reviews</span>
+            <h2 className="mkt-h2">Wat klanten zeggen</h2>
           </div>
         </Reveal>
         <div className="mkt-testimonial-grid">
-          {testimonials.map((t, i) => (
+          {realTestimonials.map((t, i) => (
             <Reveal delay={i * 90} key={t.name + i}>
               <div className="mkt-testimonial-card">
+                {t.rating && (
+                  <span className="mkt-testimonial-rating">
+                    {"★".repeat(t.rating)}
+                  </span>
+                )}
                 <p>{t.quote}</p>
                 <div className="mkt-testimonial-person">
                   <span className="mkt-testimonial-avatar">
