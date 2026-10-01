@@ -78,6 +78,15 @@
 .cal-summary strong {
   color: var(--color-text);
 }
+.cal-sync-message {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: -10px 0 16px;
+}
+.cal-sync-message a {
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
 
 /* Month grid */
 .cal-month-grid {

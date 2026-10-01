@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, CalendarCheck } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { PageHeading } from "@/components/ui";
 import {
@@ -61,6 +62,8 @@ export default function CalendarPage() {
   const [selected, setSelected] = useState<CalendarItem | null>(null);
   const [feedback, setFeedback] = useState("");
   const [focusDate, setFocusDate] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
   const today = new Date();
   useEffect(() => {
     if (window.matchMedia("(max-width: 650px)").matches) setView("list");
@@ -86,6 +89,46 @@ export default function CalendarPage() {
     if (view === "week") next.setDate(next.getDate() + dir * 7);
     else next.setMonth(next.getMonth() + dir);
     setAnchor(next);
+  }
+  async function syncGoogleCalendar() {
+    const toSync = items
+      .filter((i) => i.date)
+      .map((i) => ({
+        id: i.id,
+        title: i.title || i.contentType || "Content",
+        date: i.date,
+        time: i.time,
+        channel: i.channel,
+        caption: i.caption,
+      }));
+    if (!toSync.length) {
+      setSyncMessage("Geen ingeplande content om te synchroniseren.");
+      return;
+    }
+    setSyncing(true);
+    setSyncMessage("");
+    try {
+      const r = await fetch("/api/integrations/google_calendar/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: toSync }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Synchroniseren is niet gelukt.");
+      const ok = d.results.filter((x: { ok: boolean }) => x.ok).length;
+      const failed = d.results.length - ok;
+      setSyncMessage(
+        failed
+          ? `${ok} van ${d.results.length} items gesynchroniseerd, ${failed} mislukt.`
+          : `${ok} ${ok === 1 ? "item" : "items"} gesynchroniseerd met Google Calendar.`,
+      );
+    } catch (e) {
+      setSyncMessage(
+        e instanceof Error ? e.message : "Synchroniseren is niet gelukt.",
+      );
+    } finally {
+      setSyncing(false);
+    }
   }
   function handleMore(dateKey: string) {
     setFocusDate(dateKey);
@@ -317,9 +360,24 @@ export default function CalendarPage() {
               Lijst
             </button>
           </div>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={syncing}
+            onClick={() => void syncGoogleCalendar()}
+          >
+            <CalendarCheck size={16} />
+            {syncing ? "Bezig met synchroniseren…" : "Synchroniseer met Google Calendar"}
+          </button>
           <AddContentMenu />
         </div>
       </div>
+      {syncMessage && (
+        <p role="status" className="cal-sync-message">
+          {syncMessage}{" "}
+          <Link href="/account/integraties">Koppeling beheren</Link>
+        </p>
+      )}
       <div className="cal-filters" role="group" aria-label="Filter op kanaal">
         {CHANNELS.map((c) => (
           <button
