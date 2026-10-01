@@ -281,6 +281,99 @@
   }
 }
 
+/* Hero — dark homepage variant (not used by pricing/login/etc, which keep .mkt-hero light) */
+.mkt-hero-dark {
+  background:
+    radial-gradient(ellipse 900px 480px at 18% -10%, rgba(139, 92, 246, 0.35), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 20%, rgba(76, 29, 149, 0.4), transparent 55%),
+    linear-gradient(165deg, #0f0a1f 0%, #1c1038 42%, #2c1960 100%);
+  padding: 56px 0 0;
+  position: relative;
+}
+.mkt-hero-dark .mkt-h1,
+.mkt-hero-dark .mkt-h1 em {
+  color: #fff;
+}
+.mkt-hero-dark .mkt-h1 em {
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 55%, #e9d5ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.mkt-hero-dark .mkt-hero-lede {
+  color: #cabef0;
+}
+.mkt-hero-dark .mkt-promo-line {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6d9ff;
+}
+.mkt-hero-dark .mkt-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Agent prompt bar */
+.mkt-agent-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 7px 8px 7px 20px;
+  backdrop-filter: blur(6px);
+}
+.mkt-agent-prompt-icon {
+  color: #c4b5fd;
+  flex-shrink: 0;
+}
+.mkt-agent-prompt input {
+  flex: 1;
+  background: none;
+  border: 0;
+  color: #fff;
+  font-size: 15px;
+  min-width: 0;
+}
+.mkt-agent-prompt input::placeholder {
+  color: #a797d6;
+}
+.mkt-agent-prompt input:focus {
+  outline: none;
+}
+.mkt-agent-prompt button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 0;
+  background: #fff;
+  color: #2c1960;
+  transition: transform 160ms;
+}
+.mkt-agent-prompt button:hover {
+  transform: scale(1.05);
+}
+
+/* Small tab label above the product preview */
+.mkt-hero-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e6d9ff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 7px 14px;
+  border-radius: 999px;
+  margin-top: 26px;
+}
+
 /* Animated product preview card */
 .mkt-preview-card {
   background: #fff;
