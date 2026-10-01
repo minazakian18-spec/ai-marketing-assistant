@@ -6,6 +6,15 @@
   background: var(--bg);
   overflow-x: clip;
 }
+/* globals.css has a bare `main { max-width; margin; padding }` rule meant
+   for the authenticated app shell; neutralize it here since marketing
+   pages also render inside a plain <main>. */
+.mkt main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+}
 .mkt-container {
   max-width: var(--mkt-container);
   margin: 0 auto;
