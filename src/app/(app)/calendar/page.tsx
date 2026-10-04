@@ -297,8 +297,8 @@ export default function CalendarPage() {
   return (
     <>
       <PageHeading
-        eyebrow="VOORUITKIJKEN"
-        title="Contentkalender"
+        eyebrow="Werkruimte"
+        title="Kalender"
         description="Geef je ideeën een plek in de planning."
       />
       <div className="cal-toolbar">
@@ -448,8 +448,7 @@ export default function CalendarPage() {
         />
       )}
       <p className="calendar-disclaimer">
-        De planning is lokaal. Posts en e-mails worden niet automatisch
-        gepubliceerd of verstuurd.
+        Posts en e-mails worden niet automatisch gepubliceerd of verstuurd.
       </p>
       <CalendarDetailPanel
         item={selected}

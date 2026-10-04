@@ -56,7 +56,7 @@ export default function LibraryPage() {
     setMessage(
       "Download '" +
         asset.name +
-        "' en upload het bestand bij Instagram AI of Email AI om het te gebruiken. Rechtstreeks kiezen vanuit Library volgt in een latere stap.",
+        "' en upload het bestand bij Social of E-mail om het te gebruiken. Rechtstreeks kiezen vanuit de Bibliotheek volgt in een latere stap.",
     );
   }
   function handleDownload(asset: LibraryAsset) {
@@ -100,9 +100,9 @@ export default function LibraryPage() {
   return (
     <>
       <PageHeading
-        eyebrow="MERK"
-        title="Library"
-        description="Al je afbeeldingen, video's, logo's en AI-creaties op één plek."
+        eyebrow="Merk"
+        title="Bibliotheek"
+        description="Al je afbeeldingen, video's, logo's en creaties op één plek."
         action={
           <>
             <input

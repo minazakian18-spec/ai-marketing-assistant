@@ -122,7 +122,7 @@ export function EmailCreate({
         setEditing(false);
         setScheduling(false);
         setMessage(
-          "Mockconcept gemaakt en lokaal opgeslagen. Controleer de inhoud.",
+          "Concept gemaakt. Controleer de inhoud.",
         );
       }
     } catch {
@@ -284,8 +284,8 @@ export function EmailCreate({
           />
           <p className="field-note">
             Producten en aanbiedingen komen uit{" "}
-            <Link href="/brand-hub">Brand Hub</Link>. Doelgroepen delen de
-            mockdata van <Link href="/contacten">Contacten</Link>.
+            <Link href="/brand-hub">Brand Hub</Link>. Doelgroepen komen uit
+            de gegevens van <Link href="/contacten">Contacten</Link>.
           </p>
           <button
             className="button primary full"

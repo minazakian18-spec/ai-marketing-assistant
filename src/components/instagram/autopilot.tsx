@@ -150,7 +150,7 @@ export function AutopilotSettings({
               : "Mavix bedenkt, maakt, plant en publiceert zelfstandig binnen jouw ingestelde regels."}
           </p>
           <p className="field-note">
-            Alleen een lokale simulatie. Er draait geen achtergrondtaak en er
+            Dit is een simulatie. Er draait geen achtergrondtaak en er
             wordt niets echt gepubliceerd.
           </p>
         </section>

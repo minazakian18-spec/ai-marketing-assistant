@@ -72,7 +72,7 @@ export function AccountMenu() {
                 .filter(Boolean)
                 .join(" ") || "Mijn account"}
             </strong>
-            <span>{data.account.email || "Lokale werkruimte"}</span>
+            {data.account.email && <span>{data.account.email}</span>}
           </div>
           <nav aria-label="Account">
             {accountLinks.map(([href, label, Icon]) => (

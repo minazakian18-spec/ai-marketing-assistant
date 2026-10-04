@@ -20,15 +20,15 @@ export function ReviewSettings({
           <div>
             <h2>Google Business Profile</h2>
             <p>
-              Nog niet gekoppeld. Zodra deze integratie beschikbaar is, haalt
-              Mavix je echte reviews automatisch op.
+              Koppel je profiel via Integraties. Het automatisch ophalen van
+              je echte reviews in deze werkruimte volgt in een volgende fase.
             </p>
           </div>
         </div>
-        <button className="button secondary" disabled title="Binnenkort beschikbaar">
+        <Link className="button secondary" href="/account/integraties">
           <ShieldCheck size={16} />
-          Binnenkort beschikbaar
-        </button>
+          Koppelen
+        </Link>
       </div>
 
       <section className="panel channel-summary">
@@ -57,7 +57,7 @@ export function ReviewSettings({
         <div className="notification-row">
           <div>
             <h3>Nieuwe review binnengekomen</h3>
-            <p>Ontvang een melding zodra er een nieuwe demo-review binnenkomt.</p>
+            <p>Ontvang een melding zodra er een nieuwe review binnenkomt.</p>
           </div>
           <button
             type="button"
@@ -95,8 +95,8 @@ export function ReviewSettings({
         </div>
       </div>
       <p className="field-note">
-        Demo-instellingen worden lokaal in je werkruimte bewaard zolang je op
-        deze pagina blijft. Er is geen echte koppeling met Google actief.
+        Automatisch reageren op Google vereist een gekoppeld Google Business
+        Profile.
       </p>
     </section>
   );

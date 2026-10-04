@@ -6,7 +6,7 @@ import { usePresence } from "@/components/use-presence";
 // Instagram Post/Story/Reel each map to an existing ContentType (see
 // instagram-model.ts) via the "type" query param, which create.tsx already
 // reads. "Campagne" is not a separate creation surface: it's an e-mail kind
-// (see the CHANNELS comment in contentkalender/page.tsx), so it isn't listed
+// (see the CHANNELS comment in calendar/page.tsx), so it isn't listed
 // here as a distinct destination.
 const instagramOptions = [
   ["Post", "Instagram post", Instagram],
@@ -84,7 +84,7 @@ export function AddContentMenu({
             <Link
               key={type}
               href={
-                "/instagram-ai?tab=assist" +
+                "/social?tab=assist" +
                 suffix +
                 "&type=" +
                 encodeURIComponent(type)
@@ -95,7 +95,7 @@ export function AddContentMenu({
             </Link>
           ))}
           <Link
-            href={"/email-ai?tab=assist" + suffix}
+            href={"/email?tab=assist" + suffix}
             onClick={() => setOpen(false)}
           >
             <Mail size={16} /> E-mail maken

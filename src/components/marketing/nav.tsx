@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, Sparkle } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Brand } from "@/components/brand";
+import { Mavi } from "@/components/mavi";
 import { AgentDrawer } from "./agent-drawer";
 
 const menuLinks = [
@@ -60,7 +61,7 @@ export function MarketingNav() {
                 setAgentOpen(true);
               }}
             >
-              <Sparkle size={15} />
+              <Mavi size={15} />
               Agent
             </button>
             <button

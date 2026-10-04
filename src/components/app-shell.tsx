@@ -2,14 +2,24 @@
 import Link from "next/link";
 import { Brand } from "@/components/brand";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, PanelLeftClose, Menu, X } from "lucide-react";
-import { Suspense, useState, useEffect, useRef, type ReactNode } from "react";
+import { Menu, X } from "lucide-react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { AccountMenu } from "@/components/account/account-menu";
 import { accountLinks } from "@/components/account/account-nav";
 import { useWorkspace } from "@/components/workspace-provider";
-import { navigationGroups, navigationPath } from "@/lib/navigation";
-import { SidebarNavigation } from "@/components/sidebar-navigation";
-const links = navigationGroups.flatMap((group) => group.items);
+import {
+  navigationGroups,
+  navigationPath,
+  systemNavigation,
+} from "@/lib/navigation";
+import {
+  SidebarNavigation,
+  SystemNavigation,
+} from "@/components/sidebar-navigation";
+const links = [
+  ...navigationGroups.flatMap((group) => group.items),
+  ...systemNavigation,
+];
 export function AppShell({ children }: { children: ReactNode }) {
   const path = navigationPath(usePathname());
   const [open, setOpen] = useState(false);
@@ -60,7 +70,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       toggle.current?.focus();
     };
   }, [open, mobile]);
-  const { signedOut, resume } = useWorkspace();
+  const { signedOut, resume, data } = useWorkspace();
+  const fullName = [data.account.firstName, data.account.lastName]
+    .filter(Boolean)
+    .join(" ");
   if (signedOut)
     return (
       <div className="signed-out-page">
@@ -112,29 +125,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link href="/dashboard" className="brand">
           <Brand />
         </Link>
-        <Suspense fallback={<p>Menu laden…</p>}>
-          <SidebarNavigation onNavigate={() => setOpen(false)} />
-        </Suspense>
+        <SidebarNavigation onNavigate={() => setOpen(false)} />
         <div className="sidebar-bottom">
-          <div className="local-card">
-            <span className="live-dot" /> Jouw creatieve werkruimte
-            <p>
-              Van eerste idee naar een
-              <br />
-              sterk verhaal.
-            </p>
-            <Link href="/instagram-ai" onClick={() => setOpen(false)}>
-              Aan de slag <ArrowUpRight size={16} />
-            </Link>
-          </div>
-          <div className="workspace-user">
-            <span className="avatar">M</span>
-            <div>
-              <strong>Mijn werkruimte</strong>
-              <p>Lokale MVP</p>
-            </div>
-            <PanelLeftClose size={17} />
-          </div>
+          <SystemNavigation onNavigate={() => setOpen(false)} />
+          <Link
+            href="/account"
+            className="sidebar-user"
+            onClick={() => setOpen(false)}
+          >
+            <span className="sidebar-user-avatar">
+              {data.account.photo ? (
+                <img src={data.account.photo} alt="" />
+              ) : (
+                (fullName[0] || data.account.email[0] || "M").toUpperCase()
+              )}
+            </span>
+            <span className="sidebar-user-text">
+              <strong>{fullName || "Mijn account"}</strong>
+              {data.account.email && <small>{data.account.email}</small>}
+            </span>
+          </Link>
         </div>
       </aside>
       <div className="main-shell" inert={mobile && open}>
@@ -148,9 +158,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </strong>
           </span>
           <div className="topbar-right">
-            <span className="local-pill">
-              <span className="live-dot" /> Lokaal opgeslagen
-            </span>
             <AccountMenu />
           </div>
         </div>
@@ -159,10 +166,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             {children}
           </div>
         </main>
-        <footer>
-          Mavix <span>Meer ruimte voor jouw ideeën.</span>
-          <span className="footer-right">MVP · Geen externe koppelingen</span>
-        </footer>
       </div>
     </div>
   );

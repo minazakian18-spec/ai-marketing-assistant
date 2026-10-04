@@ -30,7 +30,7 @@ export function DashboardReview() {
               <div className="review-actions">
                 <Link
                   className="button secondary"
-                  href={"/instagram-ai?post=" + post.id}
+                  href={"/social?post=" + post.id}
                 >
                   Bekijken
                 </Link>
@@ -81,7 +81,7 @@ export function DashboardReview() {
             .map((post) => (
               <Link
                 className="activity-row"
-                href={"/instagram-ai?post=" + post.id}
+                href={"/social?post=" + post.id}
                 key={post.id}
               >
                 <div>

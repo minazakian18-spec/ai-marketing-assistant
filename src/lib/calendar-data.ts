@@ -50,7 +50,7 @@ function postToItem(p: Post): CalendarItem {
     caption: p.caption,
     createdBy: p.source === "autopilot" ? "mavix-ai" : "user",
     automated: p.source === "autopilot",
-    href: "/instagram-ai?post=" + encodeURIComponent(p.id),
+    href: "/social?post=" + encodeURIComponent(p.id),
     variant: p.variant,
     source: { kind: "post", id: p.id },
   };
@@ -70,7 +70,7 @@ function emailToItem(c: EmailCampaign): CalendarItem {
     caption: c.subject,
     createdBy: c.source === "autopilot" ? "mavix-ai" : "user",
     automated: c.source === "autopilot",
-    href: "/email-ai?tab=create&campaign=" + encodeURIComponent(c.id),
+    href: "/email?tab=create&campaign=" + encodeURIComponent(c.id),
     variant: c.variant,
     source: { kind: "email", id: c.id },
   };

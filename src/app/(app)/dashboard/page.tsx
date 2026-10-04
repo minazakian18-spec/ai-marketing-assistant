@@ -1,270 +1,343 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
-  ArrowUp,
+  ArrowRight,
   ArrowUpRight,
-  Sparkles,
+  Star,
   Instagram,
   Mail,
   CalendarDays,
   Building2,
   CheckCheck,
-  Orbit,
+  AlertTriangle,
+  Plug,
+  Plus,
 } from "lucide-react";
+import { Mavi } from "@/components/mavi";
 import { useWorkspace } from "@/components/workspace-provider";
 import { readiness } from "@/lib/instagram-model";
+import { useConnections } from "@/lib/use-connections";
 import {
   localDashboardItems,
   emailDashboardItems,
   shortDate,
 } from "@/lib/dashboard-data";
-import "../../home.css";
-const actions = [
-  {
-    label: "Instagram-post maken",
-    href: "/instagram-ai?tab=assist",
-    Icon: Instagram,
-  },
-  { label: "E-mail maken", href: "/email-ai?tab=assist", Icon: Mail },
-  { label: "Content plannen", href: "/contentkalender", Icon: CalendarDays },
-  { label: "Autopilot instellen", href: "/instagram-ai?tab=auto", Icon: Orbit },
-];
-function AiCommandBox() {
-  const [prompt, setPrompt] = useState("");
-  const [response, setResponse] = useState<{
-    label: string;
-    href: string;
-  } | null>(null);
+
+function greeting(hour: number) {
+  if (hour < 12) return "Goedemorgen";
+  if (hour < 18) return "Goedemiddag";
+  return "Goedenavond";
+}
+
+// A metric tile. Without a connected source it never shows a number, only a
+// way to connect it.
+function Kpi({
+  label,
+  icon,
+  connected,
+  connectLabel,
+}: {
+  label: string;
+  icon: ReactNode;
+  connected: boolean;
+  connectLabel: string;
+}) {
   return (
-    <>
-      <form
-        className="home-composer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!prompt.trim()) return;
-          const text = prompt.toLowerCase();
-          const action = /autopilot|automatisch/.test(text)
-            ? actions[3]
-            : /plan|kalender/.test(text)
-              ? actions[2]
-              : /mail|nieuwsbrief/.test(text)
-                ? actions[1]
-                : actions[0];
-          setResponse(action);
-        }}
-      >
-        <label className="home-composer-label" htmlFor="home-command">
-          <Sparkles size={18} /> Jouw marketing begint met een idee
-        </label>
-        <div>
-          <textarea
-            id="home-command"
-            aria-label="Marketingopdracht"
-            placeholder="Vraag Mavix iets of geef een marketingopdracht..."
-            value={prompt}
-            onChange={(e) => {
-              setPrompt(e.target.value);
-              setResponse(null);
-            }}
-            rows={3}
-          />
-          <button
-            type="submit"
-            aria-label="Opdracht versturen"
-            disabled={!prompt.trim()}
-          >
-            <ArrowUp size={21} />
-          </button>
-        </div>
-        <small>Lokale assistent · geen echte AI-koppeling</small>
-      </form>
-      {response && (
-        <div className="home-response" role="status">
-          <span>
-            Voor deze opdracht kun je verder in de onderstaande werkruimte. Er
-            is nog niets gegenereerd of gepland.
-          </span>
-          <Link href={response.href}>
-            {response.label}
-            <ArrowUpRight size={15} />
-          </Link>
-        </div>
+    <article className="dash-kpi">
+      <div className="dash-kpi-head">
+        <span>{label}</span>
+        {icon}
+      </div>
+      <strong>—</strong>
+      {connected ? (
+        <p>Gekoppeld · cijfers nog niet beschikbaar</p>
+      ) : (
+        <Link href="/account/integraties">
+          {connectLabel} <ArrowRight size={13} />
+        </Link>
       )}
-    </>
+    </article>
   );
 }
-function TodayItem({
-  icon,
+
+function Summary({
   title,
-  detail,
+  icon,
+  rows,
+  connected,
+  cta,
   href,
 }: {
-  icon: ReactNode;
   title: string;
-  detail: string;
+  icon: ReactNode;
+  rows: string[];
+  connected: boolean;
+  cta: string;
   href: string;
 }) {
   return (
-    <li>
-      <span className="home-row-icon">{icon}</span>
-      <div>
-        <strong>{title}</strong>
-        <small>{detail}</small>
+    <section className="panel dash-summary">
+      <div className="dash-block-head">
+        <h2>
+          {icon}
+          {title}
+        </h2>
+        <Link className="text-link" href={href}>
+          Openen <ArrowUpRight size={14} />
+        </Link>
       </div>
-      <Link href={href}>
-        Bekijk <ArrowUpRight size={15} />
-      </Link>
-    </li>
+      <dl>
+        {rows.map((label) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>—</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="dash-summary-note">
+        {connected ? (
+          "Gekoppeld. Statistieken verschijnen hier zodra ze beschikbaar zijn."
+        ) : (
+          <Link href="/account/integraties">
+            <Plug size={14} />
+            {cta}
+          </Link>
+        )}
+      </p>
+    </section>
   );
 }
-export default function Home() {
+
+export default function Dashboard() {
   const { data, ready } = useWorkspace();
-  if (!ready) return <p role="status">Je werkruimte laden…</p>;
-  const profile = data.profile;
-  const brand = readiness(profile);
+  const { status } = useConnections();
+  const router = useRouter();
+  const [prompt, setPrompt] = useState("");
+  if (!ready) return <p role="status">Dashboard laden…</p>;
+
+  const now = new Date();
+  const brand = readiness(data.profile);
   const items = [
     ...localDashboardItems(data.posts),
     ...emailDashboardItems(data.email?.campaigns || []),
   ];
-  const reviews = items.filter((i) => i.status === "review");
-  const blocked = items.filter(
+  const review = items.filter((i) => i.status === "review");
+  const failed = items.filter(
     (i) => i.status === "blocked" || i.status === "failed",
   );
   const upcoming = items
-    .filter((i) => i.status === "scheduled" && new Date(i.date) > new Date())
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const rows: {
+    .filter((i) => i.status === "scheduled" && new Date(i.date) > now)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 4);
+  const google = status("google_business");
+  const instagram = status("instagram");
+
+  const actions: {
     title: string;
     detail: string;
     href: string;
     icon: ReactNode;
+    tone?: "warn";
   }[] = [];
-  if (reviews.length)
-    rows.push({
-      title: `${reviews.length} ${reviews.length === 1 ? "concept wacht" : "concepten wachten"} op goedkeuring`,
-      detail: "Een laatste blik voordat je content verder kan",
-      href: reviews[0].href,
-      icon: <CheckCheck size={18} />,
+  if (failed.length)
+    actions.push({
+      title: `${failed.length} gepland ${failed.length === 1 ? "item heeft" : "items hebben"} aandacht nodig`,
+      detail: "Geblokkeerd of mislukt",
+      href: failed[0].href,
+      icon: <AlertTriangle size={16} />,
+      tone: "warn",
     });
-  if (blocked.length)
-    rows.push({
-      title: `${blocked.length} geplande items hebben aandacht nodig`,
-      detail: "Bekijk de geblokkeerde of mislukte content",
-      href: blocked[0].href,
-      icon: <CalendarDays size={18} />,
+  for (const [provider, label] of [
+    ["google_business", "Google Business Profile"],
+    ["gmail", "Gmail"],
+    ["google_calendar", "Google Calendar"],
+  ] as const) {
+    const s = status(provider);
+    if (s === "reconnect_required" || s === "permission_missing" || s === "error")
+      actions.push({
+        title: `${label} opnieuw koppelen`,
+        detail: "De koppeling werkt niet meer",
+        href: "/account/integraties",
+        icon: <Plug size={16} />,
+        tone: "warn",
+      });
+  }
+  if (google === "selection_required")
+    actions.push({
+      title: "Kies je bedrijfslocatie",
+      detail: "Google Business Profile is gekoppeld, maar nog zonder locatie",
+      href: "/account/integraties",
+      icon: <Star size={16} />,
     });
-  for (const item of upcoming.slice(0, 2))
-    rows.push({
-      title: item.title,
-      detail: item.channel + " · " + shortDate(item.date),
-      href: item.href,
-      icon:
-        item.channel === "E-mail" ? (
-          <Mail size={18} />
-        ) : (
-          <Instagram size={18} />
-        ),
+  if (review.length)
+    actions.push({
+      title: `${review.length} ${review.length === 1 ? "concept wacht" : "concepten wachten"} op goedkeuring`,
+      detail: "Bekijk ze voordat ze worden ingepland",
+      href: review[0].href,
+      icon: <CheckCheck size={16} />,
     });
-  if (brand.score < 100 && rows.length < 4)
-    rows.push({
+  if (brand.score < 100)
+    actions.push({
       title: "Maak je Brand Hub compleet",
-      detail: "Een sterke basis voor content die bij je bedrijf past",
+      detail: `${brand.score}% compleet · betere content begint hier`,
       href: "/brand-hub",
-      icon: <Building2 size={18} />,
+      icon: <Building2 size={16} />,
     });
+
   return (
-    <div className="mavix-home">
-      <section className="home-ai">
-        <span className="home-eyebrow">
-          <Sparkles size={15} /> JOUW MAVIX WERKRUIMTE
-        </span>
-        <h1>
-          Hallo, {data.account.firstName || "Alex"}!<br />
-          <span>Hoe kan Mavix je vandaag helpen?</span>
-        </h1>
-        <AiCommandBox />
-        <div className="home-quick-actions">
-          {actions.map(({ label, href, Icon }) => (
-            <Link key={href} href={href}>
-              <Icon size={15} />
-              {label}
-            </Link>
-          ))}
+    <div className="dash">
+      <header className="dash-header">
+        <div>
+          <p className="eyebrow">Dashboard</p>
+          <h1>
+            {greeting(now.getHours())}
+            {data.account.firstName ? ", " + data.account.firstName : ""}
+          </h1>
+          <p className="dash-sub">Dit speelt er vandaag in je marketing.</p>
         </div>
+        <Link className="button primary" href="/studio">
+          <Plus size={16} />
+          Nieuwe content
+        </Link>
+      </header>
+
+      <form
+        className="dash-agent"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const q = prompt.trim();
+          router.push(q ? "/agent?q=" + encodeURIComponent(q) : "/agent");
+        }}
+      >
+        <Mavi size={20} />
+        <input
+          aria-label="Vraag het Mavix Agent"
+          placeholder="Vraag het Mavix Agent, bijvoorbeeld: plan content voor volgende week"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+        />
+        <button type="submit" className="button secondary">
+          Vragen
+        </button>
+      </form>
+
+      <section className="dash-kpis" aria-label="Kerncijfers">
+        <Kpi
+          label="Google-beoordeling"
+          icon={<Star size={16} />}
+          connected={google === "connected"}
+          connectLabel="Koppel Google Business Profile"
+        />
+        <Kpi
+          label="Nieuwe reviews"
+          icon={<Star size={16} />}
+          connected={google === "connected"}
+          connectLabel="Koppel Google Business Profile"
+        />
+        <Kpi
+          label="Instagram-bereik"
+          icon={<Instagram size={16} />}
+          connected={instagram === "connected"}
+          connectLabel="Koppel Instagram om bereik te bekijken"
+        />
+        <Kpi
+          label="Engagement"
+          icon={<Instagram size={16} />}
+          connected={instagram === "connected"}
+          connectLabel="Koppel Instagram"
+        />
       </section>
-      <section aria-labelledby="business-title">
-        <div className="home-section-head">
-          <h2 id="business-title">Jouw bedrijf</h2>
-          <Link href="/brand-hub">
-            Brand Hub <ArrowUpRight size={15} />
-          </Link>
-        </div>
-        <article className="home-business">
-          <div className="home-business-main">
-            <span className="home-business-logo">
-              {profile.logo ? (
-                <img src={profile.logo} alt="Bedrijfslogo" />
-              ) : (
-                <Building2 size={28} />
-              )}
-            </span>
-            <div>
-              <h3>{profile.name || "Jouw bedrijf"}</h3>
-              <p>
-                {profile.industry ||
-                  "Voeg je bedrijfsgegevens toe in Brand Hub"}
-              </p>
-              <div className="home-chips">
-                <span className="pink">
-                  Instagram{" "}
-                  {data.integrations.instagram
-                    ? "gekoppeld · demo"
-                    : "niet gekoppeld"}
-                </span>
-                <span className="blue">
-                  E-mail{" "}
-                  {data.integrations.email ? "actief · demo" : "niet gekoppeld"}
-                </span>
-                <Link href="/brand-hub" className="mint">
-                  Brand Hub · {brand.score}% compleet
-                </Link>
-              </div>
-            </div>
+
+      <div className="dash-grid">
+        <section className="panel dash-actions">
+          <div className="dash-block-head">
+            <h2>Aandacht nodig</h2>
+            <span className="dash-count">{actions.length}</span>
           </div>
-          <div className="home-business-actions">
-            <Link
-              className="button secondary"
-              href="/instagram-ai?tab=overview"
-            >
-              <Instagram size={16} />
-              Instagram beheren
-            </Link>
-            <Link className="button secondary" href="/email-ai?tab=overview">
-              <Mail size={16} />
-              E-mail beheren
+          {actions.length ? (
+            <ul>
+              {actions.slice(0, 6).map((a) => (
+                <li key={a.title} className={a.tone === "warn" ? "warn" : ""}>
+                  <span className="dash-action-icon">{a.icon}</span>
+                  <div>
+                    <strong>{a.title}</strong>
+                    <small>{a.detail}</small>
+                  </div>
+                  <Link href={a.href} aria-label={"Openen: " + a.title}>
+                    <ArrowRight size={16} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="dash-empty">
+              <CheckCheck size={18} />
+              Alles is bijgewerkt. Er staat niets open.
+            </p>
+          )}
+        </section>
+
+        <section className="panel dash-upcoming">
+          <div className="dash-block-head">
+            <h2>Gepland</h2>
+            <Link className="text-link" href="/calendar">
+              Kalender <ArrowUpRight size={14} />
             </Link>
           </div>
-        </article>
-      </section>
-      <section className="home-today" aria-labelledby="today-title">
-        <div className="home-section-head">
-          <h2 id="today-title">Vandaag</h2>
-          <Link href="/contentkalender">
-            Contentkalender <ArrowUpRight size={15} />
-          </Link>
-        </div>
-        <ul>
-          {rows.slice(0, 4).map((row) => (
-            <TodayItem key={row.title} {...row} />
-          ))}
-        </ul>
-        {!rows.length && (
-          <p className="home-empty">
-            Alles is bijgewerkt. Je hebt momenteel geen openstaande acties.
-          </p>
-        )}
-      </section>
+          {upcoming.length ? (
+            <ul>
+              {upcoming.map((item) => (
+                <li key={item.id}>
+                  <span className="dash-action-icon">
+                    {item.channel === "E-mail" ? (
+                      <Mail size={16} />
+                    ) : (
+                      <Instagram size={16} />
+                    )}
+                  </span>
+                  <Link href={item.href}>
+                    <strong>{item.title}</strong>
+                    <small>
+                      {item.channel} · {shortDate(item.date)}
+                    </small>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="dash-empty">
+              <CalendarDays size={18} />
+              Nog niets gepland. <Link href="/studio">Content maken</Link>
+            </p>
+          )}
+        </section>
+      </div>
+
+      <div className="dash-grid">
+        <Summary
+          title="Reviews"
+          icon={<Star size={16} />}
+          rows={[
+            "Gemiddelde score",
+            "Nieuwe reviews",
+            "Onbeantwoord",
+            "Gemiddelde reactietijd",
+          ]}
+          connected={google === "connected"}
+          cta="Koppel Google Business Profile"
+          href="/reviews"
+        />
+        <Summary
+          title="Social"
+          icon={<Instagram size={16} />}
+          rows={["Bereik", "Engagement", "Profielbezoeken", "Volgersgroei"]}
+          connected={instagram === "connected"}
+          cta="Koppel Instagram"
+          href="/social"
+        />
+      </div>
     </div>
   );
 }

@@ -55,8 +55,8 @@ export function NewContentMenu() {
           aria-label="Nieuwe content"
         >
           {[
-            ["/instagram-ai?tab=assist", "Instagram content", Instagram],
-            ["/email-ai?tab=assist", "E-mail maken", Mail],
+            ["/social?tab=assist", "Instagram content", Instagram],
+            ["/email?tab=assist", "E-mail maken", Mail],
           ].map(([href, label, Icon]) => {
             const I = Icon as typeof Plus;
             return (

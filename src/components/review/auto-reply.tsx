@@ -150,7 +150,7 @@ export function ReviewAutoReply({
           />
         </div>
         <div className="ig-generate-footer">
-          <span>Wijzigingen worden meteen lokaal opgeslagen.</span>
+          <span>Wijzigingen worden meteen opgeslagen.</span>
           <button
             className="button primary"
             onClick={onSimulate}
@@ -163,7 +163,7 @@ export function ReviewAutoReply({
         </div>
       </div>
       <p className="field-note ig-bottom-note">
-        Lokale simulatie · er wordt niets echt gepubliceerd op Google Business
+        Simulatie · er wordt niets gepubliceerd op Google Business
         Profile. Deze koppeling volgt in een latere stap.
       </p>
     </section>

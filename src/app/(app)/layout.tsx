@@ -12,6 +12,7 @@ import "../interactions.css";
 import "../review.css";
 import "../library.css";
 import "../contacts.css";
+import "../workspace.css";
 export const metadata: Metadata = {
   title: "Mavix — Jouw werkruimte",
   description:

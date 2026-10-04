@@ -126,8 +126,8 @@ export function ScheduledContent({
           <h2>Geplande content</h2>
           <p>Je planning en publicatiestatus, overzichtelijk bij elkaar.</p>
         </div>
-        <Link className="text-link" href="/contentkalender">
-          Open volledige contentkalender →
+        <Link className="text-link" href="/calendar">
+          Open de kalender →
         </Link>
       </div>
       <div className="panel">

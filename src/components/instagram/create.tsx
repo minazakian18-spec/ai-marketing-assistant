@@ -162,7 +162,7 @@ export function CreateStudio({
           ? "Goedgekeurd. " +
               (date
                 ? "Je content is lokaal ingepland."
-                : "Kies een datum in de contentkalender.")
+                : "Kies een datum in de kalender.")
           : "Wijzigingen opgeslagen als concept.",
       );
     }

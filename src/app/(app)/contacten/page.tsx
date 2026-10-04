@@ -4,9 +4,9 @@ export default function ContactsPage() {
   return (
     <>
       <PageHeading
-        eyebrow="KLANTEN & RESULTATEN"
+        eyebrow="Groei"
         title="Contacten"
-        description="Beheer je contacten, groepen en e-mailstatus voor Email AI."
+        description="Beheer je contacten, groepen en e-mailstatus voor je e-mailcampagnes."
       />
       <ContactsManager />
     </>

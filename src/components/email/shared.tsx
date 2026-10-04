@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Check, AlertCircle, Mail, ArrowUpRight } from "lucide-react";
 import {
-  emailStats,
   emailReadiness,
   type EmailCampaign,
 } from "@/lib/email-model";
@@ -27,7 +26,7 @@ export function EmailStatus({ status }: { status: EmailCampaign["status"] }) {
           scheduled: "Ingepland",
           rejected: "Afgewezen",
           blocked: "Geblokkeerd",
-          sent: "Demo verzonden",
+          sent: "Verzonden (gesimuleerd)",
         }[status]
       }
     </span>
@@ -41,21 +40,13 @@ export function EmailPerformance() {
           <Mail size={17} />
           E-mail performance
         </h2>
-        <span className="badge draft">Mockdata</span>
       </div>
-      <dl>
-        {emailStats.map(([label, value]) => (
-          <div
-            className={label === "Click rate" ? "highlight" : ""}
-            key={label}
-          >
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
-      <Link className="text-link" href="/inzichten">
-        Bekijk e-mail-inzichten <ArrowUpRight size={14} />
+      <p className="ws-muted">
+        Open rate en click rate verschijnen hier zodra campagnes via een
+        gekoppeld e-mailaccount verstuurd worden.
+      </p>
+      <Link className="text-link" href="/account/integraties">
+        Integraties bekijken <ArrowUpRight size={14} />
       </Link>
     </section>
   );

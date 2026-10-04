@@ -41,7 +41,7 @@ export function ReviewCard({
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M12 11v2.7h6.3c-.27 1.6-1.94 4.7-6.3 4.7-3.8 0-6.9-3.1-6.9-7s3.1-7 6.9-7c2.16 0 3.6.9 4.43 1.7l2.28-2.2C17.15 2.6 14.8 1.6 12 1.6 6.9 1.6 2.7 5.8 2.7 11S6.9 20.4 12 20.4c6.1 0 8.9-4.3 8.9-6.5 0-.7-.06-1.3-.16-1.9H12Z" />
                 </svg>
-                Google · demo
+                Google · voorbeeld
               </span>
               <span className="rv-card-date">{relativeDate(review.date)}</span>
             </div>

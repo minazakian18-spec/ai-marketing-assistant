@@ -51,7 +51,7 @@ export function mockDashboard(now: Date): {
       channel === "E-mail"
         ? "Een mooie actie voor onze vaste klanten. Ontdek deze maand onze favorieten en laat je inspireren."
         : "Dit weekend zetten we onze favorieten in de spotlight. Kom langs en ontdek jouw nieuwe favoriet! ✨",
-    href: channel === "E-mail" ? "/email-ai" : "/instagram-ai",
+    href: channel === "E-mail" ? "/email" : "/social",
     variant: channel === "E-mail" ? 2 : 0,
   });
   const monday = new Date(now);
@@ -147,7 +147,7 @@ export function localDashboardItems(posts: Post[]): DashboardItem[] {
       status: p.status === "draft" ? "review" : p.status,
       date: p.date || p.createdAt,
       body: (p.failureReason ? p.failureReason + "\n\n" : "") + p.caption,
-      href: "/instagram-ai?post=" + encodeURIComponent(p.id),
+      href: "/social?post=" + encodeURIComponent(p.id),
       variant: p.variant,
       local: true,
     }));
@@ -183,72 +183,6 @@ export const shortDate = (date: string) =>
     day: "numeric",
     month: "short",
   });
-export const channels = {
-  instagram: {
-    title: "Instagram",
-    metrics: [
-      ["Bereik", "12.840"],
-      ["Engagement", "6,8%"],
-      ["Nieuwe volgers", "+84"],
-      ["Beste post", "Weekendactie"],
-    ],
-    link: "Bekijk Instagram-inzichten",
-  },
-  email: {
-    title: "E-mail",
-    metrics: [
-      ["Click rate", "4,6%"],
-      ["Verzonden", "4.850"],
-      ["Nieuwe contacten", "+126"],
-      ["Uitschrijvingen", "8"],
-    ],
-    link: "Bekijk e-mail-inzichten",
-  },
-};
-export type Channel = "Overzicht" | "Instagram" | "E-mail";
-export type Period = 7 | 30 | 90;
-export function performance(channel: Channel, period: Period) {
-  const factor = period === 7 ? 0.26 : period === 90 ? 2.72 : 1;
-  const email = channel === "E-mail";
-  return [
-    {
-      label: email ? "Clicks" : "Bereik",
-      value: Math.round((email ? 223 : 12840) * factor),
-      suffix: "",
-      trend: "+18%",
-    },
-    {
-      label: email ? "Click rate" : "Engagement",
-      value: email ? 4.6 : 6.8,
-      suffix: "%",
-      trend: "+0,8 pp",
-    },
-    {
-      label: email ? "Verzonden" : "Clicks",
-      value: Math.round((email ? 4850 : 486) * factor),
-      suffix: "",
-      trend: "+9%",
-    },
-  ];
-}
-export function chartValues(channel: Channel, period: Period, metric: number) {
-  const shapes = [
-    [18, 26, 23, 37, 31, 44, 40, 58, 49, 63, 57, 78],
-    [12, 24, 20, 31, 29, 38, 46, 41, 54, 48, 67, 74],
-    [25, 20, 33, 29, 45, 36, 51, 46, 65, 57, 70, 82],
-  ];
-  const stats = performance(channel, period);
-  const shape =
-    shapes[
-      (metric + (channel === "E-mail" ? 1 : 0) + (period === 7 ? 1 : 0)) % 3
-    ];
-  const scale =
-    stats[metric].suffix === "%"
-      ? stats[metric].value / 55
-      : stats[metric].value / 500;
-  return shape.map((x) => Math.round(x * scale * 10) / 10);
-}
-
 export function emailDashboardItems(
   campaigns: EmailCampaign[],
 ): DashboardItem[] {
@@ -260,7 +194,7 @@ export function emailDashboardItems(
     status: c.status === "draft" ? "review" : c.status,
     date: c.date || c.createdAt,
     body: (c.reason ? c.reason + "\n\n" : "") + c.subject + "\n\n" + c.body,
-    href: "/email-ai?tab=create&campaign=" + encodeURIComponent(c.id),
+    href: "/email?tab=create&campaign=" + encodeURIComponent(c.id),
     variant: 2,
     local: true,
   }));

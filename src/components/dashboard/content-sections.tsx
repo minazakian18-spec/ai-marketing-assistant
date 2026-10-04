@@ -159,15 +159,15 @@ export function Upcoming({
               </time>
             </button>
           ))}
-          <Link href="/contentkalender" className="dash-card-link">
-            Open contentkalender
+          <Link href="/calendar" className="dash-card-link">
+            Open kalender
             <ArrowUpRight size={15} />
           </Link>
         </>
       ) : (
         <div className="dash-empty">
           <p>Je hebt deze week nog niets gepland.</p>
-          <Link href="/contentkalender" className="button secondary">
+          <Link href="/calendar" className="button secondary">
             Plan content
           </Link>
         </div>
@@ -217,7 +217,7 @@ export function RecentContent({
       ) : (
         <div className="dash-empty">
           <p>Je hebt nog geen content gemaakt.</p>
-          <Link className="text-link" href="/instagram-ai">
+          <Link className="text-link" href="/social">
             Maak je eerste Instagram-concept
           </Link>
         </div>

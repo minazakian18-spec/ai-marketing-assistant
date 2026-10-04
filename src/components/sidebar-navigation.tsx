@@ -1,120 +1,64 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { navigationGroups, navigationPath } from "@/lib/navigation";
-import { workspaceView } from "@/lib/workspace-navigation";
-const key = "mavix.sidebar.open-section.v1";
-const sections = [
-  ["overview", "Overzicht"],
-  ["assist", "Assist"],
-  ["auto", "Auto Create"],
-] as const;
+import { usePathname } from "next/navigation";
+import {
+  isActive,
+  navigationGroups,
+  navigationPath,
+  systemNavigation,
+  type NavItem,
+} from "@/lib/navigation";
+
+function Item({
+  item,
+  path,
+  onNavigate,
+}: {
+  item: NavItem;
+  path: string;
+  onNavigate: () => void;
+}) {
+  const active = isActive(item.href, path);
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      className={"nav-item" + (active ? " is-active" : "")}
+      aria-current={active ? "page" : undefined}
+      onClick={onNavigate}
+    >
+      <Icon size={17} />
+      <span>{item.label}</span>
+    </Link>
+  );
+}
+
 export function SidebarNavigation({ onNavigate }: { onNavigate: () => void }) {
   const path = navigationPath(usePathname());
-  const search = useSearchParams();
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const initialized = useRef(false);
-  const previous = useRef(path + search.toString());
-  const channel =
-    path === "/instagram-ai" || path === "/email-ai" ? path : null;
-  const view = workspaceView(
-    search.get("tab"),
-    !!(search.get("post") || search.get("campaign")),
-  );
-  const change = (value: string | null) => {
-    setExpanded(value);
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      /* Navigation works without persistence. */
-    }
-  };
-  useEffect(() => {
-    if (!initialized.current) {
-      initialized.current = true;
-      try {
-        const raw = localStorage.getItem(key);
-        const saved = raw === null ? channel : JSON.parse(raw);
-        setExpanded(
-          saved === "/instagram-ai" || saved === "/email-ai" ? saved : null,
-        );
-      } catch {
-        setExpanded(channel);
-      }
-    } else if (previous.current !== path + search.toString() && channel)
-      change(channel);
-    previous.current = path + search.toString();
-  }, [path, search, channel]);
   return (
-    <nav className="grouped-navigation" aria-label="Hoofdnavigatie">
-      {navigationGroups.map((group) => (
+    <nav className="side-nav" aria-label="Hoofdnavigatie">
+      {navigationGroups.map((group, i) => (
         <section
-          className="navigation-group"
-          aria-label={group.label}
-          key={group.label}
+          className="side-nav-group"
+          aria-label={group.label || "Overzicht"}
+          key={group.label || i}
         >
-          <h2 className="nav-label">{group.label}</h2>
-          {group.items.map(({ href, label, icon: Icon }) => {
-            const ai = href === "/instagram-ai" || href === "/email-ai";
-            const active = path === href;
-            const open = expanded === href;
-            const id = href.slice(1) + "-submenu";
-            return (
-              <div key={href}>
-                <div className={"sidebar-item " + (active ? "is-active" : "")}>
-                  <Link
-                    href={ai ? href + "?tab=overview" : href}
-                    aria-current={active && !ai ? "page" : undefined}
-                    onClick={() => {
-                      if (ai) change(href);
-                      onNavigate();
-                    }}
-                  >
-                    <Icon size={18} />
-                    <span>{label}</span>
-                  </Link>
-                  {ai && (
-                    <button
-                      aria-label={label + (open ? " inklappen" : " uitklappen")}
-                      aria-expanded={open}
-                      aria-controls={id}
-                      onClick={() => change(open ? null : href)}
-                    >
-                      <ChevronDown
-                        size={16}
-                        className={open ? "rotated" : ""}
-                      />
-                    </button>
-                  )}
-                </div>
-                {ai && (
-                  <div
-                    id={id}
-                    className={"sidebar-submenu " + (open ? "expanded" : "")}
-                    inert={!open}
-                  >
-                    <div>
-                      {sections.map(([tab, title]) => (
-                        <Link
-                          key={tab}
-                          href={href + "?tab=" + tab}
-                          aria-current={
-                            active && view === tab ? "page" : undefined
-                          }
-                          onClick={onNavigate}
-                        >
-                          {title}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {group.label && <h2 className="side-nav-label">{group.label}</h2>}
+          {group.items.map((item) => (
+            <Item key={item.href} item={item} path={path} onNavigate={onNavigate} />
+          ))}
         </section>
+      ))}
+    </nav>
+  );
+}
+
+export function SystemNavigation({ onNavigate }: { onNavigate: () => void }) {
+  const path = navigationPath(usePathname());
+  return (
+    <nav className="side-nav side-nav-system" aria-label="Systeem">
+      {systemNavigation.map((item) => (
+        <Item key={item.href} item={item} path={path} onNavigate={onNavigate} />
       ))}
     </nav>
   );

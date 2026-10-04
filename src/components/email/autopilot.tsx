@@ -134,7 +134,7 @@ export function EmailAutopilot({
             />
           )}
           <p className="field-note">
-            Alleen een lokale simulatie. Er draait geen achtergrondtaak en er
+            Dit is een simulatie. Er draait geen achtergrondtaak en er
             worden geen e-mails verstuurd.
           </p>
         </section>

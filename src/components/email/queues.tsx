@@ -64,8 +64,8 @@ export function EmailQueue({
           </p>
         </div>
         {scheduled ? (
-          <Link className="button secondary" href="/contentkalender">
-            Open volledige contentkalender
+          <Link className="button secondary" href="/calendar">
+            Open de kalender
           </Link>
         ) : (
           <button className="button secondary" onClick={onExamples}>
@@ -109,7 +109,7 @@ export function EmailQueue({
               ? "Keur een campagne goed en kies een verzendtijd."
               : "Er staan geen campagnes in deze categorie."}
           </p>
-          <Link className="button primary" href="/email-ai?tab=assist">
+          <Link className="button primary" href="/email?tab=assist">
             E-mail maken
           </Link>
         </div>

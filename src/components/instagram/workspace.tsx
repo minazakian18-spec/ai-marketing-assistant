@@ -16,7 +16,8 @@ import {
   Orbit,
   CheckCheck,
   CalendarDays,
-  ShieldCheck,
+  Instagram,
+  Plug,
 } from "lucide-react";
 import { PageHeading } from "@/components/ui";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -50,11 +51,11 @@ function Workspace() {
     status: p.status,
     date: p.date,
     createdAt: p.createdAt,
-    href: "/instagram-ai?tab=assist&post=" + encodeURIComponent(p.id),
+    href: "/social?tab=assist&post=" + encodeURIComponent(p.id),
   }));
   function navigate(next: string, post?: Post) {
     router.replace(
-      "/instagram-ai?tab=" +
+      "/social?tab=" +
         next +
         (post ? "&post=" + encodeURIComponent(post.id) : ""),
       { scroll: false },
@@ -76,7 +77,7 @@ function Workspace() {
     if (await save({ ...data, posts: [...added, ...data.posts] }))
       setMessage(
         added.length
-          ? added.length + " lokale voorbeelditems toegevoegd."
+          ? added.length + " voorbeelditems toegevoegd."
           : "De voorbeeldset staat al in je werkruimte.",
       );
   }
@@ -159,7 +160,7 @@ function Workspace() {
       if (await save({ ...data, instagram: s, posts: [...posts, ...data.posts] }))
         setMessage(
           posts.length +
-            " mockitems gemaakt: " +
+            " concepten gemaakt: " +
             posts.filter((p) => p.status === "draft").length +
             " in de goedkeuringswachtrij, " +
             posts.filter((p) => p.status === "scheduled").length +
@@ -177,31 +178,44 @@ function Workspace() {
       setBusy(false);
     }
   }
-  if (!ready) return <p role="status">Instagram workspace laden…</p>;
+  if (!ready) return <p role="status">Social laden…</p>;
   return (
     <div className="instagram-workspace">
       <PageHeading
-        eyebrow="JOUW INSTAGRAM WORKSPACE"
-        title="Instagram AI"
-        description="Maak content zelf of laat Mavix je Instagram zelfstandig beheren."
+        eyebrow="Marketing"
+        title="Social"
+        description="Maak, plan en automatiseer content voor je social kanalen."
         action={
-          <span className="ig-prototype">
-            <ShieldCheck size={15} />
-            Lokaal prototype
-          </span>
+          <Link className="button secondary" href="/account/integraties">
+            <Plug size={15} />
+            Integraties
+          </Link>
         }
       />
 
-      <WorkspaceNav root="/instagram-ai" channel="Instagram" view={tab} />
+      <div className="social-platforms" role="group" aria-label="Platform">
+        <span className="social-platform is-active" aria-current="true">
+          <Instagram size={15} />
+          Instagram
+        </span>
+        {["Facebook", "LinkedIn", "TikTok"].map((name) => (
+          <span key={name} className="social-platform is-soon" aria-disabled="true">
+            {name}
+            <small>Binnenkort</small>
+          </span>
+        ))}
+      </div>
+
+      <WorkspaceNav root="/social" channel="Social" view={tab} />
       {tab !== "overview" && (
         <div className="channel-context">
           <span>
             Actieve modus: <strong>{modeName(settings.mode)}</strong> ·{" "}
             {settings.enabled && settings.mode !== "assist"
-              ? "Autopilot actief"
-              : "Autopilot uit"}
+              ? "Automatisering aan"
+              : "Automatisering uit"}
           </span>
-          <small>Lokaal prototype · geen echte publicatie</small>
+          <small>Publiceren naar Instagram is nog niet gekoppeld</small>
         </div>
       )}
       <p role="status" className="ig-feedback ig-top-feedback">
@@ -307,7 +321,6 @@ function Workspace() {
       </div>
       <div className="ig-workspace-footer">
         <Link href="/brand-hub">Brand Hub</Link>
-        <span>Jouw inhoud en instellingen blijven in deze browser.</span>
         {!data.posts.length && (
           <button onClick={examples}>Voorbeeldcontent toevoegen</button>
         )}
@@ -317,7 +330,7 @@ function Workspace() {
 }
 export function InstagramWorkspace() {
   return (
-    <Suspense fallback={<p>Instagram workspace laden…</p>}>
+    <Suspense fallback={<p>Social laden…</p>}>
       <Workspace />
     </Suspense>
   );

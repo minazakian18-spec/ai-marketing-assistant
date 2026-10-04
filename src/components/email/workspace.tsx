@@ -15,7 +15,7 @@ import {
   Orbit,
   CheckCheck,
   CalendarDays,
-  ShieldCheck,
+  Plug,
   Sparkles,
 } from "lucide-react";
 import { PageHeading } from "@/components/ui";
@@ -50,7 +50,7 @@ function Workspace() {
     status: c.status,
     date: c.date,
     createdAt: c.createdAt,
-    href: "/email-ai?tab=assist&campaign=" + encodeURIComponent(c.id),
+    href: "/email?tab=assist&campaign=" + encodeURIComponent(c.id),
   }));
   async function persist(c: EmailCampaign) {
     return await save({
@@ -65,7 +65,7 @@ function Workspace() {
   }
   function navigate(next: string, c?: EmailCampaign) {
     router.replace(
-      "/email-ai?tab=" +
+      "/email?tab=" +
         next +
         (c ? "&campaign=" + encodeURIComponent(c.id) : ""),
       { scroll: false },
@@ -91,7 +91,7 @@ function Workspace() {
         })
       )
         setMessage(
-          `${result.campaigns.length} mockcampagnes gemaakt: ${result.campaigns.filter((c) => c.status === "draft").length} ter goedkeuring, ${result.campaigns.filter((c) => c.status === "scheduled").length} ingepland, ${result.campaigns.filter((c) => c.status === "blocked").length} geblokkeerd. ${result.skipped} overgeslagen. Er is niets verstuurd.`,
+          `${result.campaigns.length} conceptcampagnes gemaakt: ${result.campaigns.filter((c) => c.status === "draft").length} ter goedkeuring, ${result.campaigns.filter((c) => c.status === "scheduled").length} ingepland, ${result.campaigns.filter((c) => c.status === "blocked").length} geblokkeerd. ${result.skipped} overgeslagen. Er is niets verstuurd.`,
         );
     } catch {
       setMessage("Simulatie is niet gelukt. Probeer opnieuw.");
@@ -135,38 +135,38 @@ function Workspace() {
       )
         setMessage(
           added.length
-            ? "Voorbeeldcampagnes lokaal toegevoegd."
+            ? "Voorbeeldcampagnes toegevoegd."
             : "De voorbeeldcampagnes staan al in je werkruimte.",
         );
     } finally {
       setBusy(false);
     }
   }
-  if (!ready) return <p role="status">Email workspace laden…</p>;
+  if (!ready) return <p role="status">E-mail laden…</p>;
   return (
     <div className="instagram-workspace email-workspace">
       <PageHeading
-        eyebrow="JOUW E-MAIL WORKSPACE"
-        title="Email AI"
-        description="Maak e-mailcampagnes zelf of laat Mavix je e-mailmarketing zelfstandig beheren."
+        eyebrow="Marketing"
+        title="E-mail"
+        description="Maak, plan en automatiseer je e-mailcampagnes."
         action={
-          <span className="ig-prototype">
-            <ShieldCheck size={15} />
-            Lokaal prototype
-          </span>
+          <Link className="button secondary" href="/account/integraties">
+            <Plug size={15} />
+            Integraties
+          </Link>
         }
       />
 
-      <WorkspaceNav root="/email-ai" channel="Email" view={tab} />
+      <WorkspaceNav root="/email" channel="E-mail" view={tab} />
       {tab !== "overview" && (
         <div className="channel-context">
           <span>
             Actieve modus: <strong>{modeName(settings.mode)}</strong> ·{" "}
             {settings.enabled && settings.mode !== "assist"
-              ? "Autopilot actief"
-              : "Autopilot uit"}
+              ? "Automatisering aan"
+              : "Automatisering uit"}
           </span>
-          <small>Lokaal prototype · geen echte verzending</small>
+          <small>Campagnes worden niet automatisch verstuurd</small>
         </div>
       )}
       <p role="status" className="ig-feedback ig-top-feedback">
@@ -177,7 +177,7 @@ function Workspace() {
           <>
             <ChannelOverview
               channel="Email"
-              root="/email-ai"
+              root="/email"
               mode={settings.mode}
               enabled={settings.enabled}
               requireApproval={settings.requireApproval}
@@ -338,7 +338,6 @@ function Workspace() {
       </div>
       <div className="ig-workspace-footer">
         <Link href="/brand-hub">Brand Hub</Link>
-        <span>Campagnes en instellingen blijven in deze browser.</span>
         <Link href="/contacten">Contacten bekijken</Link>
       </div>
     </div>
@@ -346,7 +345,7 @@ function Workspace() {
 }
 export function EmailWorkspace() {
   return (
-    <Suspense fallback={<p>Email workspace laden…</p>}>
+    <Suspense fallback={<p>E-mail laden…</p>}>
       <Workspace />
     </Suspense>
   );

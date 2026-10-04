@@ -2,7 +2,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { LayoutDashboard, Inbox, Sparkles, Settings, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Inbox, Sparkles, Settings, Plug } from "lucide-react";
 import { PageHeading } from "@/components/ui";
 import { useWorkspace } from "@/components/workspace-provider";
 import {
@@ -128,25 +128,30 @@ function Workspace() {
     }, 550);
   }
 
-  if (!ready) return <p role="status">Review workspace laden…</p>;
+  if (!ready) return <p role="status">Reviews laden…</p>;
   return (
     <div className="rv-workspace">
       <PageHeading
-        eyebrow="JOUW REVIEW WORKSPACE"
-        title="Review AI"
-        description="Beheer, beantwoord en publiceer je Google-reviews vanuit één werkruimte."
+        eyebrow="Marketing"
+        title="Reviews"
+        description="Beheer en beantwoord je Google-reviews vanuit één plek."
         action={
-          <span className="ig-prototype">
-            <ShieldCheck size={15} />
-            Lokaal prototype
-          </span>
+          <Link className="button secondary" href="/account/integraties">
+            <Plug size={15} />
+            Integraties
+          </Link>
         }
       />
-      <nav className="account-tabs" aria-label="Review AI-navigatie">
+      <p className="ws-notice">
+        Je ziet voorbeeldreviews. Koppel Google Business Profile om je echte
+        reviews hier te beheren.{" "}
+        <Link href="/account/integraties">Google Business Profile koppelen</Link>
+      </p>
+      <nav className="ws-tabs" aria-label="Reviews onderdelen">
         {tabs.map(([key, label, Icon]) => (
           <Link
             key={key}
-            href={"/review-ai?tab=" + key}
+            href={"/reviews?tab=" + key}
             aria-current={tab === key ? "page" : undefined}
           >
             <Icon size={16} />
@@ -194,10 +199,6 @@ function Workspace() {
       </div>
       <div className="ig-workspace-footer">
         <Link href="/brand-hub">Brand Hub</Link>
-        <span>
-          Reviews worden lokaal opgeslagen. Er is nog geen koppeling met
-          Google Business Profile.
-        </span>
       </div>
     </div>
   );
@@ -205,7 +206,7 @@ function Workspace() {
 
 export function ReviewWorkspace() {
   return (
-    <Suspense fallback={<p>Review workspace laden…</p>}>
+    <Suspense fallback={<p>Reviews laden…</p>}>
       <Workspace />
     </Suspense>
   );

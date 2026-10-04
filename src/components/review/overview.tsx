@@ -44,7 +44,7 @@ export function ReviewOverview({
         <div className="rv-summary-divider" />
         <span className="rv-summary-score">
           <strong>{reviews.length}</strong>
-          <span>Reviews totaal · demo</span>
+          <span>Reviews totaal · voorbeeld</span>
         </span>
         <div className="rv-summary-divider" />
         <span className="rv-summary-score">
@@ -56,15 +56,15 @@ export function ReviewOverview({
         <Sparkles size={16} />
         <span>
           Actieve modus: <strong>{responseModeName(mode)}</strong> ·{" "}
-          {enabled ? "Auto Reply actief · lokale simulatie" : "Auto Reply uitgeschakeld"}
+          {enabled ? "Auto Reply actief · simulatie" : "Auto Reply uitgeschakeld"}
         </span>
       </div>
       <div className="channel-kpis">
         {[
           ["Wacht op goedkeuring", String(pending.length), "Jouw blik maakt het verschil"],
           ["Aandacht nodig", String(needsAttention.length), "Lage beoordelingen om zelf te bekijken"],
-          ["Automatisch beantwoord", String(autoHandled.length), "Deze week · lokale simulatie"],
-          ["Gemiddelde score", average.toFixed(1) + " / 5", "Over alle demo-reviews"],
+          ["Automatisch beantwoord", String(autoHandled.length), "Deze week · simulatie"],
+          ["Gemiddelde score", average.toFixed(1) + " / 5", "Over alle voorbeeldreviews"],
         ].map(([label, value, note]) => (
           <article className="panel" key={label}>
             <small>{label}</small>
@@ -76,7 +76,7 @@ export function ReviewOverview({
       <section className="channel-mode-section">
         <div className="ig-section-title">
           <h2>Laatste reviews</h2>
-          <Link className="text-link" href="/review-ai?tab=inbox">
+          <Link className="text-link" href="/reviews?tab=inbox">
             Volledige inbox <ArrowUpRight size={14} />
           </Link>
         </div>
@@ -97,7 +97,7 @@ export function ReviewOverview({
           <span>Werk op jouw manier</span>
         </div>
         <div className="channel-mode-cards">
-          <Link href="/review-ai?tab=inbox">
+          <Link href="/reviews?tab=inbox">
             <Inbox size={22} />
             <strong>Inbox</strong>
             <p>Bekijk, bewerk en publiceer reacties op al je reviews.</p>
@@ -105,7 +105,7 @@ export function ReviewOverview({
               Open inbox <ArrowUpRight size={14} />
             </span>
           </Link>
-          <Link href="/review-ai?tab=auto-reply">
+          <Link href="/reviews?tab=auto-reply">
             <Sparkles size={22} />
             <strong>Auto Reply</strong>
             <p>{responseModeDescription(mode)}</p>
@@ -113,7 +113,7 @@ export function ReviewOverview({
               Instellen <ArrowUpRight size={14} />
             </span>
           </Link>
-          <Link href="/review-ai?tab=settings">
+          <Link href="/reviews?tab=settings">
             <Wrench size={22} />
             <strong>Instellingen</strong>
             <p>Koppel je Google Business Profile en beheer je voorkeuren.</p>

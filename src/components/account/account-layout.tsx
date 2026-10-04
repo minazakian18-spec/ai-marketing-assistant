@@ -24,7 +24,6 @@ export function AccountLayout({ children }: { children: ReactNode }) {
       </nav>
       {ready ? children : <p role="status">Account laden…</p>}
       <div className="account-footer">
-        <span>Je instellingen blijven in deze browser.</span>
         <button className="logout-button" onClick={logout} disabled={!ready}>
           <LogOut size={17} />
           Uitloggen

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Send, Sparkles, X } from "lucide-react";
+import { Send, X } from "lucide-react";
+import { Mavi } from "@/components/mavi";
 
 type Message = { role: "agent" | "user"; text: string; link?: { href: string; label: string } };
 
@@ -114,7 +115,7 @@ export function AgentDrawer({ open, onClose }: { open: boolean; onClose: () => v
       >
         <header className="mkt-agent-head">
           <span className="mkt-agent-avatar">
-            <Sparkles size={16} />
+            <Mavi size={18} />
           </span>
           <div>
             <strong>Mavix Agent</strong>

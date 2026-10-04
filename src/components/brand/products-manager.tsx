@@ -25,8 +25,8 @@ export function ProductsManager() {
         <div>
           <h2>Producten & diensten</h2>
           <p>
-            Elk product wordt herbruikbare context voor Instagram AI, Email AI
-            en de Contentkalender.
+            Elk product wordt herbruikbare context voor Social, E-mail
+            en de kalender.
           </p>
         </div>
         <Package size={22} />

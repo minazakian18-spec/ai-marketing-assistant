@@ -19,7 +19,7 @@ export default function ProfilePage() {
   return (
     <>
       <PageHeading
-        eyebrow="DE BASIS VAN JE MERK"
+        eyebrow="Merk"
         title="Brand Hub"
         description="Het marketinggeheugen van je bedrijf. Geef je content een herkenbare stem."
       />

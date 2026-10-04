@@ -1,58 +1,90 @@
+import type { ComponentType } from "react";
 import {
   LayoutDashboard,
-  Instagram,
-  Mail,
+  PenLine,
+  Inbox,
   CalendarDays,
+  Share2,
+  Mail,
+  Star,
+  Megaphone,
+  Search,
   Users,
   ChartNoAxesCombined,
   Palette,
-  Star,
   Images,
   Plug,
+  Settings,
 } from "lucide-react";
-export const navigationGroups = [
+import { Mavi } from "@/components/mavi";
+
+export type NavItem = {
+  href: string;
+  label: string;
+  icon: ComponentType<{ size?: number }>;
+};
+export type NavGroup = { label?: string; items: NavItem[] };
+
+export const navigationGroups: NavGroup[] = [
   {
-    label: "OVERZICHT",
     items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
-    label: "CONTENT",
+    label: "Werkruimte",
     items: [
-      { href: "/instagram-ai", label: "Instagram AI", icon: Instagram },
-      { href: "/email-ai", label: "Email AI", icon: Mail },
-      { href: "/review-ai", label: "Review AI", icon: Star },
+      { href: "/agent", label: "Mavix Agent", icon: Mavi },
+      { href: "/studio", label: "Content Studio", icon: PenLine },
+      { href: "/inbox", label: "Inbox", icon: Inbox },
+      { href: "/calendar", label: "Kalender", icon: CalendarDays },
     ],
   },
   {
-    label: "PLANNING",
+    label: "Marketing",
     items: [
-      {
-        href: "/contentkalender",
-        label: "Contentkalender",
-        icon: CalendarDays,
-      },
+      { href: "/social", label: "Social", icon: Share2 },
+      { href: "/email", label: "E-mail", icon: Mail },
+      { href: "/reviews", label: "Reviews", icon: Star },
+      { href: "/ads", label: "Advertenties", icon: Megaphone },
+      { href: "/seo", label: "SEO", icon: Search },
     ],
   },
   {
-    label: "KLANTEN & RESULTATEN",
+    label: "Groei",
     items: [
       { href: "/contacten", label: "Contacten", icon: Users },
       { href: "/inzichten", label: "Inzichten", icon: ChartNoAxesCombined },
     ],
   },
   {
-    label: "MERK",
+    label: "Merk",
     items: [
       { href: "/brand-hub", label: "Brand Hub", icon: Palette },
-      { href: "/account/integraties", label: "Integraties", icon: Plug },
-      { href: "/library", label: "Library", icon: Images },
+      { href: "/library", label: "Bibliotheek", icon: Images },
     ],
   },
 ];
+
+export const systemNavigation: NavItem[] = [
+  { href: "/account/integraties", label: "Integraties", icon: Plug },
+  { href: "/account", label: "Instellingen", icon: Settings },
+];
+
+const aliases: Record<string, string> = {
+  "/bedrijfsprofiel": "/brand-hub",
+  "/ai-content": "/social",
+  "/instagram-ai": "/social",
+  "/email-ai": "/email",
+  "/review-ai": "/reviews",
+  "/contentkalender": "/calendar",
+};
+
 export function navigationPath(path: string) {
-  return path === "/ai-content"
-    ? "/instagram-ai"
-    : path === "/bedrijfsprofiel"
-      ? "/brand-hub"
-      : path;
+  return aliases[path] || path;
+}
+
+// Exact match or a nested route, except that the Integraties settings page
+// belongs to its own system item rather than to "Instellingen" (/account).
+export function isActive(href: string, path: string) {
+  if (href === "/account" && path.startsWith("/account/integraties")) return false;
+  return path === href || path.startsWith(href + "/");
 }

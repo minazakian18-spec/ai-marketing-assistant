@@ -276,7 +276,7 @@ export function ContactsManager() {
           <h2>Bouw je publiek op</h2>
           <p>
             Voeg e-mailadressen van klanten handmatig toe of importeer ze via
-            Excel om aan de slag te gaan met Email AI.
+            Excel om aan de slag te gaan met e-mail.
           </p>
           <div className="contacts-header-actions">
             <button
@@ -361,13 +361,13 @@ export function ContactsManager() {
                     const groups = new Set(chosen.map((c) => c.group || ""));
                     if (groups.size > 1) {
                       setMessage(
-                        "Je selectie bevat meerdere groepen. Filter eerst op één groep, of kies zelf de juiste doelgroep bij 'Doelgroep kiezen' in Email AI.",
+                        "Je selectie bevat meerdere groepen. Filter eerst op één groep, of kies zelf de juiste doelgroep bij 'Doelgroep kiezen' in E-mail.",
                       );
                       return;
                     }
                     const segment = segmentForGroup(chosen[0]?.group);
                     router.push(
-                      "/email-ai?tab=assist&audience=" +
+                      "/email?tab=assist&audience=" +
                         encodeURIComponent(segment),
                     );
                   }}

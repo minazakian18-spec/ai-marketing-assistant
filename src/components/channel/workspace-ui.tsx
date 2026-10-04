@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { modeName, type WorkspaceView } from "@/lib/workspace-navigation";
+// In-page sections of a channel workspace. The ?tab= values (overview,
+// assist, auto) are kept so existing links and bookmarks keep resolving.
 export function WorkspaceNav({
   root,
   view,
@@ -20,17 +22,24 @@ export function WorkspaceNav({
   view: WorkspaceView;
   channel: string;
 }) {
-  const labels = {
-    overview: "Overzicht",
-    assist: "Assist",
-    auto: "Auto Create",
-  };
+  const tabs: [WorkspaceView, string][] = [
+    ["overview", "Overzicht"],
+    ["assist", "Maken"],
+    ["auto", "Automatisering"],
+  ];
   return (
-    <div className="channel-breadcrumb">
-      <Link href={root}>{channel} AI</Link>
-      <span aria-hidden="true">/</span>
-      <strong>{labels[view]}</strong>
-    </div>
+    <nav className="ws-tabs" aria-label={channel + " onderdelen"}>
+      {tabs.map(([key, label]) => (
+        <Link
+          key={key}
+          href={root + "?tab=" + key}
+          aria-current={view === key ? "page" : undefined}
+          scroll={false}
+        >
+          {label}
+        </Link>
+      ))}
+    </nav>
   );
 }
 export function SettingsGroup({
@@ -140,7 +149,7 @@ export function ChannelOverview({
             <small>Huidige modus</small>
             <h2>{modeName(mode)}</h2>
             <p data-autopilot={autoPublishing ? "active" : undefined}>
-              Autopilot {active ? "actief · lokale simulatie" : "uitgeschakeld"}
+              Automatisering {active ? "aan" : "uit"}
             </p>
           </div>
         </div>
@@ -159,17 +168,19 @@ export function ChannelOverview({
           [
             email ? "Geplande campagnes" : "Gepland deze week",
             String(email ? scheduled.length : weekly.length),
-            email ? "Toekomstige verzendingen" : "In je contentkalender",
+            email ? "Toekomstige verzendingen" : "In je kalender",
           ],
           [
             email ? "Ingeschreven contacten" : "Bereik deze maand",
-            email ? String(contacts || 0) : "12.840",
-            email ? "Gedeelde voorbeeldcontacten" : "Mockdata · +18%",
+            email ? String(contacts || 0) : "—",
+            email ? "Uit je contacten" : "Koppel Instagram om bereik te zien",
           ],
           [
             email ? "Click rate" : "Engagement",
-            email ? "4,6%" : "6,8%",
-            "Voorbeeldprestaties",
+            "—",
+            email
+              ? "Beschikbaar zodra campagnes echt verstuurd worden"
+              : "Koppel Instagram om engagement te zien",
           ],
         ].map(([label, value, note]) => (
           <article className="panel" key={label}>
