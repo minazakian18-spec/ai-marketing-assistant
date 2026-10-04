@@ -9,7 +9,7 @@ export function FinalCta() {
         <Reveal>
           <h2 className="mkt-h2">Laat Mavix je marketingteam versterken.</h2>
           <Link href="/register" className="mkt-btn mkt-btn-primary mkt-btn-lg">
-            Gratis starten <ArrowRight size={18} />
+            Get started <ArrowRight size={18} />
           </Link>
         </Reveal>
       </div>

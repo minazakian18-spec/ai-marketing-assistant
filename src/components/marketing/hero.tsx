@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { ProductShowcase } from "./product-showcase";
+import Image from "next/image";
+import { ShieldCheck } from "lucide-react";
 import { Reveal } from "./reveal";
 import { PromoLine } from "./promo-line";
 
@@ -26,15 +26,29 @@ export function Hero() {
         </Reveal>
         <Reveal delay={180}>
           <div className="mkt-hero-actions">
-            <Link href="/register" className="mkt-btn mkt-btn-secondary mkt-btn-lg">
-              Gratis starten <ArrowRight size={18} />
+            <Link href="/register" className="mkt-btn mkt-hero-cta">
+              Get started
             </Link>
           </div>
-          <p className="mkt-hero-confidence">Opzegbaar wanneer je wilt</p>
+          <p className="mkt-hero-confidence">
+            <ShieldCheck size={14} />
+            Opzegbaar wanneer je wilt
+          </p>
         </Reveal>
-        <Reveal delay={260} className="mkt-hero-preview">
-          <ProductShowcase />
-        </Reveal>
+      </div>
+      <Reveal delay={260} className="mkt-hero-visual">
+        <Image
+          src="/hero-visual.webp"
+          alt="Het Mavix-dashboard met een Google-review, een door Mavix geschreven reactie, een geplande Instagram-post en een e-mailcampagne"
+          width={1672}
+          height={791}
+          sizes="(max-width: 640px) 165vw, (max-width: 1200px) 100vw, 1200px"
+          loading="eager"
+          fetchPriority="high"
+          unoptimized
+        />
+      </Reveal>
+      <div className="mkt-container">
         <Reveal delay={320}>
           <p className="mkt-hero-proof">
             Mavix wordt gebouwd samen met de eerste ondernemers die ermee
