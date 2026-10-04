@@ -3,7 +3,7 @@ import {adminClient,appUrl} from './supabase';
 import {HttpError} from './access';
 import {encrypt,decrypt} from './crypto';
 export type Provider='google_business'|'gmail'|'instagram'|'google_calendar';
-export const scopes={google_business:['openid','email','https://www.googleapis.com/auth/business.manage'],gmail:['openid','email','https://www.googleapis.com/auth/gmail.send'],instagram:['instagram_business_basic','instagram_business_content_publish'],google_calendar:['openid','email','https://www.googleapis.com/auth/calendar.events','https://www.googleapis.com/auth/calendar.calendarlist.readonly']};
+export const scopes={google_business:['openid','email','https://www.googleapis.com/auth/business.manage'],gmail:['openid','email','https://www.googleapis.com/auth/gmail.send','https://www.googleapis.com/auth/gmail.readonly'],instagram:['instagram_business_basic','instagram_business_manage_messages'],google_calendar:['openid','email','https://www.googleapis.com/auth/calendar.events','https://www.googleapis.com/auth/calendar.calendarlist.readonly']};
 export type Credentials={access_token:string;refresh_token?:string;expires_in?:number;scope?:string};
 export const callback=(provider:Provider)=>appUrl()+'/api/integrations/'+provider+'/callback';
 export async function googleToken(body:Record<string,string>):Promise<Credentials>{const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...body,client_id:process.env.GOOGLE_CLIENT_ID!,client_secret:process.env.GOOGLE_CLIENT_SECRET!}),cache:'no-store'});if(!r.ok)throw new HttpError(502,'Google-autorisatie is verlopen of geweigerd. Verbind opnieuw.');return r.json();}

@@ -15,6 +15,13 @@ Belangrijk: er is nog geen echte sessie/auth-gate. `(app)`-routes zijn technisch
 
 Nog niet opgepakt in deze stap (bewust uitgesteld, niet vergeten): onboarding-wizard, Billing-pagina-uitbreiding (betaalmethodes, facturen, upgrade/downgrade), Integraties-pagina-uitbreiding (beperken tot Google Business Profile/Instagram/Gmail met gedetailleerde OAuth-states), Notificaties-uitbreiding (kanalen/ontvangers/quiet hours), Team & Gebruikers (nieuw), Privacy & Data-uitbreiding, en een brede design-system-consistentiepas. Zie de conversatie voor de volledige oorspronkelijke opdracht.
 
+## Mavix Inbox (4 oktober 2026)
+Omnichannel-inbox op `/inbox` (Gmail, Instagram DM, Messenger, WhatsApp Business). Migratie: `supabase/migrations/202610050001_inbox.sql` (moet nog in Supabase worden uitgevoerd).
+- Pure logica en parsers: `src/lib/inbox/core.ts` (server) en `shared.ts` (client-veilig); tests in `tests/inbox.test.mjs`.
+- Server: `src/lib/server/inbox.ts` (opslag, Gmail-sync via History API = polling, versturen, statussen), `meta.ts` (Instagram/Messenger OAuth, WhatsApp Cloud API), `ai.ts` (Mavi-antwoordvoorstellen via de Claude API; alleen concepten).
+- Routes: `/api/inbox/*`, publieke webhook `/api/webhooks/meta` (handtekeningcontrole, verwerking na het 200-antwoord).
+- Nieuwe omgevingsvariabelen staan in `.env.example` (alleen namen). Echte accounttests en Meta-/Google-configuratie moeten door de eigenaar worden gedaan.
+
 ## Huidige versie
 Mavix is nog geen productie-SaaS, maar heeft sinds 23 september 2026 wel een echte backend-laag (zie hieronder). Next.js, React, TypeScript, Tailwind en gewone CSS. De package-lock.json legt de geïnstalleerde versies vast.
 
