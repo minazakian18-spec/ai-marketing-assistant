@@ -4,6 +4,7 @@ import { RefreshCw, X } from "lucide-react";
 import { PageHeading, IconButton } from "@/components/ui";
 import { BrandIcon, type Brand } from "@/components/brand-icon";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
+import { GoogleCalendarCard } from "@/components/account/google-calendar-card";
 import { isBrowserDemo } from "@/lib/demo";
 
 type Connection = {
@@ -239,6 +240,7 @@ export default function IntegrationsPage() {
 
       <ul className="int-list ui-card">
         {visible.map((item) => {
+          if (item.id === "google_calendar") return <GoogleCalendarCard key={item.id} demo={demo} onNotice={setNotice} />;
           const c = conn(item);
           const state = loaded ? stateOf(item, c) : item.planned ? "planned" : "disconnected";
           const linked = !item.planned && state !== "disconnected";

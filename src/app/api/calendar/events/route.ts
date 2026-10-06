@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { workspace, failure, limited, sameOrigin, HttpError } from "@/lib/server/access";
-import { createEvent, deleteEvent, listEvents, updateEvent } from "@/lib/server/calendar";
+import {
+  workspace,
+  failure,
+  limited,
+  sameOrigin,
+  HttpError,
+} from "@/lib/server/access";
+import {
+  createEvent,
+  deleteEvent,
+  listEvents,
+  updateEvent,
+} from "@/lib/server/calendar";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const time = z.string().regex(/^\d{2}:\d{2}$/);
@@ -14,15 +25,23 @@ const eventInput = z.object({
   startTime: time.optional(),
   endDate: date,
   endTime: time.optional(),
-  timeZone: z.string().min(1).max(64).refine((tz) => {
-    try {
-      new Intl.DateTimeFormat("en", { timeZone: tz });
-      return true;
-    } catch {
-      return false;
-    }
-  }),
-  reminder: z.union([z.literal("default"), z.literal("none"), z.number().int().min(0).max(40320)]),
+  timeZone: z
+    .string()
+    .min(1)
+    .max(64)
+    .refine((tz) => {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }),
+  reminder: z.union([
+    z.literal("default"),
+    z.literal("none"),
+    z.number().int().min(0).max(40320),
+  ]),
   repeat: z
     .object({
       freq: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]),
@@ -43,21 +62,43 @@ async function ctx(request?: Request) {
 }
 
 function badInput(e: unknown) {
-  return e instanceof z.ZodError
-    ? failure(new HttpError(400, "Controleer titel, datum en tijden van het evenement."))
+  return e instanceof z.ZodError || e instanceof SyntaxError
+    ? failure(
+        new HttpError(
+          400,
+          "Controleer titel, datum en tijden van het evenement.",
+        ),
+      )
     : failure(e);
 }
 
 // Events for the visible range only (singleEvents expands recurring series).
 export async function GET(request: Request) {
   try {
+    const c = await ctx();
     const url = new URL(request.url);
-    const start = z.string().datetime({ offset: true }).parse(url.searchParams.get("start"));
-    const end = z.string().datetime({ offset: true }).parse(url.searchParams.get("end"));
-    if (Date.parse(end) - Date.parse(start) > 100 * 86400000)
+    const start = z
+      .string()
+      .datetime({ offset: true })
+      .parse(url.searchParams.get("start"));
+    const end = z
+      .string()
+      .datetime({ offset: true })
+      .parse(url.searchParams.get("end"));
+    if (
+      Date.parse(end) <= Date.parse(start) ||
+      Date.parse(end) - Date.parse(start) > 100 * 86400000
+    )
       throw new HttpError(400, "Kies een kortere periode.");
-    const calendars = (url.searchParams.get("calendars") || "").split(",").filter(Boolean).slice(0, 20);
-    const events = calendars.length ? await listEvents(await ctx(), calendars, start, end) : [];
+    const calendars = z
+      .array(id)
+      .max(20)
+      .parse(
+        (url.searchParams.get("calendars") || "").split(",").filter(Boolean),
+      );
+    const events = calendars.length
+      ? await listEvents(c, calendars, start, end)
+      : [];
     return NextResponse.json({ events }, json);
   } catch (e) {
     return badInput(e);
@@ -67,8 +108,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const c = await ctx(request);
-    const body = z.object({ calendarId: id, input: eventInput }).parse(await request.json());
-    return NextResponse.json({ event: await createEvent(c, body.calendarId, body.input) }, json);
+    const body = z
+      .object({ calendarId: id, input: eventInput })
+      .parse(await request.json());
+    return NextResponse.json(
+      { event: await createEvent(c, body.calendarId, body.input) },
+      json,
+    );
   } catch (e) {
     return badInput(e);
   }
@@ -96,7 +142,9 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const c = await ctx(request);
-    const body = z.object({ calendarId: id, eventId: id, scope }).parse(await request.json());
+    const body = z
+      .object({ calendarId: id, eventId: id, scope })
+      .parse(await request.json());
     await deleteEvent(c, body);
     return NextResponse.json({ ok: true }, json);
   } catch (e) {

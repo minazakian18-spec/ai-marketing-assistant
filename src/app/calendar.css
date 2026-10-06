@@ -610,7 +610,21 @@
 .main-shell .cal-today { min-height: 34px; padding: 6px 14px; border-radius: 17px; }
 .cal-arrows { display: flex; }
 .cal-title { margin: 0 0 0 4px; font-size: 19px !important; font-weight: 500 !important; text-transform: capitalize; white-space: nowrap; }
-.cal-loading { font-size: 12px; color: var(--app-muted); }
+.cal-loading { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--app-muted); }
+.cal-banner { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--app-border); font-size: 13px; }
+.cal-banner p { flex: 1; margin: 0; line-height: 1.45; }
+.main-shell .cal-banner .button { min-height: 32px; padding: 5px 12px; }
+.cal-banner.is-warn { background: #fff8eb; color: #7a3d05; }
+.cal-banner.is-error { background: #fef3f2; color: #912018; }
+.cal-skeleton { display: grid; gap: 8px; padding: 4px 6px 10px; }
+.cal-skeleton span { display: block; height: 12px; border-radius: 6px; background: #f1f0f5; }
+.cal-skeleton span:last-child { width: 60%; }
+@media (prefers-reduced-motion: no-preference) {
+  .cal-spin { animation: cal-spin 0.9s linear infinite; }
+  .cal-skeleton span { animation: cal-pulse 1.2s ease-in-out infinite; }
+}
+@keyframes cal-spin { to { transform: rotate(360deg); } }
+@keyframes cal-pulse { 50% { opacity: 0.55; } }
 .cal-seg { display: inline-flex; margin-left: auto; padding: 2px; border: 1px solid var(--app-border-strong); border-radius: 8px; }
 .cal-seg button { min-width: 58px; padding: 5px 10px; border: 0; border-radius: 6px; background: none; font-size: 13px; font-weight: 500; color: var(--app-text-2); cursor: pointer; }
 .cal-seg button:hover { background: var(--app-hover); }

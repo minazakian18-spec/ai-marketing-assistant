@@ -68,12 +68,14 @@ function initial(state: EditorState, calendars: GoogleCalendar[]) {
 export function EventEditor({
   state,
   calendars,
+  googleLabel = "Google Agenda",
   onClose,
   onSave,
   onDelete,
 }: {
   state: EditorState | null;
   calendars: GoogleCalendar[];
+  googleLabel?: string;
   onClose: () => void;
   onSave: (input: EventInput, calendarId: string, scope: Scope) => Promise<boolean>;
   onDelete: (scope: Scope) => Promise<boolean>;
@@ -224,12 +226,25 @@ export function EventEditor({
                 onChange={(e) => set({ calendarId: e.target.value })}
                 disabled={recurring}
               >
-                {(readOnly ? calendars : writable).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.summary}
-                  </option>
-                ))}
+                {(
+                  [
+                    ["Mavix", (readOnly ? calendars : writable).filter((c) => c.id.startsWith("mavix:"))],
+                    [googleLabel, (readOnly ? calendars : writable).filter((c) => !c.id.startsWith("mavix:"))],
+                  ] as const
+                ).map(
+                  ([label, list]) =>
+                    list.length > 0 && (
+                      <optgroup key={label} label={label}>
+                        {list.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.summary}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ),
+                )}
               </select>
+              {!local && !editing && <small>Wordt opgeslagen in Google Agenda.</small>}
             </label>
             <button type="button" className="ce-more" onClick={() => setMore(!more)} aria-expanded={more}>
               {more ? "Minder opties" : "Meer opties"}

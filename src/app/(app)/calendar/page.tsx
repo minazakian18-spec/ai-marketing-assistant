@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Film, ImagePlus, Instagram, Mail, PanelLeft, Plug, Plus, RefreshCw, X } from "lucide-react";
+import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Film, ImagePlus, Instagram, Loader2, Mail, PanelLeft, Plug, Plus, RefreshCw, X } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Menu } from "@/components/menu";
 import { BrandIcon } from "@/components/brand-icon";
@@ -66,6 +66,7 @@ type Conn =
   | {
       state: "ready";
       status: string;
+      connected?: boolean;
       email?: string;
       mine?: boolean;
       settings: Settings;
@@ -141,6 +142,8 @@ export default function CalendarPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | CalendarStatus>("all");
   const [events, setEvents] = useState<ClientEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [eventsError, setEventsError] = useState("");
+  const [connecting, setConnecting] = useState(false);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [popover, setPopover] = useState<ClientEvent | null>(null);
   const [selected, setSelected] = useState<CalendarItem | null>(null);
@@ -150,7 +153,7 @@ export default function CalendarPage() {
   const [syncing, setSyncing] = useState(false);
   const cache = useRef(new Map<string, ClientEvent[]>());
 
-  const connected = conn.state === "ready" && conn.status === "connected" && !!conn.mine;
+  const connected = conn.state === "ready" && (conn.connected ?? (conn.status === "connected" && !!conn.mine));
   const calendars = useMemo(() => (conn.state === "ready" && connected ? conn.calendars : []), [conn, connected]);
   const visibleIds = useMemo(() => calendars.filter((c) => !hidden.includes(c.id)).map((c) => c.id), [calendars, hidden]);
   const range = useMemo(() => visibleRange(view, anchor), [view, anchor]);
@@ -174,8 +177,12 @@ export default function CalendarPage() {
     }
     const params = new URLSearchParams(window.location.search);
     if (params.get("connected")) setToast("Google Agenda is gekoppeld.");
-    if (params.get("calendar_error") === "permission")
+    const calendarError = params.get("calendar_error");
+    if (calendarError === "permission")
       setToast("Niet alle toestemmingen zijn gegeven. Koppel opnieuw en sta toegang tot je agenda's en afspraken toe.");
+    if (calendarError === "denied") setToast("Je hebt geen toestemming gegeven. Google Agenda is niet gekoppeld.");
+    if (calendarError === "offline_access")
+      setToast("Google gaf geen blijvende toegang. Koppel opnieuw; trek eventueel eerst de toegang van Mavix in je Google-account in.");
     if (params.toString()) window.history.replaceState(null, "", "/calendar");
     const t = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(t);
@@ -208,17 +215,24 @@ export default function CalendarPage() {
   const loadEvents = useCallback(
     async (force = false) => {
       if (!connected) return;
-      if (!visibleIds.length) return setEvents([]);
+      if (!visibleIds.length) {
+        setEventsError("");
+        return setEvents([]);
+      }
       const cached = cache.current.get(rangeKey);
-      if (cached && !force) return setEvents(cached);
+      if (cached && !force) {
+        setEventsError("");
+        return setEvents(cached);
+      }
       setLoadingEvents(true);
       try {
         const q = new URLSearchParams({ start: range.start.toISOString(), end: range.end.toISOString(), calendars: visibleIds.join(",") });
         const d = await api<{ events: ClientEvent[] }>("/api/calendar/events?" + q);
         cache.current.set(rangeKey, d.events);
         setEvents(d.events);
+        setEventsError("");
       } catch (e) {
-        setToast((e as Error).message);
+        setEventsError((e as Error).message);
         if ((e as { status?: number }).status === 409) void loadStatus();
       } finally {
         setLoadingEvents(false);
@@ -498,11 +512,13 @@ export default function CalendarPage() {
   }
 
   async function connect() {
+    setConnecting(true);
     try {
       const d = await api<{ url: string }>("/api/integrations/google_calendar/connect", { method: "POST", body: "{}" });
       window.location.assign(d.url);
     } catch (e) {
       setToast((e as Error).message);
+      setConnecting(false);
     }
   }
   async function saveSettings(next: Settings) {
@@ -529,6 +545,8 @@ export default function CalendarPage() {
   const writable = calendars.filter((c) => c.accessRole === "owner" || c.accessRole === "writer");
   const status = conn.state === "ready" ? conn.status : "";
   const teamOwned = conn.state === "ready" && conn.mine === false && status !== "disconnected";
+  const needsReconnect = conn.state === "ready" && !connected && !teamOwned && !!status && status !== "disconnected";
+  const googleLabel = conn.state === "ready" && conn.email ? "Google Agenda · " + conn.email : "Google Agenda";
   const popoverCalendar = popover ? allCalendars.find((c) => c.id === popover.calendarId) : null;
   const contentLink = (type: string) => "/social?tab=assist&type=" + type;
 
@@ -648,8 +666,22 @@ export default function CalendarPage() {
                         : "Niet verbonden"}
               </span>
             </div>
+            {conn.state === "loading" && (
+              <div className="cal-skeleton" role="status" aria-label="Agenda's laden">
+                <span />
+                <span />
+              </div>
+            )}
             {conn.state === "demo" && <p className="cal-note">In de testmodus kun je Google Agenda niet koppelen.</p>}
-            {conn.state === "error" && <p className="cal-note">{conn.message}</p>}
+            {conn.state === "error" && (
+              <>
+                <p className="cal-note">{conn.message}</p>
+                <button type="button" className="button secondary cal-connect-btn" onClick={() => void loadStatus()}>
+                  <RefreshCw size={14} />
+                  Opnieuw proberen
+                </button>
+              </>
+            )}
             {conn.state === "ready" && !connected && (
               <>
                 <p className="cal-note">
@@ -662,25 +694,29 @@ export default function CalendarPage() {
                         : "Koppel Google Agenda om je afspraken naast je Mavix-planning te zien."}
                 </p>
                 {!teamOwned && (
-                  <button type="button" className="button secondary cal-connect-btn" onClick={() => void connect()}>
-                    <Plug size={14} />
-                    {status === "disconnected" || !status ? "Koppel Google Agenda" : "Opnieuw verbinden"}
+                  <button type="button" className="button secondary cal-connect-btn" onClick={() => void connect()} disabled={connecting}>
+                    {connecting ? <Loader2 size={14} className="cal-spin" /> : <Plug size={14} />}
+                    {connecting ? "Doorsturen…" : status === "disconnected" || !status ? "Koppel Google Agenda" : "Opnieuw koppelen"}
                   </button>
                 )}
               </>
             )}
-            {connected && (
-              <ul className="cal-checks">
-                {calendars.map((c) => (
-                  <li key={c.id}>
-                    <label>
-                      <input type="checkbox" checked={!hidden.includes(c.id)} style={{ accentColor: c.color }} onChange={(e) => toggle(c.id, e.target.checked)} />
-                      <span>{c.summary}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {connected &&
+              (calendars.length ? (
+                <ul className="cal-checks">
+                  {calendars.map((c) => (
+                    <li key={c.id}>
+                      <label>
+                        <input type="checkbox" checked={!hidden.includes(c.id)} style={{ accentColor: c.color }} onChange={(e) => toggle(c.id, e.target.checked)} />
+                        <span>{c.summary}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="cal-note">Er zijn geen agenda&apos;s gevonden in dit Google-account.</p>
+              ))}
+            {connected && calendars.length > 0 && !visibleIds.length && <p className="cal-note">Alle Google-agenda&apos;s zijn verborgen. Vink er een aan om afspraken te zien.</p>}
             {connected && conn.state === "ready" && (
               <details className="cal-disclosure">
                 <summary>Synchronisatie</summary>
@@ -712,10 +748,12 @@ export default function CalendarPage() {
                   <RefreshCw size={14} />
                   {syncing ? "Synchroniseren…" : "Nu synchroniseren"}
                 </button>
-                <Link className="text-link cal-manage" href="/account/integraties">
-                  Koppeling beheren
-                </Link>
               </details>
+            )}
+            {conn.state === "ready" && status && status !== "disconnected" && (
+              <Link className="text-link cal-manage" href="/account/integraties">
+                Koppeling beheren
+              </Link>
             )}
           </section>
         </aside>
@@ -738,7 +776,12 @@ export default function CalendarPage() {
               </button>
             </div>
             <h2 className="cal-title">{periodLabel(view, anchor)}</h2>
-            {loadingEvents && <span className="cal-loading">Laden…</span>}
+            {loadingEvents && (
+              <span className="cal-loading" role="status">
+                <Loader2 size={13} className="cal-spin" aria-hidden="true" />
+                Afspraken laden…
+              </span>
+            )}
             <div className="cal-seg" role="group" aria-label="Weergave">
               {VIEWS.map(([v, label]) => (
                 <button key={v} type="button" aria-pressed={view === v} className={"cal-seg-" + v} onClick={() => setView(v)}>
@@ -747,6 +790,27 @@ export default function CalendarPage() {
               ))}
             </div>
           </div>
+
+          {needsReconnect ? (
+            <div className="cal-banner is-warn" role="alert">
+              <BrandIcon brand="google_calendar" size={16} />
+              <p>
+                {status === "permission_missing"
+                  ? "Mavix mist toegang tot je Google-agenda's. Je ziet nu alleen je Mavix-planning."
+                  : "Je Google Agenda-koppeling is verlopen of ingetrokken. Je ziet nu alleen je Mavix-planning."}
+              </p>
+              <button type="button" className="button secondary" onClick={() => void connect()} disabled={connecting}>
+                {connecting ? "Doorsturen…" : "Opnieuw koppelen"}
+              </button>
+            </div>
+          ) : connected && eventsError ? (
+            <div className="cal-banner is-error" role="alert">
+              <p>Google-afspraken konden niet worden geladen. {eventsError}</p>
+              <button type="button" className="button secondary" onClick={() => void loadEvents(true)} disabled={loadingEvents}>
+                {loadingEvents ? "Laden…" : "Opnieuw proberen"}
+              </button>
+            </div>
+          ) : null}
 
           <div className="cal-view">
             {!ready ? (
@@ -798,6 +862,7 @@ export default function CalendarPage() {
       <EventEditor
         state={editor}
         calendars={allCalendars}
+        googleLabel={googleLabel}
         onClose={() => setEditor(null)}
         onSave={async (input, calendarId, scope) => {
           const ok = editor?.mode === "edit" ? await updateEvent(editor.event, input, calendarId, scope) : await createEvent(input, calendarId);

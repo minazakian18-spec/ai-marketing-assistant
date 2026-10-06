@@ -2,7 +2,11 @@ import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { adminClient, appUrl } from "./supabase";
 import { HttpError } from "./access";
-import { connectionToken } from "./integrations";
+import {
+  CALENDAR_SCOPES,
+  calendarToken,
+  markCalendarConnection,
+} from "./calendar-credentials";
 import { hash } from "./crypto";
 import { toCalendarItems } from "@/lib/calendar-data";
 import type { Workspace } from "@/lib/types";
@@ -48,9 +52,12 @@ export type CalendarInfo = {
 // Calendar data is personal: only the person who connected Google Calendar can
 // read or change it, even though the connection belongs to the workspace.
 async function connection(workspaceId: string, userId: string) {
-  const { token, c } = await connectionToken(workspaceId, "google_calendar");
+  const { token, c } = await calendarToken(workspaceId, userId);
   if (c.connected_user !== userId)
-    throw new HttpError(403, "Google Calendar is gekoppeld door een ander teamlid.");
+    throw new HttpError(
+      403,
+      "Google Calendar is gekoppeld door een ander teamlid.",
+    );
   return { token, c };
 }
 
@@ -62,11 +69,12 @@ async function google<T = Record<string, unknown>>(
   init: RequestInit = {},
   opts: { syncToken?: boolean } = {},
 ): Promise<T> {
-  const { token, c } = await connection(ctx.workspaceId, ctx.userId);
+  let { token, c } = await connection(ctx.workspaceId, ctx.userId);
   let r: Response;
-  try {
-    r = await fetch(API + path, {
+  const send = () =>
+    fetch(API + path, {
       ...init,
+      signal: AbortSignal.timeout(15000),
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + token.access_token,
@@ -74,7 +82,18 @@ async function google<T = Record<string, unknown>>(
       },
       cache: "no-store",
     });
-  } catch {
+  try {
+    r = await send();
+    if (r.status === 401) {
+      ({ token, c } = await calendarToken(
+        ctx.workspaceId,
+        ctx.userId,
+        token.access_token,
+      ));
+      r = await send(); // Retry only an explicit unauthorized response, once.
+    }
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(503, mapGoogleError(503).message);
   }
   if (r.ok) return (r.status === 204 ? {} : await r.json()) as T;
@@ -82,19 +101,21 @@ async function google<T = Record<string, unknown>>(
   let reason = "";
   try {
     const body = await r.json();
-    reason = [body?.error?.errors?.[0]?.reason, body?.error?.status, body?.error?.message]
+    reason = [
+      body?.error?.errors?.[0]?.reason,
+      body?.error?.status,
+      body?.error?.message,
+    ]
       .filter(Boolean)
       .join(" ");
   } catch {
     /* Non-JSON error body. */
   }
   const mapped = mapGoogleError(r.status, reason);
-  if (mapped.connection)
-    await adminClient()
-      .from("integration_connections")
-      .update({ status: mapped.connection })
-      .eq("id", c.id);
-  console.error(JSON.stringify({ event: "google_calendar_error", status: r.status }));
+  if (mapped.connection) await markCalendarConnection(c, mapped.connection);
+  console.error(
+    JSON.stringify({ event: "google_calendar_error", status: r.status }),
+  );
   throw new HttpError(mapped.status, mapped.message);
 }
 
@@ -113,27 +134,50 @@ const stripNulls = (o: Record<string, unknown>): Record<string, unknown> =>
 /* ---------- status, settings, calendars ---------- */
 
 export async function calendarStatus(workspaceId: string, userId: string) {
-  const { data } = await adminClient()
+  const { data, error } = await adminClient()
     .from("integration_connections")
-    .select("status,display_name,connected_user,metadata")
+    .select(
+      "status,display_name,account_email,connected_user,metadata,encrypted_credentials,scopes",
+    )
     .eq("workspace_id", workspaceId)
     .eq("provider", "google_calendar")
     .maybeSingle();
+  if (error) throw new HttpError(503, "De verbinding kon niet worden geladen.");
   const settings: CalendarSettings = {
     mirror: !!data?.metadata?.mirror,
     mirrorCalendarId: data?.metadata?.mirrorCalendarId || "primary",
   };
   if (!data || data.status === "disconnected")
-    return { status: "disconnected" as const, settings };
+    return {
+      status: "disconnected" as const,
+      connected: false,
+      accountEmail: null,
+      settings,
+    };
+  const mine = data.connected_user === userId;
+  const status =
+    data.status === "connected" && !data.encrypted_credentials
+      ? "reconnect_required"
+      : data.status === "connected" &&
+          !CALENDAR_SCOPES.filter((s) => s.startsWith("https:")).every((s) =>
+            data.scopes?.includes(s),
+          )
+        ? "permission_missing"
+        : data.status;
   return {
-    status: data.status as string,
-    email: data.display_name as string,
-    mine: data.connected_user === userId,
+    status: status as string,
+    connected: status === "connected" && mine,
+    accountEmail: mine ? data.account_email || data.display_name : null,
+    email: mine ? data.account_email || data.display_name : undefined,
+    mine,
     settings,
   };
 }
 
-export async function saveSettings(workspaceId: string, settings: CalendarSettings) {
+export async function saveSettings(
+  workspaceId: string,
+  settings: CalendarSettings,
+) {
   const db = adminClient();
   const { data, error } = await db
     .from("integration_connections")
@@ -141,24 +185,39 @@ export async function saveSettings(workspaceId: string, settings: CalendarSettin
     .eq("workspace_id", workspaceId)
     .eq("provider", "google_calendar")
     .single();
-  if (error || !data) throw new HttpError(409, "Verbind eerst Google Calendar.");
+  if (error || !data)
+    throw new HttpError(409, "Verbind eerst Google Calendar.");
   const { error: saveError } = await db
     .from("integration_connections")
     .update({ metadata: { ...(data.metadata || {}), ...settings } })
     .eq("id", data.id);
-  if (saveError) throw new HttpError(503, "Instellingen opslaan is niet gelukt.");
+  if (saveError)
+    throw new HttpError(503, "Instellingen opslaan is niet gelukt.");
 }
 
 export async function listCalendars(ctx: Ctx): Promise<CalendarInfo[]> {
-  const res = await google<{ items?: Record<string, unknown>[] }>(
-    ctx,
-    "/users/me/calendarList?" +
-      new URLSearchParams({
-        maxResults: "100",
-        fields: "items(id,summary,summaryOverride,backgroundColor,accessRole,primary,hidden)",
-      }),
-  );
-  return (res.items || [])
+  const items: Record<string, unknown>[] = [];
+  let pageToken = "";
+  do {
+    const res = await google<{
+      items?: Record<string, unknown>[];
+      nextPageToken?: string;
+    }>(
+      ctx,
+      "/users/me/calendarList?" +
+        new URLSearchParams({
+          maxResults: "100",
+          fields:
+            "nextPageToken,items(id,summary,summaryOverride,backgroundColor,accessRole,primary,hidden)",
+          ...(pageToken ? { pageToken } : {}),
+        }),
+    );
+    items.push(...(res.items || []));
+    pageToken = res.nextPageToken || "";
+    if (pageToken && items.length >= 10000)
+      throw new HttpError(422, "Te veel agenda’s om tegelijk op te halen.");
+  } while (pageToken);
+  return items
     .filter((c) => !c.hidden && c.accessRole !== "freeBusyReader")
     .map((c) => ({
       id: String(c.id),
@@ -170,7 +229,11 @@ export async function listCalendars(ctx: Ctx): Promise<CalendarInfo[]> {
     .sort((a, b) => Number(b.primary) - Number(a.primary));
 }
 
-async function calendarMeta(ctx: Ctx, calendarId: string, preloaded?: CalendarInfo[]) {
+async function calendarMeta(
+  ctx: Ctx,
+  calendarId: string,
+  preloaded?: CalendarInfo[],
+) {
   const calendars = preloaded || (await listCalendars(ctx));
   const found =
     calendarId === "primary"
@@ -191,13 +254,12 @@ export async function listEvents(
   const calendars = await listCalendars(ctx);
   const out: ClientEvent[] = [];
   for (const id of calendarIds.slice(0, 20)) {
-    const meta = calendars.find((c) => c.id === id);
-    if (!meta) continue;
+    const meta = await calendarMeta(ctx, id, calendars);
     let pageToken = "";
     for (let page = 0; page < 4; page++) {
       const res = await google<EventsPage>(
         ctx,
-        `/calendars/${enc(id)}/events?` +
+        `/calendars/${enc(meta.id)}/events?` +
           new URLSearchParams({
             timeMin,
             timeMax,
@@ -213,14 +275,22 @@ export async function listEvents(
         if (n) out.push(n);
       }
       if (!res.nextPageToken) break;
+      if (page === 3)
+        throw new HttpError(
+          422,
+          "Te veel evenementen. Kies een kortere periode.",
+        );
       pageToken = res.nextPageToken;
     }
   }
   return out;
 }
 
-const eventPath = (calendarId: string, eventId: string) =>
-  `/calendars/${enc(calendarId)}/events/${enc(eventId)}`;
+const eventPath = (calendarId: string, eventId: string) => {
+  if (!/^[a-zA-Z0-9_-]{1,1024}$/.test(eventId))
+    throw new HttpError(400, "Ongeldig evenement.");
+  return `/calendars/${enc(calendarId)}/events/${enc(eventId)}`;
+};
 
 async function getEvent(ctx: Ctx, calendarId: string, eventId: string) {
   return google<GoogleEvent>(ctx, eventPath(calendarId, eventId));
@@ -235,9 +305,15 @@ function sendUpdates(input: EventInput) {
   return input.attendees?.length ? "all" : "none";
 }
 
-export async function createEvent(ctx: Ctx, calendarId: string, input: EventInput) {
+export async function createEvent(
+  ctx: Ctx,
+  calendarId: string,
+  input: EventInput,
+) {
   inputOrThrow(input);
   const meta = await calendarMeta(ctx, calendarId);
+  if (!(meta.accessRole === "owner" || meta.accessRole === "writer"))
+    throw new HttpError(403, mapGoogleError(403).message);
   const created = await google<GoogleEvent>(
     ctx,
     `/calendars/${enc(meta.id)}/events?sendUpdates=${sendUpdates(input)}`,
@@ -290,7 +366,11 @@ export async function updateEvent(
     if (masterId) delete body.recurrence;
     let calendar = meta;
     let id = args.eventId;
-    if (!masterId && args.targetCalendarId && args.targetCalendarId !== meta.id) {
+    if (
+      !masterId &&
+      args.targetCalendarId &&
+      args.targetCalendarId !== meta.id
+    ) {
       const target = await calendarMeta(ctx, args.targetCalendarId);
       const moved = await google<GoogleEvent>(
         ctx,
@@ -300,14 +380,16 @@ export async function updateEvent(
       calendar = target;
       id = moved.id;
     }
-    if (!body.recurrence && !masterId && current.recurrence) body.recurrence = null;
+    if (!body.recurrence && !masterId && current.recurrence)
+      body.recurrence = null;
     const updated = await google<GoogleEvent>(
       ctx,
       `${eventPath(calendar.id, id)}?sendUpdates=${sendUpdates(args.input)}`,
       {
         method: "PATCH",
         body: JSON.stringify(body),
-        headers: args.etag && calendar.id === meta.id ? { "If-Match": args.etag } : {},
+        headers:
+          args.etag && calendar.id === meta.id ? { "If-Match": args.etag } : {},
       },
     );
     return normalizeEvent(updated, calendar);
@@ -341,7 +423,9 @@ export async function updateEvent(
       patch.start = start;
       if (input.allDay) {
         const days = Math.round(
-          (Date.parse(input.endDate + "T00:00:00Z") - Date.parse(input.startDate + "T00:00:00Z")) / 86400000,
+          (Date.parse(input.endDate + "T00:00:00Z") -
+            Date.parse(input.startDate + "T00:00:00Z")) /
+            86400000,
         );
         patch.end = { date: addDays(start.date!, days + 1), dateTime: null };
       } else {
@@ -349,7 +433,9 @@ export async function updateEvent(
           zonedToUtc(input.endDate, input.endTime!, input.timeZone) -
           zonedToUtc(input.startDate, input.startTime!, input.timeZone);
         patch.end = {
-          dateTime: new Date(Date.parse(start.dateTime!) + duration).toISOString(),
+          dateTime: new Date(
+            Date.parse(start.dateTime!) + duration,
+          ).toISOString(),
           timeZone: master.end.timeZone || master.start.timeZone,
           date: null,
         };
@@ -368,7 +454,9 @@ export async function updateEvent(
   const occurrence = current.originalStartTime || current.start || {};
   await google(ctx, eventPath(meta.id, masterId), {
     method: "PATCH",
-    body: JSON.stringify({ recurrence: truncateRecurrence(master.recurrence || [], occurrence) }),
+    body: JSON.stringify({
+      recurrence: truncateRecurrence(master.recurrence || [], occurrence),
+    }),
   });
   const created = await google<GoogleEvent>(
     ctx,
@@ -378,7 +466,8 @@ export async function updateEvent(
       body: JSON.stringify(
         stripNulls({
           ...body,
-          recurrence: body.recurrence || continueRecurrence(master.recurrence || []),
+          recurrence:
+            body.recurrence || continueRecurrence(master.recurrence || []),
         }),
       ),
     },
@@ -396,11 +485,15 @@ export async function deleteEvent(
   const current = await getEvent(ctx, meta.id, args.eventId);
   const masterId = current.recurringEventId;
   if (!masterId || args.scope === "this") {
-    await google(ctx, `${eventPath(meta.id, args.eventId)}?sendUpdates=all`, { method: "DELETE" });
+    await google(ctx, `${eventPath(meta.id, args.eventId)}?sendUpdates=all`, {
+      method: "DELETE",
+    });
     return;
   }
   if (args.scope === "all") {
-    await google(ctx, `${eventPath(meta.id, masterId)}?sendUpdates=all`, { method: "DELETE" });
+    await google(ctx, `${eventPath(meta.id, masterId)}?sendUpdates=all`, {
+      method: "DELETE",
+    });
     return;
   }
   const master = await getEvent(ctx, meta.id, masterId);
@@ -439,10 +532,16 @@ async function stopChannel(ctx: Ctx, channelId: string, resourceId: string) {
 async function ensureChannel(
   ctx: Ctx,
   calendarId: string,
-  state: { channel_id?: string | null; channel_resource_id?: string | null; channel_expires_at?: string | null } | null,
+  state: {
+    channel_id?: string | null;
+    channel_resource_id?: string | null;
+    channel_expires_at?: string | null;
+  } | null,
 ) {
   const db = adminClient();
-  const expires = state?.channel_expires_at ? new Date(state.channel_expires_at).getTime() : 0;
+  const expires = state?.channel_expires_at
+    ? new Date(state.channel_expires_at).getTime()
+    : 0;
   if (state?.channel_id && expires > Date.now() + 24 * 3600 * 1000) return true;
   if (state?.channel_id && state.channel_resource_id)
     await stopChannel(ctx, state.channel_id, state.channel_resource_id);
@@ -478,7 +577,12 @@ async function ensureChannel(
     // Push is an optimisation; incremental polling keeps working without it.
     await db
       .from("calendar_sync_state")
-      .update({ channel_id: null, channel_resource_id: null, channel_token_hash: null, channel_expires_at: null })
+      .update({
+        channel_id: null,
+        channel_resource_id: null,
+        channel_token_hash: null,
+        channel_expires_at: null,
+      })
       .eq("workspace_id", ctx.workspaceId)
       .eq("calendar_id", calendarId);
     return false;
@@ -494,17 +598,27 @@ async function syncCalendar(ctx: Ctx, calendarId: string) {
     .eq("calendar_id", calendarId)
     .maybeSingle();
   if (!state)
-    await db.from("calendar_sync_state").insert({ workspace_id: ctx.workspaceId, calendar_id: calendarId });
+    await db
+      .from("calendar_sync_state")
+      .insert({ workspace_id: ctx.workspaceId, calendar_id: calendarId });
 
   const pushActive =
     !!state?.channel_id &&
     !!state.channel_expires_at &&
     new Date(state.channel_expires_at).getTime() > Date.now();
-  const lastSync = state?.last_synced_at ? new Date(state.last_synced_at).getTime() : 0;
-  const notified = state?.changed_at ? new Date(state.changed_at).getTime() : Date.now();
+  const lastSync = state?.last_synced_at
+    ? new Date(state.last_synced_at).getTime()
+    : 0;
+  const notified = state?.changed_at
+    ? new Date(state.changed_at).getTime()
+    : Date.now();
   // With an active push channel and no notification since the last sync,
   // nothing changed: skip the Google call (re-check at least every 15 min).
-  const skip = !!state?.sync_token && pushActive && notified <= lastSync && Date.now() - lastSync < 15 * 60 * 1000;
+  const skip =
+    !!state?.sync_token &&
+    pushActive &&
+    notified <= lastSync &&
+    Date.now() - lastSync < 15 * 60 * 1000;
 
   let changed = false;
   let deletedIds: string[] = [];
@@ -521,7 +635,12 @@ async function syncCalendar(ctx: Ctx, calendarId: string) {
         params.set("showDeleted", "false");
       }
       if (req.pageToken) params.set("pageToken", req.pageToken);
-      return google<EventsPage>(ctx, `/calendars/${enc(calendarId)}/events?${params}`, {}, { syncToken: !!req.syncToken });
+      return google<EventsPage>(
+        ctx,
+        `/calendars/${enc(calendarId)}/events?${params}`,
+        {},
+        { syncToken: !!req.syncToken },
+      );
     }, state?.sync_token || null);
     changed = result.reset ? !!state?.sync_token : result.changes.length > 0;
     deletedIds = remotelyDeleted(result.changes);
@@ -535,13 +654,17 @@ async function syncCalendar(ctx: Ctx, calendarId: string) {
       .eq("workspace_id", ctx.workspaceId)
       .eq("calendar_id", calendarId);
   }
-  const push = pushAvailable() ? await ensureChannel(ctx, calendarId, state) : false;
+  const push = pushAvailable()
+    ? await ensureChannel(ctx, calendarId, state)
+    : false;
   return { changed, deletedIds, push };
 }
 
 function scheduledContent(data: Workspace): ContentItem[] {
   return toCalendarItems(data)
-    .filter((i) => i.date && (i.status === "scheduled" || i.status === "approved"))
+    .filter(
+      (i) => i.date && (i.status === "scheduled" || i.status === "approved"),
+    )
     .map((i) => ({
       type: i.source.kind === "post" ? "post" : "email",
       id: i.source.id,
@@ -554,14 +677,19 @@ function scheduledContent(data: Workspace): ContentItem[] {
     }));
 }
 
-async function mirrorContent(ctx: Ctx, settings: CalendarSettings, calendars: CalendarInfo[]) {
+async function mirrorContent(
+  ctx: Ctx,
+  settings: CalendarSettings,
+  calendars: CalendarInfo[],
+) {
   const db = adminClient();
   const { data: links } = await db
     .from("calendar_event_links")
     .select("*")
     .eq("workspace_id", ctx.workspaceId);
   const result = { created: 0, updated: 0, removed: 0 };
-  if (!settings.mirror && !(links || []).some((l) => l.state === "active")) return result;
+  if (!settings.mirror && !(links || []).some((l) => l.state === "active"))
+    return result;
   const meta = await calendarMeta(ctx, settings.mirrorCalendarId, calendars);
   let items: ContentItem[] = [];
   if (settings.mirror) {
@@ -572,10 +700,17 @@ async function mirrorContent(ctx: Ctx, settings: CalendarSettings, calendars: Ca
       .single();
     items = scheduledContent((data?.data || {}) as Workspace);
   }
-  const plan = planMirror(items, (links || []) as EventLink[], ctx.workspaceId, meta.id);
+  const plan = planMirror(
+    items,
+    (links || []) as EventLink[],
+    ctx.workspaceId,
+    meta.id,
+  );
   for (const link of plan.remove) {
     try {
-      await google(ctx, eventPath(link.calendar_id, link.provider_event_id), { method: "DELETE" });
+      await google(ctx, eventPath(link.calendar_id, link.provider_event_id), {
+        method: "DELETE",
+      });
     } catch (e) {
       if (!(e instanceof HttpError && e.status === 404)) throw e;
     }
@@ -588,10 +723,14 @@ async function mirrorContent(ctx: Ctx, settings: CalendarSettings, calendars: Ca
   }
   for (const item of plan.create.slice(0, 50)) {
     const body = contentEventBody(item, MAVIX_TZ);
-    const created = await google<GoogleEvent>(ctx, `/calendars/${enc(meta.id)}/events`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    const created = await google<GoogleEvent>(
+      ctx,
+      `/calendars/${enc(meta.id)}/events`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    );
     await db.from("calendar_event_links").upsert(
       {
         workspace_id: ctx.workspaceId,
@@ -616,7 +755,10 @@ async function mirrorContent(ctx: Ctx, settings: CalendarSettings, calendars: Ca
       });
       await db
         .from("calendar_event_links")
-        .update({ content_hash: contentHash(body), last_synced_at: new Date().toISOString() })
+        .update({
+          content_hash: contentHash(body),
+          last_synced_at: new Date().toISOString(),
+        })
         .eq("workspace_id", ctx.workspaceId)
         .eq("provider_event_id", link.provider_event_id);
       result.updated++;
@@ -637,7 +779,9 @@ export async function syncWorkspace(ctx: Ctx, calendarIds: string[]) {
   if (status.status !== "connected" || !status.mine)
     throw new HttpError(409, "Verbind eerst Google Calendar.");
   const calendars = await listCalendars(ctx);
-  const tracked = calendarIds.filter((id) => calendars.some((c) => c.id === id)).slice(0, 20);
+  const tracked = calendarIds
+    .filter((id) => calendars.some((c) => c.id === id))
+    .slice(0, 20);
   let changed = false;
   let push = tracked.length > 0;
   const deleted: string[] = [];
@@ -669,7 +813,11 @@ export async function receiveNotification(headers: Headers) {
     .select("workspace_id,calendar_id,channel_token_hash,channel_resource_id")
     .eq("channel_id", channelId)
     .maybeSingle();
-  if (!data || data.channel_token_hash !== hash(token) || data.channel_resource_id !== resourceId)
+  if (
+    !data ||
+    data.channel_token_hash !== hash(token) ||
+    data.channel_resource_id !== resourceId
+  )
     return false;
   await db
     .from("calendar_sync_state")
@@ -683,13 +831,33 @@ export async function receiveNotification(headers: Headers) {
 // state and mappings. Events already in Google are left untouched.
 export async function cleanupCalendar(workspaceId: string, userId: string) {
   const db = adminClient();
-  const { data: states } = await db
+  const { data: states, error: statesError } = await db
     .from("calendar_sync_state")
     .select("channel_id,channel_resource_id")
     .eq("workspace_id", workspaceId);
+  if (statesError)
+    throw new HttpError(
+      503,
+      "De agenda-instellingen konden niet worden geladen.",
+    );
   for (const s of states || [])
     if (s.channel_id && s.channel_resource_id)
-      await stopChannel({ workspaceId, userId }, s.channel_id, s.channel_resource_id).catch(() => {});
-  await db.from("calendar_sync_state").delete().eq("workspace_id", workspaceId);
-  await db.from("calendar_event_links").delete().eq("workspace_id", workspaceId);
+      await stopChannel(
+        { workspaceId, userId },
+        s.channel_id,
+        s.channel_resource_id,
+      ).catch(() => {});
+  const { error: syncError } = await db
+    .from("calendar_sync_state")
+    .delete()
+    .eq("workspace_id", workspaceId);
+  const { error: linksError } = await db
+    .from("calendar_event_links")
+    .delete()
+    .eq("workspace_id", workspaceId);
+  if (syncError || linksError)
+    throw new HttpError(
+      503,
+      "De agenda-instellingen konden niet worden verwijderd.",
+    );
 }
