@@ -1,17 +1,16 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, ChevronDown, Instagram, Mail, Film, ImagePlus } from "lucide-react";
+import { Plus, ChevronDown, Instagram, Mail } from "lucide-react";
 import { usePresence } from "@/components/use-presence";
-// Instagram Post/Story/Reel each map to an existing ContentType (see
+// Only formats Mavix can produce today are offered (Story/Reel follow later).
+// Instagram Post maps to an existing ContentType (see
 // instagram-model.ts) via the "type" query param, which create.tsx already
 // reads. "Campagne" is not a separate creation surface: it's an e-mail kind
 // (see the CHANNELS comment in calendar/page.tsx), so it isn't listed
 // here as a distinct destination.
 const instagramOptions = [
   ["Post", "Instagram post", Instagram],
-  ["Story", "Instagram story", ImagePlus],
-  ["Reel", "Instagram reel", Film],
 ] as const;
 export function AddContentMenu({
   date,

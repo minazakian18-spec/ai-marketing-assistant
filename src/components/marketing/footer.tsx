@@ -14,7 +14,6 @@ const columns = [
   {
     title: "Bedrijf",
     links: [
-      ["/#resources", "Resources"],
       ["/login", "Inloggen"],
       ["/register", "Gratis starten"],
     ],
@@ -22,7 +21,7 @@ const columns = [
   {
     title: "Support",
     links: [
-      ["/#faq", "Veelgestelde vragen"],
+      ["/pricing#faq", "Veelgestelde vragen"],
       ["/pricing", "Facturatie & prijzen"],
     ],
   },
@@ -48,7 +47,7 @@ export function MarketingFooter() {
           </div>
           {columns.map((col) => (
             <div className="mkt-footer-col" key={col.title}>
-              <h4>{col.title}</h4>
+              <h2>{col.title}</h2>
               {col.links.map(([href, label]) => (
                 <Link key={href} href={href}>
                   {label}

@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CheckCircle2, X } from "lucide-react";
+import { CheckCircle2, Info, X } from "lucide-react";
 export function Toast({
   message,
   onClose,
+  tone = "success",
 }: {
   message: string;
   onClose: () => void;
+  tone?: "success" | "info";
 }) {
   const [paused, setPaused] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -34,7 +36,7 @@ export function Toast({
         if (!e.currentTarget.contains(e.relatedTarget)) setPaused(false);
       }}
     >
-      <CheckCircle2 size={20} aria-hidden="true" />
+      {tone === "info" ? <Info size={20} aria-hidden="true" /> : <CheckCircle2 size={20} aria-hidden="true" />}
       <span role="status" aria-live="polite" aria-atomic="true">
         {message}
       </span>

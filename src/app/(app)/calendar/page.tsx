@@ -1,16 +1,20 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus, RefreshCw, Plug } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Film, ImagePlus, Instagram, Mail, PanelLeft, Plug, Plus, RefreshCw, X } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
-import { PageHeading } from "@/components/ui";
+import { Menu } from "@/components/menu";
+import { BrandIcon } from "@/components/brand-icon";
+import { MiniMonth } from "@/components/calendar/mini-month";
+import { EventPopover } from "@/components/calendar/event-popover";
+import { LOCAL_CALENDARS, fromInput, inRange, isLocalCalendar, reschedule, toClientEvent, type LocalCalendarEvent } from "@/lib/calendar/local";
 import { toCalendarItems, type CalendarItem, type CalendarStatus } from "@/lib/calendar-data";
 import type { Post } from "@/lib/types";
 import { campaignError, type EmailCampaign } from "@/lib/email-model";
 import { isBrowserDemo } from "@/lib/demo";
 import { MAVIX_TZ, addDays, zonedParts, type ClientEvent, type EventInput } from "@/lib/calendar/core";
 import { CalendarDetailPanel } from "@/components/calendar/detail-panel";
-import { AddContentMenu } from "@/components/calendar/add-content-menu";
 import { TimeGrid } from "@/components/calendar/time-grid";
 import { MonthGrid } from "@/components/calendar/month-grid";
 import { AgendaList } from "@/components/calendar/agenda-list";
@@ -126,6 +130,7 @@ function inputFrom(e: ClientEvent, start: number, end: number): EventInput {
 
 export default function CalendarPage() {
   const { data, ready, save } = useWorkspace();
+  const router = useRouter();
   const [view, setView] = useState<View>("week");
   const [anchor, setAnchor] = useState(() => new Date());
   const [now, setNow] = useState(() => new Date());
@@ -137,20 +142,26 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<ClientEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [popover, setPopover] = useState<ClientEvent | null>(null);
   const [selected, setSelected] = useState<CalendarItem | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [syncInfo, setSyncInfo] = useState<{ at: Date; mode: string } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const cache = useRef(new Map<string, ClientEvent[]>());
 
   const connected = conn.state === "ready" && conn.status === "connected" && !!conn.mine;
-  const calendars = useMemo(() => (conn.state === "ready" ? conn.calendars : []), [conn]);
-  const visibleIds = useMemo(
-    () => calendars.filter((c) => !hidden.includes(c.id)).map((c) => c.id),
-    [calendars, hidden],
-  );
+  const calendars = useMemo(() => (conn.state === "ready" && connected ? conn.calendars : []), [conn, connected]);
+  const visibleIds = useMemo(() => calendars.filter((c) => !hidden.includes(c.id)).map((c) => c.id), [calendars, hidden]);
   const range = useMemo(() => visibleRange(view, anchor), [view, anchor]);
   const rangeKey = range.start.toISOString() + "|" + range.end.toISOString() + "|" + visibleIds.join(",");
+  const localEvents = useMemo(() => data.calendar?.events || [], [data.calendar]);
+  // Mavix' own calendars behave like extra (always writable) calendars.
+  const localCalendars: GoogleCalendar[] = useMemo(
+    () => LOCAL_CALENDARS.map((c) => ({ id: c.id, summary: c.summary, color: c.color, accessRole: "owner", primary: false })),
+    [],
+  );
+  const allCalendars = useMemo(() => [...calendars, ...localCalendars], [calendars, localCalendars]);
 
   /* ---------- setup ---------- */
   useEffect(() => {
@@ -162,7 +173,7 @@ export default function CalendarPage() {
       /* Preferences are optional. */
     }
     const params = new URLSearchParams(window.location.search);
-    if (params.get("connected")) setToast("Google Calendar is gekoppeld.");
+    if (params.get("connected")) setToast("Google Agenda is gekoppeld.");
     if (params.get("calendar_error") === "permission")
       setToast("Niet alle toestemmingen zijn gegeven. Koppel opnieuw en sta toegang tot je agenda's en afspraken toe.");
     if (params.toString()) window.history.replaceState(null, "", "/calendar");
@@ -191,8 +202,9 @@ export default function CalendarPage() {
       /* Optional. */
     }
   }
+  const toggle = (id: string, on: boolean) => persistHidden(on ? hidden.filter((h) => h !== id) : [...hidden, id]);
 
-  /* ---------- events for the visible range ---------- */
+  /* ---------- Google events for the visible range ---------- */
   const loadEvents = useCallback(
     async (force = false) => {
       if (!connected) return;
@@ -201,11 +213,7 @@ export default function CalendarPage() {
       if (cached && !force) return setEvents(cached);
       setLoadingEvents(true);
       try {
-        const q = new URLSearchParams({
-          start: range.start.toISOString(),
-          end: range.end.toISOString(),
-          calendars: visibleIds.join(","),
-        });
+        const q = new URLSearchParams({ start: range.start.toISOString(), end: range.end.toISOString(), calendars: visibleIds.join(",") });
         const d = await api<{ events: ClientEvent[] }>("/api/calendar/events?" + q);
         cache.current.set(rangeKey, d.events);
         setEvents(d.events);
@@ -228,10 +236,10 @@ export default function CalendarPage() {
       if (!connected) return;
       setSyncing(true);
       try {
-        const r = await api<{ changed: boolean; mode: string; mirrored: { created: number; updated: number; removed: number } }>(
-          "/api/calendar/sync",
-          { method: "POST", body: JSON.stringify({ calendars: visibleIds }) },
-        );
+        const r = await api<{ changed: boolean; mode: string }>("/api/calendar/sync", {
+          method: "POST",
+          body: JSON.stringify({ calendars: visibleIds }),
+        });
         setSyncInfo({ at: new Date(), mode: r.mode });
         if (r.changed || manual) {
           cache.current.clear();
@@ -281,18 +289,17 @@ export default function CalendarPage() {
     }
   }
 
-  async function createEvent(input: EventInput, calendarId: string) {
+  async function googleCreate(input: EventInput, calendarId: string) {
     const temp = optimistic({ id: "__pending__" }, input, calendarId);
     const ok = await mutate(
       (list) => [...list, temp],
       async () => (await api<{ event: ClientEvent }>("/api/calendar/events", { method: "POST", body: JSON.stringify({ calendarId, input }) })).event,
       !!input.repeat,
     );
-    if (ok) setToast("Evenement aangemaakt in Google Calendar.");
+    if (ok) setToast("Afspraak opgeslagen in Google Agenda.");
     return ok;
   }
-
-  async function updateEvent(event: ClientEvent, input: EventInput, targetCalendarId: string, scope: Scope) {
+  async function googleUpdate(event: ClientEvent, input: EventInput, targetCalendarId: string, scope: Scope) {
     const wide = !!event.recurringEventId && scope !== "this";
     const next = optimistic({ ...event, id: "__pending__" }, input, targetCalendarId);
     const ok = await mutate(
@@ -301,63 +308,71 @@ export default function CalendarPage() {
         (
           await api<{ event: ClientEvent }>("/api/calendar/events", {
             method: "PATCH",
-            body: JSON.stringify({
-              calendarId: event.calendarId,
-              eventId: event.id,
-              targetCalendarId,
-              scope,
-              etag: event.etag,
-              input,
-            }),
+            body: JSON.stringify({ calendarId: event.calendarId, eventId: event.id, targetCalendarId, scope, etag: event.etag, input }),
           })
         ).event,
       wide || !!input.repeat !== !!event.recurrence,
     );
-    if (ok) setToast("Wijziging opgeslagen in Google Calendar.");
+    if (ok) setToast("Wijziging opgeslagen in Google Agenda.");
     return ok;
   }
-
-  async function deleteEvent(event: ClientEvent, scope: Scope) {
+  async function googleDelete(event: ClientEvent, scope: Scope, quiet = false) {
     const wide = !!event.recurringEventId && scope !== "this";
     const ok = await mutate(
       (list) => list.filter((e) => !(e.id === event.id && e.calendarId === event.calendarId)),
       async () => {
-        await api("/api/calendar/events", {
-          method: "DELETE",
-          body: JSON.stringify({ calendarId: event.calendarId, eventId: event.id, scope }),
-        });
+        await api("/api/calendar/events", { method: "DELETE", body: JSON.stringify({ calendarId: event.calendarId, eventId: event.id, scope }) });
       },
       wide,
     );
-    if (ok) setToast("Evenement verwijderd uit Google Calendar.");
+    if (ok && !quiet) setToast("Afspraak verwijderd uit Google Agenda.");
     return ok;
   }
 
-  /* ---------- Mavix content (workspace data, separate from Google) ---------- */
+  /* ---------- Mavix calendars (workspace data) ---------- */
+  const saveLocal = (next: LocalCalendarEvent[], message: string) => save({ ...data, calendar: { events: next } }, message);
+
+  async function createEvent(input: EventInput, calendarId: string) {
+    if (isLocalCalendar(calendarId)) return saveLocal([...localEvents, fromInput(input, calendarId)], "Afspraak opgeslagen");
+    return googleCreate(input, calendarId);
+  }
+  async function updateEvent(event: ClientEvent, input: EventInput, target: string, scope: Scope) {
+    const fromLocal = isLocalCalendar(event.calendarId);
+    const toLocal = isLocalCalendar(target);
+    if (fromLocal && toLocal) {
+      const base = localEvents.find((e) => e.id === event.id);
+      if (!base) return false;
+      return saveLocal(localEvents.map((e) => (e.id === event.id ? fromInput(input, target, base) : e)), "Afspraak bijgewerkt");
+    }
+    if (fromLocal && !toLocal) {
+      // Moved to Google: create there first, then remove the Mavix copy.
+      if (!(await googleCreate(input, target))) return false;
+      return saveLocal(localEvents.filter((e) => e.id !== event.id), "Afspraak verplaatst naar Google Agenda");
+    }
+    if (!fromLocal && toLocal) {
+      if (!(await saveLocal([...localEvents, fromInput(input, target)], "Afspraak verplaatst naar Mavix"))) return false;
+      return googleDelete(event, "this", true);
+    }
+    return googleUpdate(event, input, target, scope);
+  }
+  async function deleteEvent(event: ClientEvent, scope: Scope) {
+    if (isLocalCalendar(event.calendarId)) return saveLocal(localEvents.filter((e) => e.id !== event.id), "Afspraak verwijderd");
+    return googleDelete(event, scope);
+  }
+
+  /* ---------- Mavix content (posts and campaigns) ---------- */
   const mirrorAfterChange = () => {
     if (connected && conn.state === "ready" && conn.settings.mirror) void sync();
   };
-
   async function moveItem(item: CalendarItem, dateKey: string, timeStr: string) {
     const dateValue = dateKey + "T" + (timeStr || "18:00");
-    const message =
-      "Content verplaatst naar " +
-      fromKey(dateKey).toLocaleDateString("nl-NL", { day: "numeric", month: "long" });
+    const message = "Content verplaatst naar " + fromKey(dateKey).toLocaleDateString("nl-NL", { day: "numeric", month: "long" });
     if (item.source.kind === "post") {
-      await save(
-        { ...data, posts: data.posts.map((p) => (p.id === item.source.id ? { ...p, date: dateValue } : p)) },
-        message,
-      );
+      await save({ ...data, posts: data.posts.map((p) => (p.id === item.source.id ? { ...p, date: dateValue } : p)) }, message);
     } else {
       const campaigns = data.email?.campaigns || [];
       await save(
-        {
-          ...data,
-          email: {
-            settings: data.email!.settings,
-            campaigns: campaigns.map((c) => (c.id === item.source.id ? { ...c, date: dateValue } : c)),
-          },
-        },
+        { ...data, email: { settings: data.email!.settings, campaigns: campaigns.map((c) => (c.id === item.source.id ? { ...c, date: dateValue } : c)) } },
         message,
       );
     }
@@ -378,20 +393,14 @@ export default function CalendarPage() {
       const error = campaignError(c, future);
       if (error) return setToast(error);
       const next: EmailCampaign = { ...c, status: future ? "scheduled" : "approved", date: future ? c.date : "", reason: "" };
-      await save(
-        { ...data, email: { settings: data.email!.settings, campaigns: campaigns.map((x) => (x.id === c.id ? next : x)) } },
-        "Content goedgekeurd",
-      );
+      await save({ ...data, email: { settings: data.email!.settings, campaigns: campaigns.map((x) => (x.id === c.id ? next : x)) } }, "Content goedgekeurd");
     }
     setSelected(null);
     mirrorAfterChange();
   }
   async function rejectItem(item: CalendarItem) {
     if (item.source.kind === "post") {
-      await save(
-        { ...data, posts: data.posts.map((p) => (p.id === item.source.id ? { ...p, status: "rejected", date: "" } : p)) },
-        "Concept afgewezen",
-      );
+      await save({ ...data, posts: data.posts.map((p) => (p.id === item.source.id ? { ...p, status: "rejected", date: "" } : p)) }, "Concept afgewezen");
     } else {
       const campaigns = data.email?.campaigns || [];
       await save(
@@ -440,22 +449,26 @@ export default function CalendarPage() {
   /* ---------- entries & interactions ---------- */
   const items = ready ? toCalendarItems(data) : [];
   const filteredItems = items
-    .filter((i) =>
-      channel === "all" ? true : channel === "Campagnes" ? i.channel === "E-mail" && i.contentType === "Campaign" : i.channel === channel,
-    )
+    .filter((i) => (channel === "all" ? true : channel === "Campagnes" ? i.channel === "E-mail" && i.contentType === "Campaign" : i.channel === channel))
     .filter((i) => statusFilter === "all" || i.status === statusFilter);
+  const shownLocal = localEvents.filter((e) => !hidden.includes(e.calendarId) && inRange(e, range.start, range.end)).map(toClientEvent);
   const entries: Entry[] = [
-    ...(connected ? googleEntries(events.filter((e) => visibleIds.includes(e.calendarId)), calendars) : []),
+    ...googleEntries([...(connected ? events.filter((e) => visibleIds.includes(e.calendarId)) : []), ...shownLocal], allCalendars),
     ...(showMavix ? mavixEntries(filteredItems) : []),
   ];
 
   function select(entry: Entry) {
     if (entry.kind === "mavix" && entry.item) return setSelected(entry.item);
-    if (entry.google) setEditor({ mode: "edit", event: entry.google });
+    if (entry.google) setPopover(entry.google);
   }
   function create(start: Date, end: Date, allDay: boolean) {
-    if (!connected) return setToast("Koppel Google Calendar om afspraken te maken. Content plan je via ‘Content plannen’.");
     setEditor({ mode: "create", start, end, allDay });
+  }
+  function createNow() {
+    const s = new Date();
+    s.setMinutes(0, 0, 0);
+    s.setHours(s.getHours() + 1);
+    create(s, new Date(s.getTime() + 3600000), false);
   }
   function move(entry: Entry, start: number, end: number) {
     if (entry.kind === "mavix" && entry.item) {
@@ -463,19 +476,21 @@ export default function CalendarPage() {
       return void moveItem(entry.item, p.date, p.time);
     }
     const e = entry.google!;
+    if (isLocalCalendar(e.calendarId)) {
+      const base = localEvents.find((x) => x.id === e.id);
+      if (base) void saveLocal(localEvents.map((x) => (x.id === e.id ? reschedule(base, start, end, dayKey) : x)), "Afspraak verplaatst");
+      return;
+    }
     if (e.recurringEventId) setToast("Alleen deze gebeurtenis wordt verplaatst. Gebruik bewerken voor de hele reeks.");
-    void updateEvent(e, inputFrom(e, start, end), e.calendarId, "this");
+    void googleUpdate(e, inputFrom(e, start, end), e.calendarId, "this");
   }
   function moveDay(entry: Entry, day: Date) {
     if (entry.allDay && entry.google) {
+      if (isLocalCalendar(entry.google.calendarId)) return move(entry, day.getTime(), day.getTime() + 86400000);
       const days = Math.round((fromKey(entry.endDate!).getTime() - fromKey(entry.startDate!).getTime()) / 86400000);
       const start = dayKey(day);
-      const input: EventInput = {
-        ...inputFrom(entry.google, entry.start, entry.end),
-        startDate: start,
-        endDate: addDays(start, days - 1),
-      };
-      return void updateEvent(entry.google, input, entry.google.calendarId, "this");
+      const input: EventInput = { ...inputFrom(entry.google, entry.start, entry.end), startDate: start, endDate: addDays(start, days - 1) };
+      return void googleUpdate(entry.google, input, entry.google.calendarId, "this");
     }
     const s = new Date(entry.start);
     const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), s.getHours(), s.getMinutes()).getTime();
@@ -496,7 +511,7 @@ export default function CalendarPage() {
     setConn({ ...conn, settings: next });
     try {
       await api("/api/calendar/settings", { method: "PATCH", body: JSON.stringify(next) });
-      setToast(next.mirror ? "Geplande Mavix-content wordt met Google Calendar gesynchroniseerd." : "Mavix-content wordt niet meer naar Google Calendar gesynchroniseerd.");
+      setToast(next.mirror ? "Geplande Mavix-content wordt met Google Agenda gesynchroniseerd." : "Mavix-content wordt niet meer naar Google Agenda gesynchroniseerd.");
       void sync();
     } catch (e) {
       setConn({ ...conn, settings: before });
@@ -510,86 +525,64 @@ export default function CalendarPage() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const weekDays =
-    view === "day" ? [startOfDay(anchor)] : Array.from({ length: 7 }, (_, i) => addDaysLocal(startOfWeek(anchor), i));
+  const weekDays = view === "day" ? [startOfDay(anchor)] : Array.from({ length: 7 }, (_, i) => addDaysLocal(startOfWeek(anchor), i));
   const writable = calendars.filter((c) => c.accessRole === "owner" || c.accessRole === "writer");
   const status = conn.state === "ready" ? conn.status : "";
+  const teamOwned = conn.state === "ready" && conn.mine === false && status !== "disconnected";
+  const popoverCalendar = popover ? allCalendars.find((c) => c.id === popover.calendarId) : null;
+  const contentLink = (type: string) => "/social?tab=assist&type=" + type;
 
   return (
     <div className="cal-page">
-      <PageHeading eyebrow="Werkruimte" title="Kalender" description="Je afspraken en je marketingplanning in één overzicht." />
-
-      {conn.state === "ready" && !connected && (
-        <section className="panel cal-connect">
-          <div>
-            <h2>
-              {status === "reconnect_required"
-                ? "Verbind Google Calendar opnieuw"
-                : status === "permission_missing"
-                  ? "Toestemming voor Google Calendar ontbreekt"
-                  : conn.mine === false && status !== "disconnected"
-                    ? "Google Calendar is gekoppeld door een teamlid"
-                    : "Verbind Google Calendar"}
-            </h2>
-            <p>
-              {conn.mine === false && status !== "disconnected"
-                ? `De agenda van ${conn.email || "dit teamlid"} is privé en alleen voor hem of haar zichtbaar.`
-                : "Bekijk je afspraken en marketingplanning samen in één kalender, en plan direct in je eigen Google Calendar."}
-            </p>
-          </div>
-          {(conn.mine !== false || status === "disconnected") && (
-            <button type="button" className="button primary" onClick={() => void connect()}>
-              <Plug size={15} />
-              {status === "disconnected" ? "Google Calendar koppelen" : "Opnieuw koppelen"}
+      <h1 className="sr-only">Kalender</h1>
+      <div className="cal-shell ui-card" data-panel={panelOpen ? "open" : "closed"}>
+        <aside className="cal-sidebar" aria-label="Kalenders">
+          <div className="cal-sidebar-top">
+            <Menu
+              label="Maken"
+              align="start"
+              className="cal-create"
+              trigger={
+                <>
+                  <Plus size={18} />
+                  Maken
+                  <ChevronDown size={14} />
+                </>
+              }
+              items={[
+                { label: "Afspraak", icon: <CalendarPlus size={15} />, onSelect: createNow },
+                { type: "separator" },
+                { type: "heading", label: "Content plannen" },
+                { label: "Instagram-post", icon: <Instagram size={15} />, onSelect: () => router.push(contentLink("Post")) },
+                { label: "Instagram-story · binnenkort", icon: <ImagePlus size={15} />, disabled: true, onSelect: () => {} },
+                { label: "Instagram-reel · binnenkort", icon: <Film size={15} />, disabled: true, onSelect: () => {} },
+                { label: "E-mail of nieuwsbrief", icon: <Mail size={15} />, onSelect: () => router.push("/email?tab=assist") },
+              ]}
+            />
+            <button type="button" className="ui-icon-button cal-sidebar-close" aria-label="Paneel sluiten" onClick={() => setPanelOpen(false)}>
+              <X size={16} />
             </button>
-          )}
-        </section>
-      )}
-      {conn.state === "demo" && (
-        <p className="ws-notice">In de testmodus kun je Google Calendar niet koppelen. Je ziet hier alleen de Mavix-content uit de voorbeeldwerkruimte.</p>
-      )}
-      {conn.state === "error" && <p className="ws-notice">{conn.message}</p>}
-
-      <div className="cal-layout">
-        <aside className="cal-side" aria-label="Agenda's en filters">
-          <div className="cal-side-actions">
-            {connected && (
-              <button type="button" className="button primary" onClick={() => create(new Date(new Date().setMinutes(0, 0, 0) + 3600000), new Date(new Date().setMinutes(0, 0, 0) + 7200000), false)}>
-                <Plus size={15} />
-                Nieuw evenement
-              </button>
-            )}
-            <AddContentMenu />
           </div>
 
-          <details className="cal-side-section" open>
-            <summary>Mijn agenda&apos;s</summary>
-            {connected ? (
-              <ul className="cal-list">
-                {calendars.map((c) => (
-                  <li key={c.id}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={!hidden.includes(c.id)}
-                        onChange={(e) => persistHidden(e.target.checked ? hidden.filter((h) => h !== c.id) : [...hidden, c.id])}
-                        style={{ accentColor: c.color }}
-                      />
-                      <span className="cal-swatch" style={{ background: c.color }} aria-hidden="true" />
-                      <span className="cal-list-name">{c.summary}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="cal-side-note">Nog geen Google Calendar gekoppeld.</p>
-            )}
-            <ul className="cal-list">
+          <MiniMonth
+            anchor={anchor}
+            rangeStart={range.start}
+            rangeEnd={range.end}
+            onPick={(d) => {
+              setAnchor(d);
+              setPanelOpen(false);
+            }}
+          />
+
+          <section className="cal-group">
+            <h2>Mijn kalenders</h2>
+            <ul className="cal-checks">
               <li>
                 <label>
                   <input
                     type="checkbox"
                     checked={showMavix}
+                    style={{ accentColor: "#6d28d9" }}
                     onChange={(e) => {
                       setShowMavix(e.target.checked);
                       try {
@@ -599,138 +592,215 @@ export default function CalendarPage() {
                       }
                     }}
                   />
-                  <span className="cal-swatch is-mavix" aria-hidden="true" />
-                  <span className="cal-list-name">Mavix-content</span>
+                  <span>Mavix-content</span>
                 </label>
               </li>
+              {LOCAL_CALENDARS.map((c) => (
+                <li key={c.id}>
+                  <label>
+                    <input type="checkbox" checked={!hidden.includes(c.id)} style={{ accentColor: c.color }} onChange={(e) => toggle(c.id, e.target.checked)} />
+                    <span>{c.summary}</span>
+                  </label>
+                </li>
+              ))}
             </ul>
-          </details>
-
-          {showMavix && (
-            <details className="cal-side-section">
-              <summary>Filters voor content</summary>
-              <div className="cal-filters" role="group" aria-label="Filter op kanaal">
-                {CHANNELS.map((c) => (
-                  <button key={c} type="button" className="cal-pill" aria-pressed={channel === c} onClick={() => setChannel(c)}>
-                    {c === "all" ? "Alles" : c}
-                  </button>
-                ))}
-              </div>
-              <label className="cal-select">
-                <span className="sr-only">Filter op status</span>
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | CalendarStatus)}>
-                  {STATUS_FILTERS.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
+            {showMavix && (
+              <details className="cal-disclosure">
+                <summary>Contentfilters</summary>
+                <div className="cal-filters" role="group" aria-label="Filter op kanaal">
+                  {CHANNELS.map((c) => (
+                    <button key={c} type="button" className="cal-pill" aria-pressed={channel === c} onClick={() => setChannel(c)}>
+                      {c === "all" ? "Alles" : c}
+                    </button>
                   ))}
-                </select>
-              </label>
-            </details>
-          )}
-
-          {connected && conn.state === "ready" && (
-            <details className="cal-side-section">
-              <summary>Synchronisatie</summary>
-              <label className="cal-toggle">
-                <input
-                  type="checkbox"
-                  checked={conn.settings.mirror}
-                  onChange={(e) => void saveSettings({ ...conn.settings, mirror: e.target.checked })}
-                />
-                Synchroniseer geplande Mavix-content met Google Calendar
-              </label>
-              {conn.settings.mirror && (
+                </div>
                 <label className="cal-select">
-                  <span>Naar agenda</span>
-                  <select
-                    value={conn.settings.mirrorCalendarId === "primary" ? writable.find((c) => c.primary)?.id || "primary" : conn.settings.mirrorCalendarId}
-                    onChange={(e) => void saveSettings({ ...conn.settings, mirrorCalendarId: e.target.value })}
-                  >
-                    {writable.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.summary}
+                  <span className="sr-only">Filter op status</span>
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | CalendarStatus)}>
+                    {STATUS_FILTERS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
                       </option>
                     ))}
                   </select>
                 </label>
-              )}
-              <p className="cal-side-note">
-                Verbonden als {conn.email}.{" "}
-                {syncInfo
-                  ? `Laatst gesynchroniseerd om ${syncInfo.at.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}${syncInfo.mode === "push" ? " · wijzigingen worden direct gemeld" : ""}.`
-                  : ""}
-              </p>
-              <button type="button" className="button secondary" onClick={() => void sync(true)} disabled={syncing}>
-                <RefreshCw size={14} />
-                {syncing ? "Synchroniseren…" : "Nu synchroniseren"}
-              </button>
-              <Link className="text-link" href="/account/integraties">
-                Koppeling beheren
-              </Link>
-            </details>
-          )}
+              </details>
+            )}
+          </section>
+
+          <section className="cal-group">
+            <h2>Gekoppelde kalenders</h2>
+            <div className="cal-account">
+              <BrandIcon brand="google_calendar" size={20} />
+              <div>
+                <strong>Google Agenda</strong>
+                {conn.state === "ready" && conn.email && status !== "disconnected" && <span>{conn.email}</span>}
+              </div>
+              <span className={"cal-state is-" + (connected ? "ok" : status === "reconnect_required" || status === "permission_missing" ? "warn" : "off")}>
+                {connected
+                  ? "Verbonden"
+                  : status === "reconnect_required"
+                    ? "Verlopen"
+                    : status === "permission_missing"
+                      ? "Toestemming nodig"
+                      : teamOwned
+                        ? "Teamlid"
+                        : "Niet verbonden"}
+              </span>
+            </div>
+            {conn.state === "demo" && <p className="cal-note">In de testmodus kun je Google Agenda niet koppelen.</p>}
+            {conn.state === "error" && <p className="cal-note">{conn.message}</p>}
+            {conn.state === "ready" && !connected && (
+              <>
+                <p className="cal-note">
+                  {teamOwned
+                    ? `De agenda van ${conn.email || "dit teamlid"} is privé en alleen voor diegene zichtbaar.`
+                    : status === "reconnect_required"
+                      ? "De koppeling is verlopen. Verbind opnieuw om je afspraken te zien."
+                      : status === "permission_missing"
+                        ? "Mavix mist toegang tot je agenda's. Geef opnieuw toestemming."
+                        : "Koppel Google Agenda om je afspraken naast je Mavix-planning te zien."}
+                </p>
+                {!teamOwned && (
+                  <button type="button" className="button secondary cal-connect-btn" onClick={() => void connect()}>
+                    <Plug size={14} />
+                    {status === "disconnected" || !status ? "Koppel Google Agenda" : "Opnieuw verbinden"}
+                  </button>
+                )}
+              </>
+            )}
+            {connected && (
+              <ul className="cal-checks">
+                {calendars.map((c) => (
+                  <li key={c.id}>
+                    <label>
+                      <input type="checkbox" checked={!hidden.includes(c.id)} style={{ accentColor: c.color }} onChange={(e) => toggle(c.id, e.target.checked)} />
+                      <span>{c.summary}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {connected && conn.state === "ready" && (
+              <details className="cal-disclosure">
+                <summary>Synchronisatie</summary>
+                <label className="cal-toggle">
+                  <input type="checkbox" checked={conn.settings.mirror} onChange={(e) => void saveSettings({ ...conn.settings, mirror: e.target.checked })} />
+                  Geplande Mavix-content ook in Google Agenda zetten
+                </label>
+                {conn.settings.mirror && (
+                  <label className="cal-select">
+                    <span>Naar agenda</span>
+                    <select
+                      value={conn.settings.mirrorCalendarId === "primary" ? writable.find((c) => c.primary)?.id || "primary" : conn.settings.mirrorCalendarId}
+                      onChange={(e) => void saveSettings({ ...conn.settings, mirrorCalendarId: e.target.value })}
+                    >
+                      {writable.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.summary}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <p className="cal-note">
+                  {syncInfo
+                    ? `Laatst gesynchroniseerd om ${syncInfo.at.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}${syncInfo.mode === "push" ? " · wijzigingen worden direct gemeld" : ""}.`
+                    : "Wordt automatisch gesynchroniseerd."}
+                </p>
+                <button type="button" className="button secondary cal-connect-btn" onClick={() => void sync(true)} disabled={syncing}>
+                  <RefreshCw size={14} />
+                  {syncing ? "Synchroniseren…" : "Nu synchroniseren"}
+                </button>
+                <Link className="text-link cal-manage" href="/account/integraties">
+                  Koppeling beheren
+                </Link>
+              </details>
+            )}
+          </section>
         </aside>
+        {panelOpen && <div className="cal-sidebar-scrim" onClick={() => setPanelOpen(false)} aria-hidden="true" />}
 
         <section className="cal-main" aria-busy={loadingEvents}>
-          <div className="cal-toolbar">
-            <div className="cal-toolbar-left">
-              <button type="button" className="button secondary" onClick={() => setAnchor(new Date())}>
-                Vandaag
+          <div className="cal-bar">
+            <button type="button" className="ui-icon-button cal-sidebar-open" aria-label="Kalenders tonen" onClick={() => setPanelOpen(true)}>
+              <PanelLeft size={17} />
+            </button>
+            <button type="button" className="button secondary cal-today" onClick={() => setAnchor(new Date())}>
+              Vandaag
+            </button>
+            <div className="cal-arrows">
+              <button type="button" className="ui-icon-button" aria-label="Vorige periode" onClick={() => setAnchor(shiftAnchor(view, anchor, -1))}>
+                <ChevronLeft size={18} />
               </button>
-              <button type="button" className="cal-nav-btn" aria-label="Vorige periode" onClick={() => setAnchor(shiftAnchor(view, anchor, -1))}>
-                <ChevronLeft size={17} />
+              <button type="button" className="ui-icon-button" aria-label="Volgende periode" onClick={() => setAnchor(shiftAnchor(view, anchor, 1))}>
+                <ChevronRight size={18} />
               </button>
-              <button type="button" className="cal-nav-btn" aria-label="Volgende periode" onClick={() => setAnchor(shiftAnchor(view, anchor, 1))}>
-                <ChevronRight size={17} />
-              </button>
-              <h2 className="cal-period-label">{periodLabel(view, anchor)}</h2>
             </div>
-            <div className="tabs cal-views" role="group" aria-label="Weergave">
+            <h2 className="cal-title">{periodLabel(view, anchor)}</h2>
+            {loadingEvents && <span className="cal-loading">Laden…</span>}
+            <div className="cal-seg" role="group" aria-label="Weergave">
               {VIEWS.map(([v, label]) => (
-                <button key={v} type="button" aria-pressed={view === v} className={(view === v ? "selected" : "") + (v === "week" ? " cal-view-week" : "")} onClick={() => setView(v)}>
+                <button key={v} type="button" aria-pressed={view === v} className={"cal-seg-" + v} onClick={() => setView(v)}>
                   {label}
                 </button>
               ))}
             </div>
           </div>
-          <p className="cal-tz">Tijden in {browserTimeZone().replace("_", " ")}{loadingEvents ? " · laden…" : ""}</p>
 
-          {!ready ? (
-            <p role="status">Kalender laden…</p>
-          ) : view === "month" ? (
-            <MonthGrid
-              anchor={anchor}
-              entries={entries}
-              now={now}
-              onSelect={select}
-              onCreate={(day) => create(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9), new Date(day.getFullYear(), day.getMonth(), day.getDate(), 10), false)}
-              onMoveDay={moveDay}
-              onShowDay={(day) => {
-                setAnchor(day);
-                setView("day");
-              }}
-            />
-          ) : view === "agenda" ? (
-            <AgendaList start={range.start} days={30} entries={entries} now={now} onSelect={select} />
-          ) : (
-            <TimeGrid days={weekDays} entries={entries} now={now} onSelect={select} onCreate={create} onMove={move} />
-          )}
-          <p className="calendar-disclaimer">
-            Mavix-content wordt niet automatisch gepubliceerd of verstuurd. Google-evenementen worden direct in Google Calendar opgeslagen.
+          <div className="cal-view">
+            {!ready ? (
+              <p role="status" className="cal-note">
+                Kalender laden…
+              </p>
+            ) : view === "month" ? (
+              <MonthGrid
+                anchor={anchor}
+                entries={entries}
+                now={now}
+                onSelect={select}
+                onCreate={(day) => create(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9), new Date(day.getFullYear(), day.getMonth(), day.getDate(), 10), false)}
+                onMoveDay={moveDay}
+                onShowDay={(day) => {
+                  setAnchor(day);
+                  setView("day");
+                }}
+              />
+            ) : view === "agenda" ? (
+              <AgendaList start={range.start} days={30} entries={entries} now={now} onSelect={select} />
+            ) : (
+              <TimeGrid days={weekDays} entries={entries} now={now} onSelect={select} onCreate={create} onMove={move} />
+            )}
+          </div>
+          <p className="cal-foot">
+            Tijden in {browserTimeZone().replace("_", " ")}. Mavix-content wordt niet automatisch gepubliceerd of verstuurd.
           </p>
         </section>
       </div>
 
+      {popover && popoverCalendar && (
+        <EventPopover
+          event={popover}
+          calendar={popoverCalendar}
+          source={isLocalCalendar(popover.calendarId) ? "mavix" : "google"}
+          onClose={() => setPopover(null)}
+          onEdit={() => {
+            setEditor({ mode: "edit", event: popover });
+            setPopover(null);
+          }}
+          onDelete={async () => {
+            const ok = await deleteEvent(popover, "this");
+            if (ok) setPopover(null);
+            return ok;
+          }}
+        />
+      )}
       <EventEditor
         state={editor}
-        calendars={calendars}
+        calendars={allCalendars}
         onClose={() => setEditor(null)}
         onSave={async (input, calendarId, scope) => {
-          const ok =
-            editor?.mode === "edit"
-              ? await updateEvent(editor.event, input, calendarId, scope)
-              : await createEvent(input, calendarId);
+          const ok = editor?.mode === "edit" ? await updateEvent(editor.event, input, calendarId, scope) : await createEvent(input, calendarId);
           if (ok) setEditor(null);
           return ok;
         }}

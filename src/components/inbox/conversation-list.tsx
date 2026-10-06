@@ -1,32 +1,40 @@
 "use client";
-import { Search } from "lucide-react";
-import type { Channel, ConversationView } from "@/lib/inbox/shared";
-import { ChannelIcon } from "./channel-icon";
+import { ListFilter, Search, X } from "lucide-react";
+import { Menu, type MenuItem } from "@/components/menu";
+import { BrandIcon } from "@/components/brand-icon";
+import { capabilities, type Channel, type ConversationView } from "@/lib/inbox/shared";
 import { initials, listTime } from "./format";
 
 export type StatusFilter = "open" | "unread" | "mine" | "resolved";
-const CHANNEL_FILTERS: [Channel | "", string][] = [
-  ["", "Alles"],
-  ["whatsapp", "WhatsApp"],
-  ["instagram", "Instagram"],
-  ["messenger", "Messenger"],
-  ["gmail", "E-mail"],
-];
-const STATUS_FILTERS: [StatusFilter, string][] = [
-  ["open", "Open"],
-  ["unread", "Ongelezen"],
-  ["mine", "Toegewezen aan mij"],
-  ["resolved", "Afgehandeld"],
-];
+export const STATUS_LABEL: Record<StatusFilter, string> = {
+  open: "Open",
+  unread: "Ongelezen",
+  mine: "Toegewezen aan mij",
+  resolved: "Afgehandeld",
+};
+
+// Contact avatar with the channel's logo as a small badge.
+export function ContactAvatar({ name, channel, size = 38 }: { name: string; channel: Channel; size?: number }) {
+  return (
+    <span className="ib-avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.34) }} aria-hidden="true">
+      {initials(name)}
+      <span className="ib-avatar-badge">
+        <BrandIcon brand={channel} size={Math.max(11, Math.round(size * 0.32))} />
+      </span>
+    </span>
+  );
+}
 
 export function ConversationList({
   conversations,
+  channels,
   selectedId,
   channel,
   status,
   query,
   loading,
   hasMore,
+  unread,
   onChannel,
   onStatus,
   onQuery,
@@ -34,40 +42,61 @@ export function ConversationList({
   onMore,
 }: {
   conversations: ConversationView[];
+  channels: Channel[];
   selectedId: string | null;
   channel: Channel | "";
   status: StatusFilter;
   query: string;
   loading: boolean;
   hasMore: boolean;
+  unread: number;
   onChannel: (c: Channel | "") => void;
   onStatus: (s: StatusFilter) => void;
   onQuery: (q: string) => void;
   onSelect: (id: string) => void;
   onMore: () => void;
 }) {
+  const filtered = channel !== "" || status !== "open";
+  const items: MenuItem[] = [
+    { type: "heading", label: "Kanaal" },
+    { label: "Alle kanalen", checked: channel === "", onSelect: () => onChannel("") },
+    ...channels.map((c) => ({ label: capabilities[c].label, checked: channel === c, onSelect: () => onChannel(c) })),
+    { type: "separator" },
+    { type: "heading", label: "Status" },
+    ...(Object.keys(STATUS_LABEL) as StatusFilter[]).map((s) => ({ label: STATUS_LABEL[s], checked: status === s, onSelect: () => onStatus(s) })),
+  ];
   return (
     <aside className="ib-list" aria-label="Gesprekken">
-      <div className="ib-list-tools">
-        <label className="ib-search">
-          <Search size={15} aria-hidden="true" />
-          <span className="sr-only">Zoek in gesprekken</span>
-          <input type="search" placeholder="Zoek op naam of bericht" value={query} maxLength={100} onChange={(e) => onQuery(e.target.value)} />
-        </label>
-        <div className="ib-chips" role="group" aria-label="Kanaal">
-          {CHANNEL_FILTERS.map(([value, label]) => (
-            <button key={label} type="button" aria-pressed={channel === value} onClick={() => onChannel(value)}>
-              {label}
-            </button>
-          ))}
+      <div className="ib-list-head">
+        <div className="ib-list-title">
+          <h2>Gesprekken</h2>
+          {unread > 0 && <span className="ib-count">{unread} ongelezen</span>}
         </div>
-        <div className="ib-chips ib-chips-status" role="group" aria-label="Status">
-          {STATUS_FILTERS.map(([value, label]) => (
-            <button key={value} type="button" aria-pressed={status === value} onClick={() => onStatus(value)}>
-              {label}
-            </button>
-          ))}
+        <div className="ib-search-row">
+          <label className="ib-search">
+            <Search size={15} aria-hidden="true" />
+            <span className="sr-only">Zoek in gesprekken</span>
+            <input type="search" placeholder="Zoeken" value={query} maxLength={100} onChange={(e) => onQuery(e.target.value)} />
+          </label>
+          <Menu label="Filteren" className={filtered ? "is-active" : ""} trigger={<ListFilter size={16} />} items={items} />
         </div>
+        {filtered && (
+          <div className="ib-active-filters">
+            {channel && (
+              <button type="button" onClick={() => onChannel("")}>
+                <BrandIcon brand={channel} size={12} />
+                {capabilities[channel].label}
+                <X size={12} aria-label="Kanaalfilter wissen" />
+              </button>
+            )}
+            {status !== "open" && (
+              <button type="button" onClick={() => onStatus("open")}>
+                {STATUS_LABEL[status]}
+                <X size={12} aria-label="Statusfilter wissen" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <ul className="ib-items">
         {conversations.map((c) => (
@@ -78,32 +107,31 @@ export function ConversationList({
               aria-current={selectedId === c.id ? "true" : undefined}
               onClick={() => onSelect(c.id)}
             >
-              <span className="ib-avatar" aria-hidden="true">
-                {initials(c.contact.name)}
-                <ChannelIcon channel={c.channel} size={10} />
-              </span>
+              <ContactAvatar name={c.contact.name} channel={c.channel} />
               <span className="ib-item-main">
                 <span className="ib-item-top">
                   <strong>{c.contact.name}</strong>
                   <time dateTime={c.lastMessageAt}>{listTime(c.lastMessageAt)}</time>
                 </span>
-                {c.subject && <span className="ib-item-subject">{c.subject}</span>}
-                <span className="ib-item-preview">
-                  {c.lastDirection === "outbound" && <span className="ib-you">Jij: </span>}
-                  {c.preview || "—"}
+                <span className="ib-item-bottom">
+                  <span className="ib-item-preview">
+                    {c.lastDirection === "outbound" && <span className="ib-you">Jij: </span>}
+                    {c.subject && c.channel === "gmail" ? c.subject + " — " : ""}
+                    {c.preview || "—"}
+                  </span>
+                  {c.unread > 0 && (
+                    <span className="ib-unread" aria-label={c.unread + " ongelezen"}>
+                      {c.unread > 9 ? "9+" : c.unread}
+                    </span>
+                  )}
                 </span>
               </span>
-              {c.unread > 0 && (
-                <span className="ib-unread" aria-label={c.unread + " ongelezen"}>
-                  {c.unread > 9 ? "9+" : c.unread}
-                </span>
-              )}
             </button>
           </li>
         ))}
       </ul>
       {!loading && !conversations.length && (
-        <p className="ib-list-empty">{query ? "Geen gesprekken gevonden." : "Geen gesprekken in deze weergave."}</p>
+        <p className="ib-list-empty">{query ? "Geen gesprekken gevonden." : filtered ? "Geen gesprekken met dit filter." : "Nog geen gesprekken."}</p>
       )}
       {loading && !conversations.length && <p className="ib-list-empty">Gesprekken laden…</p>}
       {hasMore && (

@@ -84,10 +84,10 @@
 /* Reveal animation */
 .mkt-reveal {
   opacity: 0;
-  transform: translateY(18px);
+  transform: translateY(12px);
   transition:
-    opacity 620ms var(--ease-premium),
-    transform 620ms var(--ease-premium);
+    opacity 420ms var(--ease-premium),
+    transform 420ms var(--ease-premium);
 }
 .mkt-reveal-in {
   opacity: 1;
@@ -141,9 +141,9 @@
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px) saturate(1.5);
-  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  /* Nearly opaque instead of a blur+saturate backdrop filter, which had to
+     be recomputed on every scroll frame. */
+  background: rgba(255, 255, 255, 0.97);
   border-bottom: 1px solid var(--border);
   transition:
     background-color 280ms var(--ease-premium),
@@ -530,12 +530,12 @@
   inset: 0;
   z-index: 60;
   background: rgba(15, 8, 35, 0.36);
-  backdrop-filter: blur(2px);
   opacity: 0;
   pointer-events: none;
   transition: opacity 280ms var(--ease-premium);
 }
 .mkt-agent-scrim.open {
+  backdrop-filter: blur(2px);
   opacity: 1;
   pointer-events: auto;
 }
@@ -1617,6 +1617,8 @@
   color: var(--color-text);
 }
 .mkt-core-tag {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1717,7 +1719,8 @@
   gap: 32px;
   margin-bottom: 48px;
 }
-.mkt-footer-col h4 {
+.mkt-footer-col h2 {
+  font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;

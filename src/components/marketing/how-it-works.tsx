@@ -5,7 +5,7 @@ const steps = [
   {
     icon: Plug,
     title: "Koppel je kanalen",
-    description: "Google, Gmail en Instagram.",
+    description: "Google, Gmail, Instagram, WhatsApp en meer.",
   },
   {
     icon: Sparkles,

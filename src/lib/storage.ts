@@ -10,6 +10,7 @@ import {
 import { sampleLibraryAssets, libraryAssetValid } from "./library-model.ts";
 import { segmentValid, productValid, brandVoiceValid } from "./brand-model.ts";
 import type { Workspace } from "./types";
+import { localEventValid } from "./calendar/local.ts";
 export const STORAGE_KEY = "marketing-ai.workspace.v1";
 export const emptyWorkspace: Workspace = {
   profile: {
@@ -112,6 +113,13 @@ export function readWorkspace(): Workspace {
           : structuredClone(sampleReviews()),
       }
     : structuredClone(emptyWorkspace.review);
+  // Invalid Mavix calendar events are dropped rather than failing the load.
+  if (merged.calendar)
+    merged.calendar = {
+      events: Array.isArray(merged.calendar.events)
+        ? merged.calendar.events.filter(localEventValid)
+        : [],
+    };
   if (merged.instagram)
     merged.instagram = migrateAutopilotMode(merged.instagram);
   if (merged.email)

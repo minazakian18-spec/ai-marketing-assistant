@@ -13,7 +13,7 @@ const options = [
   {
     href: "/social?tab=assist",
     title: "Social post",
-    text: "Een post, Reel of carrousel voor Instagram.",
+    text: "Een Instagram-post met caption en beeld.",
     Icon: Share2,
   },
   {

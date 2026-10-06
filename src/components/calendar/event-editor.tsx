@@ -112,6 +112,8 @@ export function EventEditor({
 
   if (!state || !form) return null;
   const set = (patch: Partial<typeof form>) => setForm({ ...form, ...patch });
+  // Mavix' own calendars store simple events: no repeat rules or guests.
+  const local = form.calendarId.startsWith("mavix:");
 
   function toInput(): EventInput {
     const f = form!;
@@ -129,8 +131,8 @@ export function EventEditor({
       endTime: f.allDay ? undefined : f.endTime,
       timeZone: browserTimeZone(),
       reminder: f.reminder === "default" || f.reminder === "none" ? f.reminder : Number(f.reminder),
-      repeat,
-      attendees: f.guests
+      repeat: local ? null : repeat,
+      attendees: local ? [] : f.guests
         .split(/[,;\s]+/)
         .map((g) => g.trim())
         .filter(Boolean),
@@ -252,7 +254,7 @@ export function EventEditor({
                     ))}
                   </select>
                 </label>
-                <div className="ce-row">
+                {!local && (<div className="ce-row">
                   <label className="ce-field">
                     <span>Herhalen</span>
                     <select value={form.repeat} onChange={(e) => set({ repeat: e.target.value })}>
@@ -269,8 +271,8 @@ export function EventEditor({
                       <input type="number" min={1} max={99} value={form.interval} onChange={(e) => set({ interval: Number(e.target.value) })} />
                     </label>
                   )}
-                </div>
-                <label className="ce-field">
+                </div>)}
+                {!local && (<label className="ce-field">
                   <span>Gasten (e-mailadressen)</span>
                   <input
                     value={form.guests}
@@ -278,7 +280,7 @@ export function EventEditor({
                     onChange={(e) => set({ guests: e.target.value })}
                   />
                   {form.guests.trim() && <small>Gasten ontvangen een uitnodiging van Google Calendar.</small>}
-                </label>
+                </label>)}
               </div>
             )}
           </fieldset>
@@ -324,7 +326,7 @@ export function EventEditor({
               )}
               {editing?.htmlLink && (
                 <a className="ce-link" href={editing.htmlLink} target="_blank" rel="noreferrer">
-                  Openen in Google Calendar <ExternalLink size={13} />
+                  Openen in Google Agenda <ExternalLink size={13} />
                 </a>
               )}
               {!readOnly && (

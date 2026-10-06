@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+<defs>
+<linearGradient id="left" x1="4" y1="12" x2="14" y2="37" gradientUnits="userSpaceOnUse"><stop stop-color="#38249C"/><stop offset="1" stop-color="#7752EF"/></linearGradient>
+<linearGradient id="middle" x1="22" y1="11" x2="19" y2="31" gradientUnits="userSpaceOnUse"><stop stop-color="#A786FF"/><stop offset="1" stop-color="#6B45DB"/></linearGradient>
+<linearGradient id="fold" x1="7" y1="10" x2="24" y2="35" gradientUnits="userSpaceOnUse"><stop stop-color="#9165FA"/><stop offset=".58" stop-color="#5D3AD1"/><stop offset="1" stop-color="#4330AD"/></linearGradient>
+<linearGradient id="rise" x1="34" y1="2" x2="30" y2="37" gradientUnits="userSpaceOnUse"><stop stop-color="#AF88FF"/><stop offset="1" stop-color="#4C35C5"/></linearGradient>
+</defs>
+<path d="M3 15a4 4 0 0 1 1.8-3.3l2.7-1.8L13 17v12.5a4 4 0 0 1-1.8 3.3l-5.1 3.4A2 2 0 0 1 3 34.5V15Z" fill="url(#left)"/>
+<path d="m17 14.4 6-3.9a2 2 0 0 1 3.1 1.7V30l-11-8.3v-3.9a4 4 0 0 1 1.9-3.4Z" fill="url(#middle)"/>
+<path d="M4.5 11.8 6.8 10a3 3 0 0 1 3.6.1l13.8 11a5 5 0 0 1 1.9 3.9v8.4a3 3 0 0 1-4.8 2.4L5 22.8a5.3 5.3 0 0 1-2-4.1v-3a5 5 0 0 1 1.5-3.9Z" fill="url(#fold)"/>
+<path d="m30.5 6.4 5.4-3.5A2 2 0 0 1 39 4.6v24.7a4 4 0 0 1-1.8 3.3l-5.1 3.5a2 2 0 0 1-3.1-1.7V9.7a4 4 0 0 1 1.5-3.3Z" fill="url(#rise)"/>
+</svg>

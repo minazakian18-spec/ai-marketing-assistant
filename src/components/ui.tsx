@@ -1,5 +1,101 @@
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { Post } from "@/lib/types";
+
+// Shared workspace building blocks (styles in workspace.css). Flat, 1px
+// bordered, neutral; purple only for active states and primary actions.
+
+export function Card({
+  children,
+  className = "",
+  label,
+}: {
+  children: ReactNode;
+  className?: string;
+  label?: string;
+}) {
+  return (
+    <section className={"ui-card " + className} aria-label={label}>
+      {children}
+    </section>
+  );
+}
+
+export function SectionHeader({
+  title,
+  icon,
+  count,
+  action,
+}: {
+  title: string;
+  icon?: ReactNode;
+  count?: number;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="ui-section-header">
+      <h2>
+        {icon}
+        {title}
+        {count !== undefined && <span className="ui-count">{count}</span>}
+      </h2>
+      {action}
+    </header>
+  );
+}
+
+export function EmptyState({
+  icon,
+  title,
+  children,
+  action,
+}: {
+  icon?: ReactNode;
+  title?: string;
+  children?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="ui-empty">
+      {icon && <span className="ui-empty-icon">{icon}</span>}
+      <div>
+        {title && <strong>{title}</strong>}
+        {children && <p>{children}</p>}
+        {action}
+      </div>
+    </div>
+  );
+}
+
+export function IconButton({
+  label,
+  active,
+  children,
+  className = "",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; active?: boolean }) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={"ui-icon-button " + className}
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function Badge({
+  children,
+  tone = "neutral",
+}: {
+  children: ReactNode;
+  tone?: "neutral" | "accent" | "warn" | "success";
+}) {
+  return <span className={"ui-badge ui-badge-" + tone}>{children}</span>;
+}
 export function PageHeading({
   eyebrow,
   title,

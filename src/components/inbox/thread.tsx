@@ -1,31 +1,40 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
+  ArrowUp,
   Check,
   CheckCheck,
   Clock,
   Download,
   FileText,
-  Info,
+  MailOpen,
+  MoreHorizontal,
+  PanelRight,
   Paperclip,
   RotateCcw,
-  Send,
   StickyNote,
+  UserPlus,
   X,
 } from "lucide-react";
 import { Mavi } from "@/components/mavi";
+import { Menu } from "@/components/menu";
+import { IconButton } from "@/components/ui";
 import {
   ALLOWED_UPLOADS,
   MAX_UPLOAD_BYTES,
   type Capabilities,
+  type ConversationStatus,
   type ConversationView,
   type MessageView,
   type Upload,
 } from "@/lib/inbox/shared";
 import { ChannelIcon } from "./channel-icon";
-import { messageTime, windowLabel } from "./format";
+import { ContactAvatar } from "./conversation-list";
+import { dayKey, dayLabel, messageTime, windowLabel } from "./format";
 
 export type Detail = {
   conversation: ConversationView;
@@ -42,25 +51,17 @@ export type SendPayload = {
   attachments?: Upload[];
   template?: { name: string; language: string; variables: string[] };
 };
+export type ConversationPatch = { status?: ConversationStatus; assignedUserId?: string | null; unread?: boolean; labels?: string[] };
 
-function StatusIcon({ m }: { m: MessageView }) {
-  if (m.direction === "inbound" || m.direction === "note") return null;
-  const map = {
-    pending: [Clock, "Wordt verstuurd"],
-    sent: [Check, "Verzonden"],
-    delivered: [CheckCheck, "Afgeleverd"],
-    read: [CheckCheck, "Gelezen"],
-    failed: [AlertCircle, "Niet verzonden"],
-    received: [Check, "Ontvangen"],
-  } as const;
-  const [Icon, label] = map[m.status];
-  return (
-    <span className={"ib-status ib-status-" + m.status} title={label}>
-      <Icon size={13} aria-hidden="true" />
-      <span className="sr-only">{label}</span>
-    </span>
-  );
-}
+const STATUS_TEXT = { open: "Open", pending: "In afwachting", resolved: "Afgehandeld" } as const;
+const STATUS_ICON = {
+  pending: [Clock, "Wordt verstuurd"],
+  sent: [Check, "Verzonden"],
+  delivered: [CheckCheck, "Afgeleverd"],
+  read: [CheckCheck, "Gelezen"],
+  failed: [AlertCircle, "Niet verzonden"],
+  received: [Check, "Ontvangen"],
+} as const;
 
 function Attachments({ m }: { m: MessageView }) {
   if (!m.attachments.length) return null;
@@ -73,16 +74,11 @@ function Attachments({ m }: { m: MessageView }) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={a.href} alt={a.name || "Afbeelding"} loading="lazy" referrerPolicy="no-referrer" />
             </a>
-          ) : a.href ? (
-            <a href={a.href} target="_blank" rel="noreferrer noopener" className="ib-file">
-              <Download size={14} aria-hidden="true" />
+          ) : (
+            <a href={a.href} target="_blank" rel="noreferrer noopener" className="ib-file" aria-disabled={!a.href}>
+              {a.href ? <Download size={14} aria-hidden="true" /> : <FileText size={14} aria-hidden="true" />}
               {a.name || "Bijlage"}
             </a>
-          ) : (
-            <span className="ib-file">
-              <FileText size={14} aria-hidden="true" />
-              {a.name || "Bijlage"}
-            </span>
           )}
         </li>
       ))}
@@ -100,7 +96,7 @@ const readFile = (file: File) =>
 
 export function Thread({
   detail,
-  demo,
+  userId,
   draft,
   onDraft,
   onSend,
@@ -110,12 +106,14 @@ export function Thread({
   onOlder,
   onBack,
   onDetails,
+  detailsOpen = false,
+  onUpdate,
   onSuggest,
   templates,
   onLoadTemplates,
 }: {
   detail: Detail;
-  demo: boolean;
+  userId: string;
   draft: string;
   onDraft: (v: string) => void;
   onSend: (p: SendPayload) => void;
@@ -125,6 +123,8 @@ export function Thread({
   onOlder: () => void;
   onBack: () => void;
   onDetails: () => void;
+  detailsOpen?: boolean;
+  onUpdate: (patch: ConversationPatch) => void;
   onSuggest: () => Promise<string | null>;
   templates: Template[] | null;
   onLoadTemplates: () => void;
@@ -132,34 +132,39 @@ export function Thread({
   const { conversation: c, capabilities: caps, window: win } = detail;
   const [mode, setMode] = useState<"reply" | "note">("reply");
   const [files, setFiles] = useState<Upload[]>([]);
-  const [fileError, setFileError] = useState("");
+  const [notice, setNotice] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const [suggested, setSuggested] = useState(false);
-  const [aiError, setAiError] = useState("");
   const [template, setTemplate] = useState<Template | null>(null);
   const [vars, setVars] = useState<string[]>([]);
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const lastId = detail.messages[detail.messages.length - 1]?.id;
 
   useEffect(() => {
     setMode("reply");
     setFiles([]);
-    setFileError("");
+    setNotice("");
     setSuggested(false);
-    setAiError("");
     setTemplate(null);
   }, [c.id]);
 
-  // Keep the newest message in view when a conversation opens or grows.
   useLayoutEffect(() => {
     const el = scroller.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [c.id, lastId]);
 
+  useEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  }, [draft]);
+
   const closed = win.applies && !win.open;
   const noteMode = mode === "note";
-  const blocked = demo || (!noteMode && closed && !caps.templates);
+  const blocked = !noteMode && closed && !caps.templates;
   const useTemplate = !noteMode && closed && caps.templates;
 
   useEffect(() => {
@@ -167,7 +172,6 @@ export function Thread({
   }, [useTemplate, templates, onLoadTemplates]);
 
   function submit() {
-    if (demo) return;
     if (noteMode) {
       if (!draft.trim()) return;
       onNote(draft);
@@ -195,20 +199,20 @@ export function Thread({
   }
 
   async function addFiles(list: FileList | null) {
-    setFileError("");
+    setNotice("");
     if (!list) return;
-    const next: Upload[] = [...files];
+    const next = [...files];
     for (const f of Array.from(list)) {
       if (!ALLOWED_UPLOADS[f.type]) {
-        setFileError("Dit bestandstype kan niet worden verstuurd.");
+        setNotice("Dit bestandstype kan niet worden verstuurd.");
         continue;
       }
       if (f.size > MAX_UPLOAD_BYTES) {
-        setFileError("Een bijlage mag maximaal 10 MB zijn.");
+        setNotice("Een bijlage mag maximaal 10 MB zijn.");
         continue;
       }
       if (next.length >= 5) {
-        setFileError("Je kunt maximaal 5 bijlagen versturen.");
+        setNotice("Je kunt maximaal 5 bijlagen versturen.");
         break;
       }
       next.push(await readFile(f));
@@ -218,7 +222,7 @@ export function Thread({
 
   async function suggest() {
     setSuggesting(true);
-    setAiError("");
+    setNotice("");
     try {
       const text = await onSuggest();
       if (text) {
@@ -228,28 +232,70 @@ export function Thread({
         window.setTimeout(() => input.current?.focus(), 0);
       }
     } catch (e) {
-      setAiError(e instanceof Error ? e.message : "Mavi kon geen voorstel maken.");
+      setNotice(e instanceof Error ? e.message : "Mavi kon geen voorstel maken.");
     } finally {
       setSuggesting(false);
     }
   }
 
+  const assignee = detail.members.find((m) => m.userId === c.assignedUserId);
+  const resolved = c.status === "resolved";
+
   return (
     <section className="ib-thread" aria-label={"Gesprek met " + c.contact.name}>
       <header className="ib-thread-head">
-        <button type="button" className="ib-icon ib-back" onClick={onBack} aria-label="Terug naar gesprekken">
-          <ArrowLeft size={18} />
-        </button>
+        <IconButton label="Terug naar gesprekken" className="ib-back" onClick={onBack}>
+          <ArrowLeft size={17} />
+        </IconButton>
+        <ContactAvatar name={c.contact.name} channel={c.channel} size={36} />
         <div className="ib-thread-title">
-          <h2>{c.contact.name}</h2>
+          <h2>
+            {c.contact.name}
+            <span className={"ib-state is-" + c.status}>{STATUS_TEXT[c.status]}</span>
+          </h2>
           <p>
-            <ChannelIcon channel={c.channel} label />
-            {c.subject && <span className="ib-subject">· {c.subject}</span>}
+            <ChannelIcon channel={c.channel} size={12} label />
+            {c.contact.handle && c.contact.handle !== c.contact.name && <span>{c.contact.handle}</span>}
+            {c.subject && <span className="ib-subject">{c.subject}</span>}
+            {assignee && <span className="ib-assignee">· {assignee.userId === userId ? "Toegewezen aan jou" : assignee.name}</span>}
           </p>
         </div>
-        <button type="button" className="ib-icon ib-details-btn" onClick={onDetails} aria-label="Klantgegevens tonen">
-          <Info size={18} />
-        </button>
+        <div className="ib-thread-actions">
+          <Menu
+            label="Toewijzen"
+            trigger={<UserPlus size={16} />}
+            items={[
+              { type: "heading", label: "Toewijzen aan" },
+              { label: "Niemand", checked: !c.assignedUserId, onSelect: () => onUpdate({ assignedUserId: null }) },
+              ...detail.members.map((m) => ({
+                label: m.userId === userId ? m.name + " (ik)" : m.name,
+                checked: c.assignedUserId === m.userId,
+                onSelect: () => onUpdate({ assignedUserId: m.userId }),
+              })),
+            ]}
+          />
+          <IconButton
+            label={resolved ? "Heropenen" : "Afhandelen en archiveren"}
+            onClick={() => onUpdate({ status: resolved ? "open" : "resolved" })}
+          >
+            {resolved ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+          </IconButton>
+          <Menu
+            label="Meer acties"
+            trigger={<MoreHorizontal size={16} />}
+            items={[
+              { type: "heading", label: "Status" },
+              { label: "Open", checked: c.status === "open", onSelect: () => onUpdate({ status: "open" }) },
+              { label: "In afwachting", checked: c.status === "pending", onSelect: () => onUpdate({ status: "pending" }) },
+              { label: "Afgehandeld", checked: c.status === "resolved", onSelect: () => onUpdate({ status: "resolved" }) },
+              { type: "separator" },
+              { label: "Markeren als ongelezen", icon: <MailOpen size={15} />, onSelect: () => onUpdate({ unread: true }) },
+            ]}
+          />
+          <IconButton label={detailsOpen ? "Klantgegevens verbergen" : "Klantgegevens tonen"} active={detailsOpen} className="ib-details-btn" onClick={onDetails}>
+            <PanelRight size={16} />
+          </IconButton>
+        </div>
       </header>
 
       <div className="ib-messages" ref={scroller}>
@@ -258,70 +304,91 @@ export function Thread({
             Oudere berichten laden
           </button>
         )}
-        {detail.messages.map((m) => (
-          <article key={m.id} className={"ib-msg ib-msg-" + m.direction + (m.status === "failed" ? " is-failed" : "")}>
-            <header>
-              {m.direction === "note" && <StickyNote size={12} aria-hidden="true" />}
-              <span>{m.direction === "note" ? "Interne notitie · " + m.author : m.author}</span>
-              <time dateTime={m.createdAt}>{messageTime(m.createdAt)}</time>
-              <StatusIcon m={m} />
-            </header>
-            {m.body && <p className="ib-msg-body">{m.body}</p>}
-            <Attachments m={m} />
-            {m.status === "failed" && (
-              <p className="ib-msg-error" role="alert">
-                {m.error || "Versturen is niet gelukt."}
-                {m.clientId && canRetry(m.clientId) && (
-                  <button type="button" onClick={() => onRetry(m.clientId!)}>
-                    <RotateCcw size={12} aria-hidden="true" /> Opnieuw proberen
-                  </button>
-                )}
-              </p>
+        {detail.messages.map((m, i) => {
+          const icon = m.direction === "outbound" ? STATUS_ICON[m.status] : null;
+          const StatusGlyph = icon?.[0];
+          const prev = detail.messages[i - 1];
+          const next = detail.messages[i + 1];
+          const newDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt);
+          // Consecutive messages from the same side within 5 minutes form a group.
+          const joins = (a?: MessageView, b?: MessageView) => !!a && !!b && a.direction === b.direction && a.direction !== "note" && dayKey(a.createdAt) === dayKey(b.createdAt) && Math.abs(Date.parse(b.createdAt) - Date.parse(a.createdAt)) < 300000;
+          const lastOfGroup = !joins(m, next);
+          return (
+            <Fragment key={m.id}>
+            {newDay && (
+              <div className="ib-day" role="separator">
+                <span>{dayLabel(m.createdAt)}</span>
+              </div>
             )}
-          </article>
-        ))}
+            <article className={"ib-msg ib-msg-" + m.direction + (m.status === "failed" ? " is-failed" : "") + (joins(prev, m) && !newDay ? " is-grouped" : "")}>
+              {m.direction === "note" && (
+                <p className="ib-note-label">
+                  <StickyNote size={12} aria-hidden="true" /> Interne notitie
+                </p>
+              )}
+              {m.body && <p className="ib-msg-body">{m.body}</p>}
+              <Attachments m={m} />
+              {(lastOfGroup || m.status === "failed") && (<footer>
+                {m.direction !== "inbound" && <span>{m.author}</span>}
+                <time dateTime={m.createdAt}>{messageTime(m.createdAt)}</time>
+                {icon && StatusGlyph && (
+                  <span className={"ib-status ib-status-" + m.status} title={icon[1]}>
+                    <StatusGlyph size={12} aria-hidden="true" />
+                    <span className="sr-only">{icon[1]}</span>
+                  </span>
+                )}
+              </footer>)}
+              {m.status === "failed" && (
+                <p className="ib-msg-error" role="alert">
+                  {m.error || "Versturen is niet gelukt."}
+                  {m.clientId && canRetry(m.clientId) && (
+                    <button type="button" onClick={() => onRetry(m.clientId!)}>
+                      <RotateCcw size={12} aria-hidden="true" /> Opnieuw
+                    </button>
+                  )}
+                </p>
+              )}
+            </article>
+            </Fragment>
+          );
+        })}
         {!detail.messages.length && <p className="ib-list-empty">Nog geen berichten in dit gesprek.</p>}
       </div>
 
       <div className={"ib-composer" + (noteMode ? " is-note" : "")}>
         <div className="ib-composer-tabs" role="tablist" aria-label="Soort bericht">
           <button type="button" role="tab" aria-selected={!noteMode} onClick={() => setMode("reply")}>
-            Antwoord
+            Bericht
           </button>
           <button type="button" role="tab" aria-selected={noteMode} onClick={() => setMode("note")}>
             Interne notitie
           </button>
-          {!noteMode && !useTemplate && (
-            <button type="button" className="ib-mavi" onClick={() => void suggest()} disabled={demo || suggesting || blocked}>
-              <Mavi size={16} state={suggesting ? "thinking" : "idle"} />
-              {suggesting ? "Mavi denkt na…" : "Mavi antwoord voorstellen"}
-            </button>
+          {!noteMode && win.applies && win.open && windowLabel(win.closesAt) && (
+            <span className="ib-window" title="Binnen dit venster kun je vrij antwoorden">
+              Antwoordvenster: {windowLabel(win.closesAt)}
+            </span>
           )}
         </div>
 
-        {demo && <p className="ib-banner">Demo: versturen is uitgeschakeld voor voorbeeldgesprekken.</p>}
-        {!demo && !noteMode && closed && !caps.templates && (
+        {!noteMode && closed && !caps.templates && (
           <p className="ib-banner">
             Het 24-uursvenster van {caps.label} is gesloten. Je kunt weer antwoorden zodra de klant opnieuw een bericht stuurt.
           </p>
         )}
-        {!demo && !noteMode && win.applies && win.open && windowLabel(win.closesAt) && (
-          <p className="ib-window">Antwoordvenster open: {windowLabel(win.closesAt)}</p>
-        )}
-        {suggested && !noteMode && (
-          <p className="ib-ai-note" role="status">
-            Voorstel van Mavi — controleer en pas aan voordat je verstuurt. Er wordt niets automatisch verzonden.
+        {suggested && !noteMode && <p className="ib-ai-note">Voorstel van Mavi — controleer en pas aan voor je verstuurt.</p>}
+        {notice && (
+          <p className="ib-error" role="alert">
+            {notice}
           </p>
         )}
-        {aiError && <p className="ib-error" role="alert">{aiError}</p>}
 
-        {useTemplate && !demo ? (
+        {useTemplate ? (
           <div className="ib-templates">
-            <p className="ib-banner">Het 24-uursvenster is gesloten. Kies een goedgekeurde WhatsApp-template.</p>
+            <p className="ib-banner">Het 24-uursvenster is gesloten. Stuur een goedgekeurde WhatsApp-template.</p>
             {templates === null ? (
-              <p className="ib-list-empty">Templates laden…</p>
+              <p className="ib-muted">Templates laden…</p>
             ) : templates.length === 0 ? (
-              <p className="ib-list-empty">Er zijn geen goedgekeurde templates zonder media-header. Maak er een aan in WhatsApp Manager.</p>
+              <p className="ib-muted">Er zijn geen goedgekeurde templates zonder media-header. Maak er een aan in WhatsApp Manager.</p>
             ) : (
               <>
                 <label className="ib-field">
@@ -350,13 +417,13 @@ export function Thread({
                   </label>
                 ))}
                 <button type="button" className="button primary" onClick={submit} disabled={!template || vars.some((v) => !v.trim())}>
-                  <Send size={15} /> Template versturen
+                  Template versturen
                 </button>
               </>
             )}
           </div>
         ) : (
-          <>
+          <div className="ib-compose-box">
             {files.length > 0 && (
               <ul className="ib-files">
                 {files.map((f, i) => (
@@ -370,30 +437,29 @@ export function Thread({
                 ))}
               </ul>
             )}
-            {fileError && <p className="ib-error" role="alert">{fileError}</p>}
-            <div className="ib-compose-row">
-              <label className="sr-only" htmlFor="ib-input">
-                {noteMode ? "Interne notitie" : "Antwoord"}
-              </label>
-              <textarea
-                id="ib-input"
-                ref={input}
-                rows={3}
-                value={draft}
-                disabled={blocked && !noteMode}
-                maxLength={noteMode ? 5000 : caps.subject ? 20000 : 4000}
-                placeholder={noteMode ? "Notitie voor je team (de klant ziet dit niet)" : "Schrijf een antwoord… (Enter = versturen, Shift+Enter = nieuwe regel)"}
-                onChange={(e) => {
-                  onDraft(e.target.value);
-                }}
-                onKeyDown={keyDown}
-              />
-              <div className="ib-compose-actions">
-                {!noteMode && caps.outboundAttachments && !demo && (
-                  <label className="ib-icon" title="Bijlage toevoegen">
-                    <Paperclip size={17} aria-hidden="true" />
-                    <span className="sr-only">Bijlage toevoegen</span>
+            <label className="sr-only" htmlFor="ib-input">
+              {noteMode ? "Interne notitie" : "Bericht"}
+            </label>
+            <textarea
+              id="ib-input"
+              ref={input}
+              rows={2}
+              value={draft}
+              disabled={blocked}
+              maxLength={noteMode ? 5000 : caps.subject ? 20000 : 4000}
+              placeholder={noteMode ? "Notitie voor je team — de klant ziet dit niet" : "Bericht schrijven…"}
+              onChange={(e) => onDraft(e.target.value)}
+              onKeyDown={keyDown}
+            />
+            <div className="ib-compose-bar">
+              <div className="ib-compose-tools">
+                {!noteMode && caps.outboundAttachments && (
+                  <>
+                    <IconButton label="Bijlage toevoegen" onClick={() => fileInput.current?.click()}>
+                      <Paperclip size={16} />
+                    </IconButton>
                     <input
+                      ref={fileInput}
                       type="file"
                       multiple
                       hidden
@@ -403,20 +469,26 @@ export function Thread({
                         e.target.value = "";
                       }}
                     />
-                  </label>
+                  </>
                 )}
-                <button
-                  type="button"
-                  className="button primary"
-                  onClick={submit}
-                  disabled={demo || (noteMode ? !draft.trim() : blocked || (!draft.trim() && !files.length))}
-                >
-                  {noteMode ? <StickyNote size={15} /> : <Send size={15} />}
-                  {noteMode ? "Notitie opslaan" : "Versturen"}
-                </button>
+                {!noteMode && (
+                  <IconButton label="Antwoord laten voorstellen door Mavi" onClick={() => void suggest()} disabled={suggesting || blocked}>
+                    <Mavi size={16} state={suggesting ? "thinking" : "idle"} />
+                  </IconButton>
+                )}
+                <span className="ib-compose-hint">Enter om te versturen · Shift+Enter nieuwe regel</span>
               </div>
+              <button
+                type="button"
+                className="composer-send"
+                onClick={submit}
+                aria-label={noteMode ? "Notitie opslaan" : "Versturen"}
+                disabled={noteMode ? !draft.trim() : blocked || (!draft.trim() && !files.length)}
+              >
+                {noteMode ? <StickyNote size={16} /> : <ArrowUp size={17} />}
+              </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </section>

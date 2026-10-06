@@ -3,8 +3,12 @@ import {supabaseUrl,supabasePublicKey} from '@/lib/supabase-config';
 import {requiresAuthentication} from '@/lib/security';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+// Public marketing pages need no session work: skipping the Supabase call
+// keeps them fast (TTFB) and cacheable for visitors and search engines.
+const isPublic=(p:string)=>p==='/'||p==='/pricing'||p.startsWith('/legal/');
 export async function proxy(request:NextRequest) {
  let response=NextResponse.next({request});
+ if(isPublic(request.nextUrl.pathname)&&!demoSession(request.cookies.get(DEMO_COOKIE)?.value,process.env.NODE_ENV))return response;
  if(demoSession(request.cookies.get(DEMO_COOKIE)?.value,process.env.NODE_ENV)) {
   if(request.nextUrl.pathname.startsWith('/api/')) return NextResponse.json({error:'Deze functie vereist een echt account. In de testmodus worden alleen lokale voorbeeldgegevens gebruikt.'},{status:403});
   response.headers.set('Cache-Control','private, no-store');
@@ -17,4 +21,4 @@ export async function proxy(request:NextRequest) {
  if(data.user && ['/login','/register'].includes(request.nextUrl.pathname)){const redirect=NextResponse.redirect(new URL('/dashboard',request.url));for(const c of response.cookies.getAll())redirect.cookies.set(c);return redirect;}
  response.headers.set('Cache-Control','private, no-store');return response;
 }
-export const config={matcher:['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp)$).*)']};
+export const config={matcher:['/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|opengraph-image|.*\\.(?:svg|png|jpg|webp|ico)$).*)']};

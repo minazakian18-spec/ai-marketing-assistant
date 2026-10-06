@@ -199,3 +199,88 @@ export function emailDashboardItems(
     local: true,
   }));
 }
+
+// Recent activity derived from real workspace records (posts and e-mail
+// campaigns). Reviews are left out: the review list still contains example
+// reviews, which must not show up as real activity.
+export type Activity = {
+  id: string;
+  title: string;
+  channel: "Instagram" | "E-mail";
+  label: string;
+  at: string;
+  href: string;
+  tone: "neutral" | "accent" | "warn" | "success";
+};
+
+const POST_LABELS: Record<Post["status"], [string, Activity["tone"]]> = {
+  draft: ["Concept opgeslagen", "neutral"],
+  approved: ["Goedgekeurd", "success"],
+  scheduled: ["Ingepland", "accent"],
+  published: ["Demo gepubliceerd", "success"],
+  rejected: ["Afgewezen", "neutral"],
+  blocked: ["Geblokkeerd", "warn"],
+  failed: ["Mislukt", "warn"],
+};
+const EMAIL_LABELS: Record<EmailCampaign["status"], [string, Activity["tone"]]> = {
+  draft: ["Concept opgeslagen", "neutral"],
+  approved: ["Goedgekeurd", "success"],
+  scheduled: ["Ingepland", "accent"],
+  sent: ["Verzonden (gesimuleerd)", "success"],
+  rejected: ["Afgewezen", "neutral"],
+  blocked: ["Geblokkeerd", "warn"],
+};
+
+export function recentActivity(
+  posts: Post[],
+  campaigns: EmailCampaign[],
+  now: Date,
+  limit = 6,
+): Activity[] {
+  // Published/sent/failed items happened at their planned date; everything
+  // else is dated by when it was created.
+  const when = (status: string, date: string, createdAt: string) =>
+    ["published", "sent", "failed", "blocked"].includes(status) && date ? date : createdAt;
+  const items: Activity[] = [
+    ...posts.map((p) => {
+      const [label, tone] = POST_LABELS[p.status];
+      return {
+        id: "post-" + p.id,
+        title: p.prompt || p.caption.slice(0, 80) || "Instagram-post",
+        channel: "Instagram" as const,
+        label: p.status === "scheduled" && p.date ? label + " voor " + shortDate(p.date) : label,
+        at: when(p.status, p.date, p.createdAt),
+        href: "/social?post=" + encodeURIComponent(p.id),
+        tone,
+      };
+    }),
+    ...campaigns.map((c) => {
+      const [label, tone] = EMAIL_LABELS[c.status];
+      return {
+        id: "email-" + c.id,
+        title: c.title || c.subject || "E-mailcampagne",
+        channel: "E-mail" as const,
+        label: c.status === "scheduled" && c.date ? label + " voor " + shortDate(c.date) : label,
+        at: when(c.status, c.date, c.createdAt),
+        href: "/email?tab=create&campaign=" + encodeURIComponent(c.id),
+        tone,
+      };
+    }),
+  ];
+  return items
+    .filter((a) => a.at && !isNaN(Date.parse(a.at)) && new Date(a.at) <= now)
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, limit);
+}
+
+export const relativeTime = (iso: string, now = new Date()) => {
+  const minutes = Math.round((now.getTime() - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) return "zojuist";
+  if (minutes < 60) return minutes + " min geleden";
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return hours + " uur geleden";
+  const days = Math.round(hours / 24);
+  if (days === 1) return "gisteren";
+  if (days < 7) return days + " dagen geleden";
+  return shortDate(iso);
+};

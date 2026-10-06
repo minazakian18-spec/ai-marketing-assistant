@@ -1,95 +1,117 @@
-import { capabilities, windowState, type Capabilities, type ConversationView, type MessageView } from "./shared";
+import { capabilities, windowState, type Capabilities, type Channel, type ConversationView, type MessageView } from "./shared";
 
-// Clearly labelled example conversations for demo mode only. Real
-// workspaces never see these; sending is disabled in demo mode.
-const ago = (minutes: number) => new Date(Date.now() - minutes * 60000).toISOString();
+// Clearly labelled example conversations for TEST MODE ONLY (demo cookie).
+// Real workspaces never load these; nothing is sent to any channel.
+const at = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60000).toISOString();
+let n = 0;
+const msg = (direction: MessageView["direction"], author: string, body: string, minutesAgo: number, status?: MessageView["status"]): MessageView => ({
+  id: "demo-m" + ++n,
+  direction,
+  author,
+  body,
+  attachments: [],
+  status: status || (direction === "inbound" ? "received" : "read"),
+  error: null,
+  createdAt: at(minutesAgo),
+});
 
-type Demo = { conversation: ConversationView; messages: MessageView[] };
+type DemoThread = { conversation: ConversationView; messages: MessageView[] };
 
-function msg(id: string, direction: MessageView["direction"], author: string, body: string, minutes: number, status: MessageView["status"] = direction === "inbound" ? "received" : "read"): MessageView {
-  return { id, direction, author, body, attachments: [], status, error: null, createdAt: ago(minutes) };
+function thread(id: string, channel: Channel, name: string, handle: string, messages: MessageView[], extra: Partial<ConversationView> = {}): DemoThread {
+  const last = messages[messages.length - 1];
+  const lastIn = [...messages].reverse().find((m) => m.direction === "inbound");
+  return {
+    conversation: {
+      id,
+      channel,
+      accountId: "demo",
+      contact: { name, handle, email: channel === "gmail" ? handle : undefined, phone: channel === "whatsapp" ? handle : undefined },
+      contactId: null,
+      subject: "",
+      status: "open",
+      assignedUserId: null,
+      lastMessageAt: last.createdAt,
+      lastInboundAt: lastIn?.createdAt || null,
+      preview: last.body.replace(/\s+/g, " ").slice(0, 140),
+      lastDirection: last.direction,
+      unread: 0,
+      labels: [],
+      ...extra,
+    },
+    messages,
+  };
 }
 
-export function demoInbox(): Demo[] {
+export function demoThreads(): DemoThread[] {
+  n = 0;
   return [
-    {
-      conversation: {
-        id: "demo-1",
-        channel: "whatsapp",
-        accountId: "demo",
-        contact: { name: "Sanne (voorbeeld)", handle: "+31 6 00000000" },
-        contactId: null,
-        subject: "",
-        status: "open",
-        assignedUserId: null,
-        lastMessageAt: ago(4),
-        lastInboundAt: ago(4),
-        preview: "Kan ik zaterdag nog langskomen voor een afspraak?",
-        lastDirection: "inbound",
-        unread: 1,
-        demo: true,
-      },
-      messages: [
-        msg("d1a", "inbound", "Sanne (voorbeeld)", "Hoi! Ik zag jullie nieuwe actie op Instagram.", 12),
-        msg("d1b", "outbound", "Jij", "Hoi Sanne, leuk dat je reageert! Waarmee kunnen we je helpen?", 9),
-        msg("d1c", "inbound", "Sanne (voorbeeld)", "Kan ik zaterdag nog langskomen voor een afspraak?", 4),
+    thread(
+      "demo-1",
+      "whatsapp",
+      "Sanne de Vries",
+      "+31 6 1234 5678",
+      [
+        msg("inbound", "Sanne de Vries", "Hoi! Hebben jullie zaterdagavond nog plek voor 4 personen?", 26),
+        msg("outbound", "Jij", "Hoi Sanne, zaterdag om 19:00 of 20:30 kan nog. Welke tijd past jullie het best?", 21),
+        msg("inbound", "Sanne de Vries", "19:00 graag!", 6),
+        msg("inbound", "Sanne de Vries", "Kan er ook een kinderstoel bij?", 5),
       ],
-    },
-    {
-      conversation: {
-        id: "demo-2",
-        channel: "gmail",
-        accountId: "demo",
-        contact: { name: "Mark Jansen (voorbeeld)", handle: "mark@voorbeeld.nl", email: "mark@voorbeeld.nl" },
-        contactId: null,
-        subject: "Offerte aanvraag",
-        status: "pending",
-        assignedUserId: null,
-        lastMessageAt: ago(95),
-        lastInboundAt: ago(180),
-        preview: "Bedankt, ik kijk ernaar en kom erop terug.",
-        lastDirection: "outbound",
-        unread: 0,
-        demo: true,
-      },
-      messages: [
-        msg("d2a", "inbound", "Mark Jansen (voorbeeld)", "Goedemiddag,\n\nKunnen jullie een offerte sturen voor 20 personen op 12 november?\n\nMet vriendelijke groet,\nMark", 180),
-        msg("d2b", "note", "Jij", "Check eerst de beschikbaarheid van de grote zaal.", 120, "sent"),
-        msg("d2c", "outbound", "Jij", "Beste Mark,\n\nDank voor je aanvraag. Je ontvangt morgen een offerte.\n\nGroet,\nHet team", 95, "sent"),
+      { unread: 2, labels: ["Reservering"] },
+    ),
+    thread(
+      "demo-2",
+      "instagram",
+      "Lisa Bakker",
+      "@lisa.eet.mee",
+      [
+        msg("inbound", "Lisa Bakker", "Jullie nieuwe lunchkaart ziet er geweldig uit 😍 Is de pasta ook vegan te bestellen?", 75),
       ],
-    },
-    {
-      conversation: {
-        id: "demo-3",
-        channel: "instagram",
-        accountId: "demo",
-        contact: { name: "@lisa.voorbeeld", handle: "@lisa.voorbeeld" },
-        contactId: null,
-        subject: "",
-        status: "open",
-        assignedUserId: null,
-        lastMessageAt: ago(60 * 30),
-        lastInboundAt: ago(60 * 30),
-        preview: "Verzenden jullie ook naar België?",
-        lastDirection: "inbound",
-        unread: 0,
-        demo: true,
-      },
-      messages: [msg("d3a", "inbound", "@lisa.voorbeeld", "Verzenden jullie ook naar België?", 60 * 30)],
-    },
+      { unread: 1 },
+    ),
+    thread(
+      "demo-3",
+      "gmail",
+      "Mark Jansen",
+      "mark.jansen@example.com",
+      [
+        msg("inbound", "Mark Jansen", "Goedemiddag,\n\nWij willen op 14 november met 18 collega's komen eten. Kunnen jullie een groepsmenu en een offerte sturen?\n\nMet vriendelijke groet,\nMark Jansen", 60 * 5),
+        msg("note", "Jij", "Grote zaal checken bij Tom, offerte voor vrijdag.", 60 * 4),
+        msg("outbound", "Jij", "Beste Mark,\n\nDank voor je aanvraag! Je ontvangt uiterlijk vrijdag een voorstel voor het groepsmenu.\n\nHartelijke groet,\nHet team", 60 * 4 - 20, "sent"),
+      ],
+      { subject: "Groepsdiner 14 november", status: "pending", labels: ["Offerte"] },
+    ),
+    thread(
+      "demo-4",
+      "messenger",
+      "Peter Smit",
+      "Facebook",
+      [
+        msg("inbound", "Peter Smit", "Zijn jullie op maandag open?", 60 * 26),
+        msg("outbound", "Jij", "Hoi Peter, op maandag zijn we gesloten. Dinsdag t/m zondag vanaf 12:00 ben je welkom!", 60 * 25),
+        msg("inbound", "Peter Smit", "Top, dank je!", 60 * 25 - 10),
+      ],
+      { status: "resolved" },
+    ),
+    thread(
+      "demo-5",
+      "whatsapp",
+      "Yasmin El Amrani",
+      "+31 6 8765 4321",
+      [msg("inbound", "Yasmin El Amrani", "Kan ik een cadeaubon van €50 bij jullie kopen?", 60 * 50)],
+    ),
   ];
 }
 
-export function demoDetail(id: string) {
-  const d = demoInbox().find((x) => x.conversation.id === id);
-  if (!d) return null;
+export const DEMO_MEMBERS = [{ userId: "demo-user", name: "Jij" }];
+
+export function demoDetail(t: DemoThread) {
   return {
-    conversation: d.conversation,
-    messages: d.messages,
+    conversation: t.conversation,
+    messages: t.messages,
     hasMore: false,
-    window: windowState(d.conversation.channel, d.conversation.lastInboundAt),
-    capabilities: capabilities[d.conversation.channel] as Capabilities,
+    window: windowState(t.conversation.channel, t.conversation.lastInboundAt),
+    capabilities: capabilities[t.conversation.channel] as Capabilities,
     contact: null,
-    members: [],
+    members: DEMO_MEMBERS,
   };
 }

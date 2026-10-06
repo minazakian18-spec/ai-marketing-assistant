@@ -89,7 +89,7 @@ export type ConversationView = {
   preview: string;
   lastDirection: Direction;
   unread: number;
-  demo?: boolean;
+  labels: string[];
 };
 
 export type MessageView = {

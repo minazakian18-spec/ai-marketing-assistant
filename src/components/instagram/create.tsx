@@ -17,7 +17,9 @@ import {
   RefreshCw,
   Save,
   Check,
+  Clock,
 } from "lucide-react";
+import { Toast } from "@/components/toast";
 import Link from "next/link";
 import type { Post, Profile } from "@/lib/types";
 import type { ContentType } from "@/lib/instagram-model";
@@ -35,6 +37,17 @@ const quick = [
   ["Photos to Reel", "Photos to Reel", Layers],
 ] as const;
 const contentTypes = quick.map(([id]) => id) as ContentType[];
+// Only formats Mavix can really produce today are selectable. The others are
+// shown as upcoming so customers see what is coming, without pretending.
+const VIDEO = ["Reel", "Animate Image", "Photos to Reel"];
+const UPCOMING: Record<string, string> = {
+  Carousel: "Binnenkort — carrousels met meerdere slides zijn in ontwikkeling.",
+  Story: "Binnenkort — verticale stories zijn in ontwikkeling.",
+  Reel: "Binnenkort — AI-video is in ontwikkeling.",
+  "Animate Image": "Binnenkort — AI-video is in ontwikkeling.",
+  "Photos to Reel": "Binnenkort — AI-video is in ontwikkeling.",
+};
+const isUpcoming = (t: string) => t in UPCOMING;
 export function CreateStudio({
   profile,
   editPost,
@@ -49,9 +62,12 @@ export function CreateStudio({
   onPersist: (post: Post) => Promise<boolean>;
 }) {
   const [type, setType] = useState<ContentType>(
-    (initialType && contentTypes.includes(initialType as ContentType)
+    initialType && contentTypes.includes(initialType as ContentType) && !isUpcoming(initialType)
       ? (initialType as ContentType)
-      : "Post"),
+      : "Post",
+  );
+  const [notice, setNotice] = useState(
+    initialType && isUpcoming(initialType) ? UPCOMING[initialType] : "",
   );
   const [prompt, setPrompt] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
@@ -92,6 +108,10 @@ export function CreateStudio({
     setMessage("");
     if (!prompt.trim()) {
       setMessage("Beschrijf eerst wat je wilt maken.");
+      return;
+    }
+    if (isUpcoming(type)) {
+      setMessage(UPCOMING[type]);
       return;
     }
     const mode = type === "Reel" ? videoMode : type;
@@ -337,26 +357,34 @@ export function CreateStudio({
             <span>Kies je formaat</span>
           </div>
           <div className="ig-quick-grid">
-            {quick.map(([key, label, Icon]) => (
-              <button
-                key={key}
-                aria-pressed={type === key}
-                onClick={() => {
-                  setType(key);
-                  setMessage("");
-                }}
-              >
-                <Icon size={21} />
-                <strong>{label}</strong>
-                <small>
-                  {["Reel", "Animate Image", "Photos to Reel"].includes(key)
-                    ? "5–10 sec · mock storyboard"
-                    : "Caption & beeldconcept"}
-                </small>
-              </button>
-            ))}
-          </div>
-          <div className="ig-small-tools">
+            {quick.map(([key, label, Icon]) => {
+              const upcoming = isUpcoming(key);
+              return (
+                <button
+                  key={key}
+                  className={upcoming ? "is-upcoming" : ""}
+                  aria-pressed={!upcoming && type === key}
+                  aria-disabled={upcoming || undefined}
+                  title={upcoming ? "In ontwikkeling" : undefined}
+                  onClick={() => {
+                    if (upcoming) return setNotice(UPCOMING[key]);
+                    setType(key);
+                    setMessage("");
+                  }}
+                >
+                  <Icon size={21} />
+                  <strong>{label}</strong>
+                  <small>{upcoming ? (VIDEO.includes(key) ? "AI-video · in ontwikkeling" : "In ontwikkeling") : "Caption & beeldconcept"}</small>
+                  {upcoming && (
+                    <span className="ig-soon">
+                      <Clock size={11} aria-hidden="true" />
+                      Binnenkort
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>          <div className="ig-small-tools">
             {(
               [
                 ["Captions & Hashtags", Type],
@@ -518,6 +546,7 @@ export function CreateStudio({
           {message}
         </p>
       </aside>
+      {notice && <Toast tone="info" message={notice} onClose={() => setNotice("")} />}
     </div>
   );
 }

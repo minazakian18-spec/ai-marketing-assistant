@@ -22,6 +22,16 @@ Omnichannel-inbox op `/inbox` (Gmail, Instagram DM, Messenger, WhatsApp Business
 - Routes: `/api/inbox/*`, publieke webhook `/api/webhooks/meta` (handtekeningcontrole, verwerking na het 200-antwoord).
 - Nieuwe omgevingsvariabelen staan in `.env.example` (alleen namen). Echte accounttests en Meta-/Google-configuratie moeten door de eigenaar worden gedaan.
 
+## Kalender, Bibliotheek en Integraties (6 oktober 2026)
+- Kalender: Google Agenda-achtige indeling (Maken, mini-maand, Mijn kalenders, Gekoppelde kalenders, detailvenster). Eigen Mavix-agenda's (Marketing, Content, Persoonlijk, Taken) staan in de werkruimtedata (`calendar.events`, `src/lib/calendar/local.ts`); Google-afspraken via de bestaande Calendar API-koppeling.
+- Bibliotheek: privé Supabase Storage-bucket `library` + tabellen `library_files`/`library_albums` (migratie `202610060001_library.sql`, nog uitvoeren). API onder `/api/library/*`; optionele limiet via `LIBRARY_QUOTA_BYTES`. Oude base64-afbeeldingen kunnen eenmalig worden geïmporteerd.
+- Integraties: categorieën, merklogo's (`simple-icons`, `src/components/brand-icon.tsx`), Beheren-venster. LinkedIn, Shopify, Google Ads en Meta Ads staan als "Binnenkort".
+
+## Onderzoek mijn restaurant (7 oktober 2026)
+- Inzichten → "Onderzoek mijn restaurant/bedrijf". Eén keer per kalendermaand per werkruimte, afgedwongen door `unique (workspace_id, period)` in `research_reports` (migratie `202610070001_research.sql`, nog uitvoeren).
+- Lagen: `src/lib/research/` (types, extract, rules, report: puur en getest in `tests/research.test.mjs`), `src/lib/server/research.ts` (verzamelen en opslaan, verwerking via `after()`), `src/lib/server/safe-fetch.ts` (SSRF-veilig website ophalen), `src/lib/server/ai.ts` (samenvatting en vervolgvragen; optioneel).
+- Echte bronnen: profiel, Mavix-content, e-mail/contacten, Inbox, Google-reviews en -profiel (indien gekoppeld), homepage van de website. Nog niet: Instagram-statistieken, concurrenten, reserveringen/kassa.
+
 ## Huidige versie
 Mavix is nog geen productie-SaaS, maar heeft sinds 23 september 2026 wel een echte backend-laag (zie hieronder). Next.js, React, TypeScript, Tailwind en gewone CSS. De package-lock.json legt de geïnstalleerde versies vast.
 

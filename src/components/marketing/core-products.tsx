@@ -5,7 +5,7 @@ const products = [
   {
     name: "Review AI",
     description:
-      "Reageer persoonlijk op Google-reviews zonder er dagelijks mee bezig te zijn.",
+      "Beantwoord Google-reviews persoonlijk met AI, zonder er dagelijks mee bezig te zijn.",
     visual: (
       <div className="mkt-core-visual">
         <span className="mkt-core-stars">
@@ -23,7 +23,7 @@ const products = [
   },
   {
     name: "Social AI",
-    description: "Maak en plan social content die past bij jouw merk.",
+    description: "Maak en plan Instagram-posts, stories en reels die passen bij jouw merk.",
     visual: (
       <div className="mkt-core-visual">
         <div className="mkt-core-insta-art" aria-hidden="true" />
@@ -35,7 +35,7 @@ const products = [
   },
   {
     name: "Email AI",
-    description: "Maak campagnes en verstuur e-mails vanuit één werkruimte.",
+    description: "Schrijf e-mailcampagnes en nieuwsbrieven met AI en verstuur ze vanuit één werkruimte.",
     visual: (
       <div className="mkt-core-visual">
         <p className="mkt-core-visual-subject">
@@ -51,7 +51,7 @@ const products = [
 
 export function CoreProducts() {
   return (
-    <section className="mkt-section">
+    <section className="mkt-section" id="oplossingen">
       <div className="mkt-container">
         <Reveal className="mkt-section-head">
           <h2 className="mkt-h2">Alles wat je marketing nodig heeft.</h2>
@@ -61,10 +61,10 @@ export function CoreProducts() {
             <Reveal delay={i * 80} key={p.name}>
               <div className="mkt-core-card">
                 {p.visual}
-                <span className="mkt-core-tag">
-                  <Sparkles size={12} />
+                <h3 className="mkt-core-tag">
+                  <Sparkles size={12} aria-hidden="true" />
                   {p.name}
-                </span>
+                </h3>
                 <p className="mkt-core-desc">{p.description}</p>
               </div>
             </Reveal>

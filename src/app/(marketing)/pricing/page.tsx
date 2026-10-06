@@ -4,11 +4,14 @@ import { PricingCards } from "@/components/marketing/pricing-cards";
 import { Faq, type FaqItem } from "@/components/marketing/faq";
 import { Reveal } from "@/components/marketing/reveal";
 import { compareRows, pricingPlans } from "@/lib/pricing-data";
+import { pageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "Prijzen — Mavix",
-  description: "Bekijk de Mavix-abonnementen en kies het niveau dat bij je past.",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Prijzen",
+  description:
+    "Bekijk de Mavix-abonnementen voor AI-marketing: Starter, Growth en Autopilot. Maandelijks opzegbaar, prijzen exclusief btw.",
+  path: "/pricing",
+});
 
 const pricingFaq: FaqItem[] = [
   {

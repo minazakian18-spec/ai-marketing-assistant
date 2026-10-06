@@ -13,6 +13,8 @@ import {
   Plug,
 } from "lucide-react";
 import { PageHeading } from "@/components/ui";
+import { ResearchSection } from "@/components/research/research-section";
+import "../../research.css";
 import { Mavi } from "@/components/mavi";
 import { useWorkspace } from "@/components/workspace-provider";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
@@ -123,6 +125,7 @@ export default function Insights() {
         description="Je planning, openstaande acties en resultaten per kanaal."
         action={<NewContentMenu />}
       />
+      <ResearchSection />
       <section className="command-kpis" aria-label="Marketingoverzicht">
         {kpis.map(({ label, value, sub, Icon }) => (
           <article className="command-kpi" key={label}>

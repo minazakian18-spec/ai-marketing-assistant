@@ -44,10 +44,29 @@
 html {
   background: var(--bg);
 }
-body {
-  margin: 0;
+/* The soft page gradient sits on its own fixed, composited layer instead of
+   background-attachment: fixed, which repainted the whole page on every
+   scroll frame and made scrolling feel stiff. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
   background: var(--gradient-hero);
-  background-attachment: fixed;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+html {
+  scroll-padding-top: 88px;
+}
+body {
+  position: relative;
+  margin: 0;
+  background: transparent;
   color: var(--ink);
   font-family: var(--font-sans, Arial, Helvetica, sans-serif);
   font-size: 14px;

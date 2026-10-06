@@ -26,6 +26,7 @@ const patch = z
     status: z.enum(["open", "pending", "resolved"]).optional(),
     assignedUserId: z.string().uuid().nullable().optional(),
     unread: z.boolean().optional(),
+    labels: z.array(z.string().trim().min(1).max(30)).max(10).optional(),
   })
   .refine((v) => Object.keys(v).length > 0);
 

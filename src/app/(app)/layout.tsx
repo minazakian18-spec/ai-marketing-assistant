@@ -13,10 +13,11 @@ import "../review.css";
 import "../library.css";
 import "../contacts.css";
 import "../workspace.css";
+// The logged-in workspace is private: never indexed.
 export const metadata: Metadata = {
-  title: "Mavix — Jouw werkruimte",
-  description:
-    "Maak, bewerk en plan je marketingcontent in je Mavix-werkruimte.",
+  title: { default: "Werkruimte", template: "%s | Mavix" },
+  description: "Maak, bewerk en plan je marketingcontent in je Mavix-werkruimte.",
+  robots: { index: false, follow: false, nocache: true },
 };
 export default async function AppGroupLayout({
   children,

@@ -20,8 +20,8 @@ export function Hero() {
         </Reveal>
         <Reveal delay={120}>
           <p className="mkt-lede mkt-hero-lede">
-            Reviews, social media en e-mail vanuit één plek, zodat jij tijd
-            houdt voor je bedrijf.
+            Mavix is AI-marketingsoftware voor ondernemers: beantwoord reviews,
+            maak social content en verstuur e-mailcampagnes vanuit één plek.
           </p>
         </Reveal>
         <Reveal delay={180}>

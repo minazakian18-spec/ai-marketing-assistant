@@ -34,3 +34,13 @@ export const initials = (name: string) =>
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
     .join("") || "?";
+
+export const dayKey = (iso: string) => new Date(iso).toDateString();
+export function dayLabel(iso: string) {
+  const d = new Date(iso), now = new Date();
+  if (sameDay(d, now)) return "Vandaag";
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (sameDay(d, y)) return "Gisteren";
+  return d.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+}

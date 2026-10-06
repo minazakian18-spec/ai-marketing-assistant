@@ -7,6 +7,9 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { AccountMenu } from "@/components/account/account-menu";
 import { accountLinks } from "@/components/account/account-nav";
 import { useWorkspace } from "@/components/workspace-provider";
+import { AgentProvider } from "@/components/agent/agent-provider";
+import { AgentLauncher } from "@/components/agent/agent-launcher";
+import { AgentPanel } from "@/components/agent/agent-panel";
 import {
   navigationGroups,
   navigationPath,
@@ -91,6 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
     );
   return (
+    <AgentProvider>
     <div className="app-shell">
       <button
         ref={toggle}
@@ -158,6 +162,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </strong>
           </span>
           <div className="topbar-right">
+            <AgentLauncher />
             <AccountMenu />
           </div>
         </div>
@@ -167,6 +172,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
+      <AgentPanel />
     </div>
+    </AgentProvider>
   );
 }

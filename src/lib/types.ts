@@ -1,6 +1,7 @@
 import type { EmailCampaign, EmailSettings } from "./email-model";
 import type { InstagramSettings, ContentType } from "./instagram-model";
 import type { Review, ReviewAutoReplySettings } from "./review-model";
+import type { LocalCalendarEvent } from "./calendar/local";
 import type { LibraryAsset } from "./library-model";
 import type { AudienceSegment, Product, BrandVoice } from "./brand-model";
 export type Profile = {
@@ -95,4 +96,6 @@ export type Workspace = {
   account: Account;
   notifications: Notifications;
   integrations: Integrations;
+  // Events in Mavix' own calendars (src/lib/calendar/local.ts).
+  calendar?: { events: LocalCalendarEvent[] };
 };

@@ -63,6 +63,7 @@ type ConversationRow = {
   last_message_preview: string;
   last_message_direction: "inbound" | "outbound" | "note";
   unread_count: number;
+  labels: string[];
 };
 type MessageRow = {
   id: string;
@@ -81,7 +82,7 @@ type MessageRow = {
   provider_created_at: string;
 };
 const CONVERSATION_COLUMNS =
-  "id,workspace_id,provider,provider_account_id,provider_thread_id,external_contact,contact_id,subject,status,assigned_user_id,last_message_at,last_inbound_at,last_message_preview,last_message_direction,unread_count";
+  "id,workspace_id,provider,provider_account_id,provider_thread_id,external_contact,contact_id,subject,status,assigned_user_id,last_message_at,last_inbound_at,last_message_preview,last_message_direction,unread_count,labels";
 const MESSAGE_COLUMNS =
   "id,conversation_id,provider,provider_message_id,client_message_id,direction,sender,author_user_id,body,attachments,delivery_status,error,metadata,provider_created_at";
 
@@ -106,6 +107,7 @@ export function toConversationView(r: ConversationRow): ConversationView {
     preview: r.last_message_preview,
     lastDirection: r.last_message_direction,
     unread: r.unread_count,
+    labels: r.labels || [],
   };
 }
 
@@ -842,11 +844,12 @@ export async function addNote(ctx: { workspaceId: string; userId: string }, id: 
 export async function updateConversation(
   workspaceId: string,
   id: string,
-  patch: { status?: "open" | "pending" | "resolved"; assignedUserId?: string | null; unread?: boolean },
+  patch: { status?: "open" | "pending" | "resolved"; assignedUserId?: string | null; unread?: boolean; labels?: string[] },
 ) {
   const row = await conversationRow(workspaceId, id);
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.status) update.status = patch.status;
+  if (patch.labels) update.labels = [...new Set(patch.labels.map((l) => l.trim()).filter(Boolean))].slice(0, 10);
   if (patch.unread !== undefined) update.unread_count = patch.unread ? Math.max(1, row.unread_count) : 0;
   if (patch.assignedUserId !== undefined) {
     if (patch.assignedUserId) {

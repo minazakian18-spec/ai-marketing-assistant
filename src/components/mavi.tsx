@@ -45,6 +45,33 @@ export function Mavi({
   );
 }
 
+// Mavi with its name and a short status line. Reusable wherever the
+// assistant introduces itself: dashboard, chat header, onboarding,
+// notifications, empty states and automations.
+export function MaviIdentity({
+  size = 40,
+  state = "idle",
+  title = "Mavi",
+  subtitle,
+  className = "",
+}: {
+  size?: number;
+  state?: MaviState;
+  title?: string;
+  subtitle?: string;
+  className?: string;
+}) {
+  return (
+    <div className={"mavi-identity " + className}>
+      <MaviAvatar size={size} state={state} />
+      <div>
+        <strong>{title}</strong>
+        {subtitle && <span>{subtitle}</span>}
+      </div>
+    </div>
+  );
+}
+
 // Mavi on a soft tile, used as the chat/agent avatar.
 export function MaviAvatar({ size = 32, state = "idle" }: { size?: number; state?: MaviState }) {
   return (
