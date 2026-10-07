@@ -57,6 +57,18 @@ export function memoryDb(tables) {
         predicates.push((row) => row[key] === value);
         return q;
       },
+      match(values) {
+        for (const [key, value] of Object.entries(values)) q.eq(key, value);
+        return q;
+      },
+      in(key, values) {
+        predicates.push((row) => values.includes(row[key]));
+        return q;
+      },
+      neq(key, value) {
+        predicates.push((row) => row[key] !== value);
+        return q;
+      },
       gt(key, value) {
         predicates.push((row) => row[key] > value);
         return q;

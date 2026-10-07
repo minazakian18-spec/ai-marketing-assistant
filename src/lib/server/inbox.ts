@@ -1,7 +1,11 @@
+import { hydrateGmailBody } from "./gmail-mime";
+import { randomUUID } from "node:crypto";
+import { gmailRequest as gmail, GmailHistoryExpired } from "./gmail-api";
+import { gmailConnection as activeGmailConnection } from "./gmail-credentials";
+import { replyGmailThread } from "./gmail";
 import "server-only";
 import { adminClient } from "./supabase";
 import { HttpError } from "./access";
-import { connectionToken } from "./integrations";
 import {
   metaConnection,
   metaProfile,
@@ -11,7 +15,6 @@ import {
   type MetaProvider,
 } from "./meta";
 import {
-  buildGmailReply,
   capabilities,
   cleanText,
   CONVERSATION_PAGE,
@@ -42,7 +45,8 @@ import { wantsNotification } from "../security";
 // Mavix Inbox storage and provider orchestration. Message content is never
 // written to server logs; only event names and status codes are.
 
-export const GMAIL_READ_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+export const GMAIL_READ_SCOPE =
+  "https://www.googleapis.com/auth/gmail.readonly";
 const db = () => adminClient();
 const log = (event: string, extra: Record<string, string | number> = {}) =>
   console.info(JSON.stringify({ event, ...extra }));
@@ -111,7 +115,11 @@ export function toConversationView(r: ConversationRow): ConversationView {
   };
 }
 
-function toMessageView(r: MessageRow, names: Map<string, string>, contactName: string): MessageView {
+function toMessageView(
+  r: MessageRow,
+  names: Map<string, string>,
+  contactName: string,
+): MessageView {
   return {
     id: r.id,
     direction: r.direction,
@@ -119,7 +127,9 @@ function toMessageView(r: MessageRow, names: Map<string, string>, contactName: s
       r.direction === "inbound"
         ? r.sender?.name || contactName
         : (r.author_user_id && names.get(r.author_user_id)) ||
-          (r.direction === "note" ? "Teamlid" : "Verstuurd via " + capabilities[r.provider].label),
+          (r.direction === "note"
+            ? "Teamlid"
+            : "Verstuurd via " + capabilities[r.provider].label),
     body: r.body,
     attachments: (r.attachments || []).map((a, i) => ({
       ...a,
@@ -136,41 +146,70 @@ function toMessageView(r: MessageRow, names: Map<string, string>, contactName: s
 
 export type ChannelState = {
   channel: Channel;
-  state: "not_connected" | "connected" | "reconsent" | "reconnect" | "selection" | "error";
+  state:
+    | "not_connected"
+    | "connected"
+    | "reconsent"
+    | "reconnect"
+    | "selection"
+    | "error";
   account: string;
 };
 
-export async function channelStates(workspaceId: string): Promise<ChannelState[]> {
+export async function channelStates(
+  workspaceId: string,
+): Promise<ChannelState[]> {
   const { data, error } = await db()
     .from("integration_connections")
     .select("provider,status,scopes,display_name,provider_account_id")
     .eq("workspace_id", workspaceId)
     .in("provider", ["gmail", "instagram", "messenger", "whatsapp"]);
   if (error) throw error;
-  return (["gmail", "instagram", "messenger", "whatsapp"] as Channel[]).map((channel) => {
-    const c = data?.find((d) => d.provider === channel);
-    if (!c || c.status === "disconnected") return { channel, state: "not_connected", account: "" };
-    const account = c.display_name || "";
-    if (c.status === "reconnect_required") return { channel, state: "reconnect", account };
-    if (c.status === "selection_required") return { channel, state: "selection", account };
-    if (c.status === "permission_missing") return { channel, state: "reconsent", account };
-    if (channel === "gmail" && !(c.scopes || []).includes(GMAIL_READ_SCOPE)) return { channel, state: "reconsent", account };
-    if (c.status !== "connected") return { channel, state: "error", account };
-    return { channel, state: "connected", account };
-  });
+  return (["gmail", "instagram", "messenger", "whatsapp"] as Channel[]).map(
+    (channel) => {
+      const c = data?.find((d) => d.provider === channel);
+      if (!c || c.status === "disconnected")
+        return { channel, state: "not_connected", account: "" };
+      const account = c.display_name || "";
+      if (c.status === "reconnect_required")
+        return { channel, state: "reconnect", account };
+      if (c.status === "selection_required")
+        return { channel, state: "selection", account };
+      if (c.status === "permission_missing")
+        return { channel, state: "reconsent", account };
+      if (channel === "gmail" && !(c.scopes || []).includes(GMAIL_READ_SCOPE))
+        return { channel, state: "reconsent", account };
+      if (c.status !== "connected") return { channel, state: "error", account };
+      return { channel, state: "connected", account };
+    },
+  );
 }
 
 // ---------------------------------------------------------------- Ingest
 
 async function workspaceContacts(workspaceId: string) {
-  const { data } = await db().from("business_profiles").select("data").eq("workspace_id", workspaceId).maybeSingle();
+  const { data } = await db()
+    .from("business_profiles")
+    .select("data")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
   const contacts = (data?.data as { contacts?: unknown })?.contacts;
   return Array.isArray(contacts)
-    ? (contacts as { id: string; email?: string; phone?: string; source?: string }[])
+    ? (contacts as {
+        id: string;
+        email?: string;
+        phone?: string;
+        source?: string;
+      }[])
     : [];
 }
 
-async function notifyNewConversation(workspaceId: string, conversationId: string, channel: Channel, name: string) {
+async function notifyNewConversation(
+  workspaceId: string,
+  conversationId: string,
+  channel: Channel,
+  name: string,
+) {
   const event = "new_conversation";
   const { data: prefs } = await db()
     .from("notification_preferences")
@@ -179,7 +218,13 @@ async function notifyNewConversation(workspaceId: string, conversationId: string
     .eq("event_type", event)
     .eq("channel", "IN_APP")
     .eq("enabled", true);
-  const users = [...new Set((prefs || []).filter((p) => wantsNotification([p], event, "IN_APP")).map((p) => p.user_id))];
+  const users = [
+    ...new Set(
+      (prefs || [])
+        .filter((p) => wantsNotification([p], event, "IN_APP"))
+        .map((p) => p.user_id),
+    ),
+  ];
   if (!users.length) return;
   await db()
     .from("notifications")
@@ -196,8 +241,15 @@ async function notifyNewConversation(workspaceId: string, conversationId: string
     );
 }
 
-const searchText = (contact: Record<string, string | undefined>, subject: string, last: string) =>
-  [contact.name, contact.username, contact.email, contact.phone, subject, last].filter(Boolean).join(" ").toLowerCase();
+const searchText = (
+  contact: Record<string, string | undefined>,
+  subject: string,
+  last: string,
+) =>
+  [contact.name, contact.username, contact.email, contact.phone, subject, last]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 
 export async function ingest(
   workspaceId: string,
@@ -211,9 +263,14 @@ export async function ingest(
     provider_thread_id: m.threadId,
   };
   const contact: Record<string, string> = {};
-  for (const [k, v] of Object.entries(m.customer)) if (v && k !== "id") contact[k] = String(v).slice(0, 320);
+  for (const [k, v] of Object.entries(m.customer))
+    if (v && k !== "id") contact[k] = String(v).slice(0, 320);
   let created = false;
-  let { data: conv } = await db().from("inbox_conversations").select(CONVERSATION_COLUMNS).match(key).maybeSingle();
+  let { data: conv } = await db()
+    .from("inbox_conversations")
+    .select(CONVERSATION_COLUMNS)
+    .match(key)
+    .maybeSingle();
   if (!conv) {
     const msgPreview = preview(m.text, m.attachments);
     const { data, error } = await db()
@@ -228,12 +285,24 @@ export async function ingest(
           last_message_direction: m.direction,
           search_text: searchText(contact, m.subject || "", msgPreview),
         },
-        { onConflict: "workspace_id,provider,provider_account_id,provider_thread_id", ignoreDuplicates: true },
+        {
+          onConflict:
+            "workspace_id,provider,provider_account_id,provider_thread_id",
+          ignoreDuplicates: true,
+        },
       )
       .select(CONVERSATION_COLUMNS);
     if (error) throw error;
     created = !!data?.length;
-    conv = data?.[0] || (await db().from("inbox_conversations").select(CONVERSATION_COLUMNS).match(key).single()).data;
+    conv =
+      data?.[0] ||
+      (
+        await db()
+          .from("inbox_conversations")
+          .select(CONVERSATION_COLUMNS)
+          .match(key)
+          .single()
+      ).data;
     if (!conv) throw new Error("conversation_upsert_failed");
   }
   const row = conv as ConversationRow;
@@ -255,7 +324,8 @@ export async function ingest(
       provider_created_at: m.createdAt,
     });
   if (insertError) {
-    if (insertError.code === "23505") return { conversationId: row.id, created: false, duplicate: true };
+    if (insertError.code === "23505")
+      return { conversationId: row.id, created: false, duplicate: true };
     throw insertError;
   }
 
@@ -263,19 +333,31 @@ export async function ingest(
   // contact match, Gmail subject.
   const patch: Record<string, unknown> = {};
   let merged = { ...(row.external_contact || {}), ...contact };
-  if (created && (m.channel === "instagram" || m.channel === "messenger") && m.direction === "inbound") {
+  if (
+    created &&
+    (m.channel === "instagram" || m.channel === "messenger") &&
+    m.direction === "inbound"
+  ) {
     const profile = await metaProfile(workspaceId, m.channel, m.threadId);
     if (profile.name || profile.username) {
-      merged = { ...merged, ...Object.fromEntries(Object.entries(profile).filter(([, v]) => v)) } as Record<string, string>;
+      merged = {
+        ...merged,
+        ...Object.fromEntries(Object.entries(profile).filter(([, v]) => v)),
+      } as Record<string, string>;
       patch.external_contact = merged;
     }
-  } else if (!row.external_contact?.name && contact.name) patch.external_contact = merged;
+  } else if (!row.external_contact?.name && contact.name)
+    patch.external_contact = merged;
   if (!row.contact_id) {
-    const hit = matchContact(await workspaceContacts(workspaceId), { email: merged.email, phone: merged.phone });
+    const hit = matchContact(await workspaceContacts(workspaceId), {
+      email: merged.email,
+      phone: merged.phone,
+    });
     if (hit) patch.contact_id = hit.id;
   }
   if (!row.subject && m.subject) patch.subject = m.subject;
-  if (Object.keys(patch).length) await db().from("inbox_conversations").update(patch).eq("id", row.id);
+  if (Object.keys(patch).length)
+    await db().from("inbox_conversations").update(patch).eq("id", row.id);
 
   const msgPreview = preview(m.text, m.attachments);
   await db().rpc("inbox_touch_conversation", {
@@ -287,7 +369,12 @@ export async function ingest(
     p_unread: opts.unread && m.direction === "inbound",
   });
   if (created && opts.notify && m.direction === "inbound")
-    await notifyNewConversation(workspaceId, row.id, m.channel, displayName(m.channel, merged as never)).catch(() => {});
+    await notifyNewConversation(
+      workspaceId,
+      row.id,
+      m.channel,
+      displayName(m.channel, merged as never),
+    ).catch(() => {});
   return { conversationId: row.id, created, duplicate: false };
 }
 
@@ -306,7 +393,12 @@ export async function applyStatus(workspaceId: string, u: StatusUpdate) {
     if (status !== msg.delivery_status)
       await db()
         .from("inbox_messages")
-        .update({ delivery_status: status, ...(status === "failed" ? { error: u.error || "Niet afgeleverd." } : {}) })
+        .update({
+          delivery_status: status,
+          ...(status === "failed"
+            ? { error: u.error || "Niet afgeleverd." }
+            : {}),
+        })
         .eq("id", msg.id);
     return;
   }
@@ -343,8 +435,14 @@ async function workspacesFor(provider: MetaProvider, accountId: string) {
   return (data || []).map((d) => d.workspace_id as string);
 }
 
-async function firstDelivery(key: string, provider: string, workspaceId: string) {
-  const { error } = await db().from("inbox_webhook_events").insert({ event_key: key, provider, workspace_id: workspaceId });
+async function firstDelivery(
+  key: string,
+  provider: string,
+  workspaceId: string,
+) {
+  const { error } = await db()
+    .from("inbox_webhook_events")
+    .insert({ event_key: key, provider, workspace_id: workspaceId });
   if (!error) return true;
   if (error.code === "23505") return false;
   throw error;
@@ -354,76 +452,114 @@ async function firstDelivery(key: string, provider: string, workspaceId: string)
 export async function processMetaWebhook(payload: unknown) {
   const object = (payload as { object?: string })?.object;
   const provider: MetaProvider | null =
-    object === "instagram" ? "instagram" : object === "page" ? "messenger" : object === "whatsapp_business_account" ? "whatsapp" : null;
+    object === "instagram"
+      ? "instagram"
+      : object === "page"
+        ? "messenger"
+        : object === "whatsapp_business_account"
+          ? "whatsapp"
+          : null;
   if (!provider) return;
   const { messages, statuses } =
-    provider === "whatsapp" ? parseWhatsApp(payload) : parseMetaMessaging(payload, provider);
+    provider === "whatsapp"
+      ? parseWhatsApp(payload)
+      : parseMetaMessaging(payload, provider);
   const cache = new Map<string, string[]>();
   const targets = async (accountId: string) => {
-    if (!cache.has(accountId)) cache.set(accountId, await workspacesFor(provider, accountId));
+    if (!cache.has(accountId))
+      cache.set(accountId, await workspacesFor(provider, accountId));
     return cache.get(accountId)!;
   };
   let processed = 0;
   for (const m of messages)
     for (const ws of await targets(m.accountId)) {
-      if (!(await firstDelivery(eventKey(provider, m.accountId, "msg", m.messageId, ws), provider, ws))) continue;
+      if (
+        !(await firstDelivery(
+          eventKey(provider, m.accountId, "msg", m.messageId, ws),
+          provider,
+          ws,
+        ))
+      )
+        continue;
       try {
-        await ingest(ws, m, { unread: m.direction === "inbound", notify: true });
+        await ingest(ws, m, {
+          unread: m.direction === "inbound",
+          notify: true,
+        });
         processed++;
       } catch (e) {
-        await db().from("inbox_webhook_events").delete().eq("event_key", eventKey(provider, m.accountId, "msg", m.messageId, ws));
+        await db()
+          .from("inbox_webhook_events")
+          .delete()
+          .eq(
+            "event_key",
+            eventKey(provider, m.accountId, "msg", m.messageId, ws),
+          );
         throw e;
       }
     }
   for (const s of statuses)
     for (const ws of await targets(s.accountId))
-      if (await firstDelivery(eventKey(provider, s.accountId, "status", s.messageId || s.threadId || "", s.status, s.watermark || "", ws), provider, ws))
+      if (
+        await firstDelivery(
+          eventKey(
+            provider,
+            s.accountId,
+            "status",
+            s.messageId || s.threadId || "",
+            s.status,
+            s.watermark || "",
+            ws,
+          ),
+          provider,
+          ws,
+        )
+      )
         await applyStatus(ws, s);
-  log("inbox_webhook_processed", { provider, messages: processed, statuses: statuses.length });
+  log("inbox_webhook_processed", {
+    provider,
+    messages: processed,
+    statuses: statuses.length,
+  });
   // Occasional pruning of old idempotency keys.
   if (Math.random() < 0.02)
-    await db().from("inbox_webhook_events").delete().lt("received_at", new Date(Date.now() - 30 * 86400000).toISOString());
+    await db()
+      .from("inbox_webhook_events")
+      .delete()
+      .lt("received_at", new Date(Date.now() - 30 * 86400000).toISOString());
 }
 
 // ---------------------------------------------------------------- Gmail
 
-class GmailHistoryExpired extends Error {}
-
-async function gmail(workspaceId: string, path: string, init: RequestInit = {}) {
-  const { token, c } = await connectionToken(workspaceId, "gmail");
-  const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me" + path, {
-    ...init,
-    headers: { Authorization: "Bearer " + token.access_token, "Content-Type": "application/json", ...init.headers },
-    cache: "no-store",
-    signal: AbortSignal.timeout(20000),
-  });
-  if (r.ok) return r.json();
-  const body = await r.json().catch(() => ({}));
-  const reason = body?.error?.errors?.[0]?.reason || body?.error?.status || "";
-  if (r.status === 404 && path.startsWith("/history")) throw new GmailHistoryExpired();
-  if (r.status === 401) {
-    await db().from("integration_connections").update({ status: "reconnect_required" }).eq("id", c.id);
-    throw new HttpError(409, "Verbind Gmail opnieuw.");
-  }
-  if (r.status === 403 && /insufficient|PERMISSION_DENIED|forbidden/i.test(reason))
-    throw new HttpError(403, "Gmail heeft nieuwe toestemming nodig om e-mails te lezen.");
-  if (r.status === 429 || /rateLimit/i.test(reason)) throw new HttpError(429, "Gmail is even te druk. Probeer het zo opnieuw.");
-  if (r.status === 404) throw new HttpError(404, "Dit e-mailbericht bestaat niet meer.");
-  throw new HttpError(502, "Gmail kon de actie niet uitvoeren.");
-}
-
 async function gmailConnection(workspaceId: string) {
   const { data: c } = await db()
     .from("integration_connections")
-    .select("id,status,scopes,provider_account_id,display_name")
+    .select(
+      "id,status,scopes,provider_account_id,display_name,connection_generation",
+    )
     .eq("workspace_id", workspaceId)
     .eq("provider", "gmail")
     .maybeSingle();
-  if (!c || c.status !== "connected" || !(c.scopes || []).includes(GMAIL_READ_SCOPE) || !c.provider_account_id) return null;
-  return c as { id: string; provider_account_id: string; display_name: string };
+  if (
+    !c ||
+    c.status !== "connected" ||
+    !(c.scopes || []).includes(GMAIL_READ_SCOPE) ||
+    !c.provider_account_id
+  )
+    return null;
+  return c as {
+    id: string;
+    provider_account_id: string;
+    display_name: string;
+    connection_generation: string;
+  };
 }
 
-async function knownThreads(workspaceId: string, accountId: string, threadIds: string[]) {
+async function knownThreads(
+  workspaceId: string,
+  accountId: string,
+  threadIds: string[],
+) {
   if (!threadIds.length) return new Set<string>();
   const { data } = await db()
     .from("inbox_conversations")
@@ -435,7 +571,11 @@ async function knownThreads(workspaceId: string, accountId: string, threadIds: s
   return new Set((data || []).map((d) => d.provider_thread_id as string));
 }
 
-async function storedIds(workspaceId: string, accountId: string, ids: string[]) {
+async function storedIds(
+  workspaceId: string,
+  accountId: string,
+  ids: string[],
+) {
   if (!ids.length) return new Set<string>();
   const { data } = await db()
     .from("inbox_messages")
@@ -449,33 +589,78 @@ async function storedIds(workspaceId: string, accountId: string, ids: string[]) 
 
 async function importGmail(
   workspaceId: string,
-  account: { provider_account_id: string; display_name: string },
+  account: {
+    provider_account_id: string;
+    display_name: string;
+    connection_generation: string;
+  },
   refs: { id: string; threadId: string; labelIds?: string[] }[],
   initial: boolean,
+  heartbeat: () => Promise<void>,
 ) {
   const accountId = account.provider_account_id;
-  const fresh = refs.filter((r, i) => refs.findIndex((x) => x.id === r.id) === i);
-  const stored = await storedIds(workspaceId, accountId, fresh.map((r) => r.id));
-  const todo = fresh.filter((r) => !stored.has(r.id)).slice(0, 100);
+  const fresh = refs.filter(
+    (r, i) => refs.findIndex((x) => x.id === r.id) === i,
+  );
+  const stored = await storedIds(
+    workspaceId,
+    accountId,
+    fresh.map((r) => r.id),
+  );
+  const todo = fresh.filter((r) => !stored.has(r.id));
   let imported = 0;
   for (let i = 0; i < todo.length; i += 5) {
+    await heartbeat();
+    const active = await activeGmailConnection(workspaceId);
+    if (
+      active.provider_account_id !== accountId ||
+      active.connection_generation !== account.connection_generation
+    )
+      throw new HttpError(409, "De Gmail-koppeling is gewijzigd.");
     const batch = todo.slice(i, i + 5);
-    const known = await knownThreads(workspaceId, accountId, batch.map((r) => r.threadId));
+    const known = await knownThreads(
+      workspaceId,
+      accountId,
+      batch.map((r) => r.threadId),
+    );
     const full = await Promise.all(
       batch.map((r) =>
         r.labelIds && !shouldImportGmail(r.labelIds, known.has(r.threadId))
           ? null
-          : (gmail(workspaceId, `/messages/${encodeURIComponent(r.id)}?format=full`) as Promise<GmailMessage>).catch((e) =>
-              e instanceof HttpError && e.status === 404 ? null : Promise.reject(e),
+          : (
+              gmail(
+                workspaceId,
+                `/messages/${encodeURIComponent(r.id)}?format=full`,
+                {},
+                accountId,
+                account.connection_generation,
+              ) as Promise<GmailMessage>
+            ).catch((e) =>
+              e instanceof HttpError && e.status === 404
+                ? null
+                : Promise.reject(e),
             ),
       ),
     );
     for (const msg of full) {
-      if (!msg || !shouldImportGmail(msg.labelIds, known.has(msg.threadId || ""))) continue;
+      if (
+        !msg ||
+        !shouldImportGmail(msg.labelIds, known.has(msg.threadId || ""))
+      )
+        continue;
+      await hydrateGmailBody(
+        workspaceId,
+        msg,
+        accountId,
+        account.connection_generation,
+      );
       const parsed = parseGmailMessage(msg, account.display_name, accountId);
       if (!parsed) continue;
-      const unread = initial ? (msg.labelIds || []).includes("UNREAD") : true;
-      const result = await ingest(workspaceId, parsed, { unread, notify: !initial });
+      const unread = (msg.labelIds || []).includes("UNREAD");
+      const result = await ingest(workspaceId, parsed, {
+        unread,
+        notify: !initial,
+      });
       if (!result.duplicate) {
         imported++;
         known.add(parsed.threadId);
@@ -490,37 +675,117 @@ async function importGmail(
 export async function syncGmail(workspaceId: string, force = false) {
   const account = await gmailConnection(workspaceId);
   if (!account) return { status: "not_ready" as const, imported: 0 };
-  const stateKey = { workspace_id: workspaceId, provider: "gmail", provider_account_id: account.provider_account_id };
-  const { data: state } = await db().from("inbox_sync_state").select("cursor,last_synced_at").match(stateKey).maybeSingle();
-  if (!force && state?.last_synced_at && Date.now() - new Date(state.last_synced_at).getTime() < 25000)
-    return { status: "recent" as const, imported: 0, lastSyncedAt: state.last_synced_at };
-  await db().from("inbox_sync_state").upsert({ ...stateKey, last_synced_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+  const request = (path: string) =>
+    gmail(
+      workspaceId,
+      path,
+      {},
+      account.provider_account_id,
+      account.connection_generation,
+    );
+  const stateKey = {
+    workspace_id: workspaceId,
+    provider: "gmail",
+    provider_account_id: account.provider_account_id,
+  };
+  const { data: state } = await db()
+    .from("inbox_sync_state")
+    .select("cursor,last_synced_at")
+    .match(stateKey)
+    .maybeSingle();
+  if (
+    !force &&
+    state?.last_synced_at &&
+    Date.now() - new Date(state.last_synced_at).getTime() < 25000
+  )
+    return {
+      status: "recent" as const,
+      imported: 0,
+      lastSyncedAt: state.last_synced_at,
+    };
+  const owner = randomUUID();
+  const { data: claimed, error: claimError } = await db().rpc(
+    "claim_gmail_sync",
+    {
+      p_workspace: workspaceId,
+      p_account: account.provider_account_id,
+      p_generation: account.connection_generation,
+      p_owner: owner,
+    },
+  );
+  if (claimError)
+    throw new HttpError(
+      503,
+      "Gmail-synchronisatie vereist de nieuwste databasemigratie.",
+    );
+  if (!claimed) return { status: "busy" as const, imported: 0 };
+  const heartbeat = async () => {
+    const { data, error } = await db()
+      .from("inbox_sync_state")
+      .update({ lease_until: new Date(Date.now() + 120000).toISOString() })
+      .match(stateKey)
+      .eq("lease_owner", owner)
+      .select("workspace_id");
+    if (error || !data?.length)
+      throw new HttpError(
+        409,
+        "De Gmail-synchronisatie is overgenomen. Probeer opnieuw.",
+      );
+  };
   let imported = 0;
-  let cursor = state?.cursor || null;
+  let cursor: string | null = null;
   try {
+    const { data: locked, error } = await db()
+      .from("inbox_sync_state")
+      .select("cursor")
+      .match(stateKey)
+      .eq("lease_owner", owner)
+      .single();
+    if (error || !locked)
+      throw new HttpError(
+        503,
+        "De Gmail-synchronisatie kon niet worden geladen.",
+      );
+    cursor = locked.cursor || null;
     if (cursor) {
       try {
-        let page = "";
-        const refs: { id: string; threadId: string; labelIds?: string[] }[] = [];
+        const saved = cursor.startsWith("{")
+          ? (JSON.parse(cursor) as { start: string; page: string })
+          : { start: cursor, page: "" };
+        let page = saved.page;
+        const refs: { id: string; threadId: string; labelIds?: string[] }[] =
+          [];
         let latest = cursor;
-        for (let i = 0; i < 5; i++) {
-          const q = new URLSearchParams({ startHistoryId: cursor, historyTypes: "messageAdded", maxResults: "100", ...(page ? { pageToken: page } : {}) });
-          const h = await gmail(workspaceId, "/history?" + q);
+        for (let i = 0; i < 1; i++) {
+          const q = new URLSearchParams({
+            startHistoryId: saved.start,
+            historyTypes: "messageAdded",
+            maxResults: "100",
+            ...(page ? { pageToken: page } : {}),
+          });
+          const h = await request("/history?" + q);
           for (const item of h.history || [])
-            for (const added of item.messagesAdded || []) if (added.message?.id) refs.push(added.message);
+            for (const added of item.messagesAdded || [])
+              if (added.message?.id) refs.push(added.message);
           latest = h.historyId || latest;
           page = h.nextPageToken || "";
           if (!page) break;
         }
-        imported = await importGmail(workspaceId, account, refs, false);
-        cursor = latest;
+        imported = await importGmail(
+          workspaceId,
+          account,
+          refs,
+          false,
+          heartbeat,
+        );
+        cursor = page ? JSON.stringify({ start: saved.start, page }) : latest;
       } catch (e) {
         if (!(e instanceof GmailHistoryExpired)) throw e;
         cursor = null; // History older than Gmail keeps: start over below.
       }
     }
     if (!cursor) {
-      const profile = await gmail(workspaceId, "/profile");
+      const profile = await request("/profile");
       const refs: { id: string; threadId: string }[] = [];
       let page = "";
       for (let i = 0; i < 2; i++) {
@@ -529,21 +794,137 @@ export async function syncGmail(workspaceId: string, force = false) {
           maxResults: "50",
           ...(page ? { pageToken: page } : {}),
         });
-        const list = await gmail(workspaceId, "/messages?" + q);
+        const list = await request("/messages?" + q);
         refs.push(...(list.messages || []));
         page = list.nextPageToken || "";
         if (!page) break;
       }
-      imported = await importGmail(workspaceId, account, refs, true);
+      imported = await importGmail(workspaceId, account, refs, true, heartbeat);
       cursor = String(profile.historyId);
     }
-    await db().from("inbox_sync_state").upsert({ ...stateKey, cursor, last_synced_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() });
-    await db().from("integration_connections").update({ last_synced_at: new Date().toISOString() }).eq("id", account.id);
+    const current = await activeGmailConnection(workspaceId);
+    if (current.connection_generation !== account.connection_generation)
+      throw new HttpError(409, "De Gmail-koppeling is gewijzigd.");
+    const { data: saved, error: saveError } = await db()
+      .from("inbox_sync_state")
+      .update({
+        cursor,
+        last_synced_at: new Date().toISOString(),
+        last_error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .match(stateKey)
+      .eq("lease_owner", owner)
+      .select("workspace_id");
+    if (saveError || !saved?.length)
+      throw new HttpError(
+        503,
+        "De Gmail-synchronisatie kon niet worden opgeslagen.",
+      );
+    await db()
+      .from("integration_connections")
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq("id", account.id);
     log("inbox_gmail_synced", { imported });
-    return { status: "synced" as const, imported, lastSyncedAt: new Date().toISOString() };
+    return {
+      status: "synced" as const,
+      imported,
+      lastSyncedAt: new Date().toISOString(),
+    };
   } catch (e) {
-    await db().from("inbox_sync_state").upsert({ ...stateKey, last_error: e instanceof HttpError ? e.message : "sync_failed", updated_at: new Date().toISOString() });
+    await db()
+      .from("inbox_sync_state")
+      .update({
+        last_error: e instanceof HttpError ? e.message : "sync_failed",
+        updated_at: new Date().toISOString(),
+      })
+      .match(stateKey)
+      .eq("lease_owner", owner);
     throw e;
+  } finally {
+    await db()
+      .from("inbox_sync_state")
+      .update({ lease_owner: null, lease_until: null })
+      .match(stateKey)
+      .eq("lease_owner", owner);
+  }
+}
+
+// "Meer laden" for Gmail: imports the next page of older customer mail
+// (Gmail nextPageToken), never the whole mailbox. The page token lives in the
+// connection's metadata, which is reset on every (re)connect. Shares the sync
+// lease so it never overlaps a regular sync.
+const BACKFILL_QUERY = "in:inbox -category:promotions -category:social -category:forums";
+type BackfillState = { pageToken?: string; done?: boolean };
+
+export async function backfillGmail(workspaceId: string) {
+  const account = await gmailConnection(workspaceId);
+  if (!account) throw new HttpError(409, "Verbind eerst Gmail.");
+  const full = await activeGmailConnection(workspaceId);
+  const metadata = (full.metadata || {}) as { backfill?: BackfillState };
+  if (metadata.backfill?.done) return { status: "done" as const, imported: 0, done: true };
+  const stateKey = {
+    workspace_id: workspaceId,
+    provider: "gmail",
+    provider_account_id: account.provider_account_id,
+  };
+  const owner = randomUUID();
+  const { data: claimed, error: claimError } = await db().rpc("claim_gmail_sync", {
+    p_workspace: workspaceId,
+    p_account: account.provider_account_id,
+    p_generation: account.connection_generation,
+    p_owner: owner,
+  });
+  if (claimError)
+    throw new HttpError(503, "Gmail-synchronisatie vereist de nieuwste databasemigratie.");
+  if (!claimed) return { status: "busy" as const, imported: 0, done: false };
+  const heartbeat = async () => {
+    const { data, error } = await db()
+      .from("inbox_sync_state")
+      .update({ lease_until: new Date(Date.now() + 120000).toISOString() })
+      .match(stateKey)
+      .eq("lease_owner", owner)
+      .select("workspace_id");
+    if (error || !data?.length)
+      throw new HttpError(409, "De Gmail-synchronisatie is overgenomen. Probeer opnieuw.");
+  };
+  try {
+    let pageToken = metadata.backfill?.pageToken || "";
+    let imported = 0;
+    let done = false;
+    // Skip pages that are already in the Inbox (the first sync covered the
+    // last 30 days), but never fetch more than 3 pages per click.
+    for (let i = 0; i < 3 && !imported && !done; i++) {
+      const q = new URLSearchParams({
+        q: BACKFILL_QUERY,
+        maxResults: "50",
+        ...(pageToken ? { pageToken } : {}),
+      });
+      const list = await gmail(
+        workspaceId,
+        "/messages?" + q,
+        {},
+        account.provider_account_id,
+        account.connection_generation,
+      );
+      imported += await importGmail(workspaceId, account, list.messages || [], true, heartbeat);
+      pageToken = typeof list.nextPageToken === "string" ? list.nextPageToken : "";
+      done = !pageToken;
+    }
+    const { error } = await db()
+      .from("integration_connections")
+      .update({ metadata: { ...metadata, backfill: { pageToken, done } } })
+      .eq("id", account.id)
+      .eq("connection_generation", account.connection_generation);
+    if (error) throw new HttpError(503, "De voortgang kon niet worden opgeslagen.");
+    log("inbox_gmail_backfill", { imported });
+    return { status: "synced" as const, imported, done };
+  } finally {
+    await db()
+      .from("inbox_sync_state")
+      .update({ lease_owner: null, lease_until: null })
+      .match(stateKey)
+      .eq("lease_owner", owner);
   }
 }
 
@@ -558,7 +939,30 @@ export type ListParams = {
 
 const like = (q: string) => "%" + q.replace(/[\\%_]/g, (c) => "\\" + c) + "%";
 
-export async function listConversations(workspaceId: string, userId: string, p: ListParams) {
+// Cached Gmail conversations are only shown for the mailbox that is linked
+// right now. After a disconnect (account cleared) or a switch to another
+// Google account, older cached mail disappears from the Inbox.
+export async function visibleGmailAccount(workspaceId: string) {
+  const { data } = await db()
+    .from("integration_connections")
+    .select("provider_account_id,status")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", "gmail")
+    .maybeSingle();
+  const id = data?.status !== "disconnected" ? data?.provider_account_id : null;
+  return typeof id === "string" && /^[\w.-]{1,128}$/.test(id) ? id : null;
+}
+const gmailScope = (account: string) =>
+  `provider.neq.gmail,provider_account_id.eq."${account}"`;
+
+export async function listConversations(
+  workspaceId: string,
+  userId: string,
+  p: ListParams,
+) {
+  const gmailAccount = await visibleGmailAccount(workspaceId);
+  if (p.channel === "gmail" && !gmailAccount)
+    return { conversations: [], nextCursor: null };
   let query = db()
     .from("inbox_conversations")
     .select(CONVERSATION_COLUMNS)
@@ -567,16 +971,28 @@ export async function listConversations(workspaceId: string, userId: string, p: 
     .order("id", { ascending: false })
     .limit(CONVERSATION_PAGE + 1);
   if (p.channel) query = query.eq("provider", p.channel);
+  if (p.channel === "gmail") query = query.eq("provider_account_id", gmailAccount!);
+  else if (!gmailAccount) query = query.neq("provider", "gmail");
   if (p.filter === "unread") query = query.gt("unread_count", 0);
-  else if (p.filter === "mine") query = query.eq("assigned_user_id", userId).neq("status", "resolved");
+  else if (p.filter === "mine")
+    query = query.eq("assigned_user_id", userId).neq("status", "resolved");
   else if (p.filter === "resolved") query = query.eq("status", "resolved");
   else query = query.neq("status", "resolved");
+  // Combined OR-conditions (one PostgREST `or` parameter): Gmail account
+  // scope for the "all channels" view and the pagination cursor.
+  const conditions: string[] = [];
+  if (!p.channel && gmailAccount) conditions.push(`or(${gmailScope(gmailAccount)})`);
   if (p.cursor) {
     const [at, id] = p.cursor.split("|");
-    if (!at || isNaN(Date.parse(at)) || !/^[0-9a-f-]{36}$/.test(id || "")) throw new HttpError(400, "Ongeldige pagina.");
+    if (!at || isNaN(Date.parse(at)) || !/^[0-9a-f-]{36}$/.test(id || ""))
+      throw new HttpError(400, "Ongeldige pagina.");
     const iso = new Date(at).toISOString();
-    query = query.or(`last_message_at.lt."${iso}",and(last_message_at.eq."${iso}",id.lt.${id})`);
+    conditions.push(
+      `or(last_message_at.lt."${iso}",and(last_message_at.eq."${iso}",id.lt.${id}))`,
+    );
   }
+  if (conditions.length === 1) query = query.or(conditions[0].slice(3, -1));
+  else if (conditions.length > 1) query = query.or(`and(${conditions.join(",")})`);
   const q = (p.q || "").trim().slice(0, 100);
   if (q) {
     // Server-side search: contact/subject/preview, plus message bodies.
@@ -594,7 +1010,12 @@ export async function listConversations(workspaceId: string, userId: string, p: 
       .eq("workspace_id", workspaceId)
       .ilike("search_text", like(q.toLowerCase()))
       .limit(200);
-    const ids = [...new Set([...(hits || []).map((h) => h.conversation_id), ...(byMeta || []).map((h) => h.id)])].slice(0, 200);
+    const ids = [
+      ...new Set([
+        ...(hits || []).map((h) => h.conversation_id),
+        ...(byMeta || []).map((h) => h.id),
+      ]),
+    ].slice(0, 200);
     if (!ids.length) return { conversations: [], nextCursor: null };
     query = query.in("id", ids);
   }
@@ -605,35 +1026,66 @@ export async function listConversations(workspaceId: string, userId: string, p: 
   const last = page[page.length - 1];
   return {
     conversations: page.map(toConversationView),
-    nextCursor: rows.length > CONVERSATION_PAGE && last ? last.last_message_at + "|" + last.id : null,
+    nextCursor:
+      rows.length > CONVERSATION_PAGE && last
+        ? last.last_message_at + "|" + last.id
+        : null,
   };
 }
 
 export async function unreadCount(workspaceId: string) {
-  const { count, error } = await db()
+  const gmailAccount = await visibleGmailAccount(workspaceId);
+  let query = db()
     .from("inbox_conversations")
     .select("id", { count: "exact", head: true })
     .eq("workspace_id", workspaceId)
     .gt("unread_count", 0);
+  query = gmailAccount ? query.or(gmailScope(gmailAccount)) : query.neq("provider", "gmail");
+  const { count, error } = await query;
   if (error) throw error;
   return count || 0;
 }
 
 async function conversationRow(workspaceId: string, id: string) {
-  if (!/^[0-9a-f-]{36}$/.test(id)) throw new HttpError(404, "Gesprek niet gevonden.");
-  const { data } = await db().from("inbox_conversations").select(CONVERSATION_COLUMNS).eq("workspace_id", workspaceId).eq("id", id).maybeSingle();
+  if (!/^[0-9a-f-]{36}$/.test(id))
+    throw new HttpError(404, "Gesprek niet gevonden.");
+  const { data } = await db()
+    .from("inbox_conversations")
+    .select(CONVERSATION_COLUMNS)
+    .eq("workspace_id", workspaceId)
+    .eq("id", id)
+    .maybeSingle();
   if (!data) throw new HttpError(404, "Gesprek niet gevonden.");
+  if (
+    data.provider === "gmail" &&
+    data.provider_account_id !== (await visibleGmailAccount(workspaceId))
+  )
+    throw new HttpError(404, "Gesprek niet gevonden.");
   return data as ConversationRow;
 }
 
 async function memberNames(workspaceId: string) {
-  const { data: members } = await db().from("workspace_members").select("user_id").eq("workspace_id", workspaceId);
+  const { data: members } = await db()
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", workspaceId);
   const ids = (members || []).map((m) => m.user_id as string);
-  const { data: profiles } = ids.length ? await db().from("profiles").select("id,full_name").in("id", ids) : { data: [] };
-  return new Map((profiles || []).map((p) => [p.id as string, (p.full_name as string) || "Teamlid"]));
+  const { data: profiles } = ids.length
+    ? await db().from("profiles").select("id,full_name").in("id", ids)
+    : { data: [] };
+  return new Map(
+    (profiles || []).map((p) => [
+      p.id as string,
+      (p.full_name as string) || "Teamlid",
+    ]),
+  );
 }
 
-export async function getConversation(workspaceId: string, id: string, before?: string) {
+export async function getConversation(
+  workspaceId: string,
+  id: string,
+  before?: string,
+) {
   const row = await conversationRow(workspaceId, id);
   let q = db()
     .from("inbox_messages")
@@ -643,7 +1095,8 @@ export async function getConversation(workspaceId: string, id: string, before?: 
     .order("id", { ascending: false })
     .limit(MESSAGE_PAGE + 1);
   if (before) {
-    if (isNaN(Date.parse(before))) throw new HttpError(400, "Ongeldige pagina.");
+    if (isNaN(Date.parse(before)))
+      throw new HttpError(400, "Ongeldige pagina.");
     q = q.lt("provider_created_at", new Date(before).toISOString());
   }
   const { data, error } = await q;
@@ -651,25 +1104,38 @@ export async function getConversation(workspaceId: string, id: string, before?: 
   const rows = (data || []) as MessageRow[];
   const names = await memberNames(workspaceId);
   const view = toConversationView(row);
-  const messages = rows.slice(0, MESSAGE_PAGE).reverse().map((r) => toMessageView(r, names, view.contact.name));
+  const messages = rows
+    .slice(0, MESSAGE_PAGE)
+    .reverse()
+    .map((r) => toMessageView(r, names, view.contact.name));
   if (!before && row.unread_count > 0) {
-    await db().from("inbox_conversations").update({ unread_count: 0 }).eq("id", row.id);
+    await db()
+      .from("inbox_conversations")
+      .update({ unread_count: 0 })
+      .eq("id", row.id);
     view.unread = 0;
   }
   let contact = null;
   if (row.contact_id) {
-    const found = (await workspaceContacts(workspaceId)).find((c) => c.id === row.contact_id) as Record<string, string> | undefined;
+    const found = (await workspaceContacts(workspaceId)).find(
+      (c) => c.id === row.contact_id,
+    ) as Record<string, string> | undefined;
     if (found)
       contact = {
         id: found.id,
-        name: [found.firstName, found.lastName].filter(Boolean).join(" ") || found.email,
+        name:
+          [found.firstName, found.lastName].filter(Boolean).join(" ") ||
+          found.email,
         email: found.email || "",
         phone: found.phone || "",
         company: found.company || "",
         status: found.status || "",
       };
   }
-  const members = [...names.entries()].map(([userId, name]) => ({ userId, name }));
+  const members = [...names.entries()].map(([userId, name]) => ({
+    userId,
+    name,
+  }));
   return {
     conversation: view,
     messages,
@@ -690,32 +1156,38 @@ export type SendInput = {
   template?: { name: string; language: string; variables: string[] };
 };
 
-async function latestRfcIds(conversationId: string) {
-  const { data } = await db()
-    .from("inbox_messages")
-    .select("metadata")
-    .eq("conversation_id", conversationId)
-    .neq("direction", "note")
-    .order("provider_created_at", { ascending: false })
-    .limit(10);
-  const withId = (data || []).find((d) => (d.metadata as Record<string, string>)?.rfcMessageId);
-  const meta = (withId?.metadata || {}) as Record<string, string>;
-  return { inReplyTo: meta.rfcMessageId, references: meta.references };
-}
-
-export async function sendReply(ctx: { workspaceId: string; userId: string }, id: string, input: SendInput) {
+export async function sendReply(
+  ctx: { workspaceId: string; userId: string },
+  id: string,
+  input: SendInput,
+) {
   const row = await conversationRow(ctx.workspaceId, id);
   const caps = capabilities[row.provider];
-  const body = cleanText(input.body, row.provider === "gmail" ? 20000 : row.provider === "whatsapp" ? 4096 : 1000);
+  const body = cleanText(
+    input.body,
+    row.provider === "gmail"
+      ? 20000
+      : row.provider === "whatsapp"
+        ? 4096
+        : 1000,
+  );
   const attachments = input.attachments || [];
   if (attachments.length && !caps.outboundAttachments)
-    throw new HttpError(400, "Bijlagen versturen kan nog niet via " + caps.label + ".");
+    throw new HttpError(
+      400,
+      "Bijlagen versturen kan nog niet via " + caps.label + ".",
+    );
   if (attachments.length) {
     const problem = validateUploads(attachments);
     if (problem) throw new HttpError(400, problem);
   }
-  if (input.template && !caps.templates) throw new HttpError(400, "Templates zijn alleen beschikbaar voor WhatsApp.");
-  if (!input.template && !body.trim() && !attachments.length) throw new HttpError(400, "Schrijf eerst een bericht.");
+  if (input.template && !caps.templates)
+    throw new HttpError(
+      400,
+      "Templates zijn alleen beschikbaar voor WhatsApp.",
+    );
+  if (!input.template && !body.trim() && !attachments.length)
+    throw new HttpError(400, "Schrijf eerst een bericht.");
   const win = windowState(row.provider, row.last_inbound_at);
   if (win.applies && !win.open && !input.template)
     throw new HttpError(
@@ -725,7 +1197,10 @@ export async function sendReply(ctx: { workspaceId: string; userId: string }, id
         : "Het 24-uursvenster is gesloten. Je kunt pas weer antwoorden als de klant opnieuw een bericht stuurt.",
     );
   const text = input.template
-    ? `Template: ${input.template.name}` + (input.template.variables.length ? " (" + input.template.variables.join(", ") + ")" : "")
+    ? `Template: ${input.template.name}` +
+      (input.template.variables.length
+        ? " (" + input.template.variables.join(", ") + ")"
+        : "")
     : body;
 
   // Idempotent by client id: a retry re-sends the same row.
@@ -737,10 +1212,18 @@ export async function sendReply(ctx: { workspaceId: string; userId: string }, id
     .maybeSingle();
   let messageId: string;
   if (existing) {
-    if ((existing as MessageRow).conversation_id !== row.id) throw new HttpError(409, "Ongeldige aanvraag.");
-    if ((existing as MessageRow).delivery_status !== "failed") return { messageId: existing.id as string, status: existing.delivery_status as DeliveryStatus };
+    if ((existing as MessageRow).conversation_id !== row.id)
+      throw new HttpError(409, "Ongeldige aanvraag.");
+    if ((existing as MessageRow).delivery_status !== "failed")
+      return {
+        messageId: existing.id as string,
+        status: existing.delivery_status as DeliveryStatus,
+      };
     messageId = existing.id as string;
-    await db().from("inbox_messages").update({ delivery_status: "pending", error: null }).eq("id", messageId);
+    await db()
+      .from("inbox_messages")
+      .update({ delivery_status: "pending", error: null })
+      .eq("id", messageId);
   } else {
     const { data, error } = await db()
       .from("inbox_messages")
@@ -753,14 +1236,20 @@ export async function sendReply(ctx: { workspaceId: string; userId: string }, id
         direction: "outbound",
         author_user_id: ctx.userId,
         body: text,
-        attachments: attachments.map((a) => ({ kind: a.mimeType.startsWith("image/") ? "image" : "file", name: a.name, mimeType: a.mimeType, size: Buffer.byteLength(a.data, "base64") })),
+        attachments: attachments.map((a) => ({
+          kind: a.mimeType.startsWith("image/") ? "image" : "file",
+          name: a.name,
+          mimeType: a.mimeType,
+          size: Buffer.byteLength(a.data, "base64"),
+        })),
         delivery_status: "pending",
         metadata: input.template ? { template: input.template.name } : {},
       })
       .select("id")
       .single();
     if (error) {
-      if (error.code === "23505") return { messageId: "", status: "pending" as DeliveryStatus };
+      if (error.code === "23505")
+        return { messageId: "", status: "pending" as DeliveryStatus };
       throw error;
     }
     messageId = data.id;
@@ -769,21 +1258,37 @@ export async function sendReply(ctx: { workspaceId: string; userId: string }, id
   try {
     let providerId: string;
     if (row.provider === "gmail") {
-      const to = row.external_contact?.email;
-      if (!to) throw new HttpError(409, "Er is geen e-mailadres voor dit gesprek.");
-      const ids = await latestRfcIds(row.id);
-      const raw = buildGmailReply({ to, subject: row.subject, body, attachments, ...ids });
-      const sent = await gmail(ctx.workspaceId, "/messages/send", { method: "POST", body: JSON.stringify({ raw, threadId: row.provider_thread_id }) });
+      const sent = await replyGmailThread(
+        ctx.workspaceId,
+        row.provider_thread_id,
+        body,
+        row.provider_account_id,
+        attachments,
+      );
       providerId = String(sent.id);
     } else if (input.template) {
-      providerId = await sendWhatsAppTemplate(ctx.workspaceId, row.provider_thread_id, input.template);
+      providerId = await sendWhatsAppTemplate(
+        ctx.workspaceId,
+        row.provider_thread_id,
+        input.template,
+      );
     } else {
-      providerId = await sendMetaText(ctx.workspaceId, row.provider as MetaProvider, row.provider_thread_id, body);
+      providerId = await sendMetaText(
+        ctx.workspaceId,
+        row.provider as MetaProvider,
+        row.provider_thread_id,
+        body,
+      );
     }
     const now = new Date().toISOString();
     let { error } = await db()
       .from("inbox_messages")
-      .update({ provider_message_id: providerId, delivery_status: "sent", error: null, provider_created_at: now })
+      .update({
+        provider_message_id: providerId,
+        delivery_status: "sent",
+        error: null,
+        provider_created_at: now,
+      })
       .eq("id", messageId);
     if (error?.code === "23505") {
       // The provider's echo webhook/sync arrived first; keep our row (author,
@@ -796,28 +1301,59 @@ export async function sendReply(ctx: { workspaceId: string; userId: string }, id
         .eq("provider_account_id", row.provider_account_id)
         .eq("provider_message_id", providerId)
         .is("client_message_id", null);
-      ({ error } = await db().from("inbox_messages").update({ provider_message_id: providerId, delivery_status: "sent", error: null, provider_created_at: now }).eq("id", messageId));
+      ({ error } = await db()
+        .from("inbox_messages")
+        .update({
+          provider_message_id: providerId,
+          delivery_status: "sent",
+          error: null,
+          provider_created_at: now,
+        })
+        .eq("id", messageId));
     }
     if (error) throw error;
     await db().rpc("inbox_touch_conversation", {
       p_id: row.id,
       p_at: now,
-      p_preview: preview(text, attachments.map((a) => ({ kind: "file", name: a.name, mimeType: a.mimeType }))),
+      p_preview: preview(
+        text,
+        attachments.map((a) => ({
+          kind: "file",
+          name: a.name,
+          mimeType: a.mimeType,
+        })),
+      ),
       p_direction: "outbound",
-      p_search: searchText(row.external_contact || {}, row.subject, preview(text)),
+      p_search: searchText(
+        row.external_contact || {},
+        row.subject,
+        preview(text),
+      ),
       p_unread: false,
     });
     log("inbox_message_sent", { provider: row.provider });
     return { messageId, status: "sent" as DeliveryStatus };
   } catch (e) {
-    const message = e instanceof HttpError ? e.message : "Versturen is niet gelukt.";
-    await db().from("inbox_messages").update({ delivery_status: "failed", error: message }).eq("id", messageId);
-    log("inbox_message_failed", { provider: row.provider, code: e instanceof HttpError ? e.status : 500 });
+    const message =
+      e instanceof HttpError ? e.message : "Versturen is niet gelukt.";
+    await db()
+      .from("inbox_messages")
+      .update({ delivery_status: "failed", error: message })
+      .eq("id", messageId);
+    log("inbox_message_failed", {
+      provider: row.provider,
+      code: e instanceof HttpError ? e.status : 500,
+    });
     return { messageId, status: "failed" as DeliveryStatus, error: message };
   }
 }
 
-export async function addNote(ctx: { workspaceId: string; userId: string }, id: string, body: string, clientId: string) {
+export async function addNote(
+  ctx: { workspaceId: string; userId: string },
+  id: string,
+  body: string,
+  clientId: string,
+) {
   const row = await conversationRow(ctx.workspaceId, id);
   const text = cleanText(body, 5000).trim();
   if (!text) throw new HttpError(400, "Schrijf eerst een notitie.");
@@ -844,13 +1380,24 @@ export async function addNote(ctx: { workspaceId: string; userId: string }, id: 
 export async function updateConversation(
   workspaceId: string,
   id: string,
-  patch: { status?: "open" | "pending" | "resolved"; assignedUserId?: string | null; unread?: boolean; labels?: string[] },
+  patch: {
+    status?: "open" | "pending" | "resolved";
+    assignedUserId?: string | null;
+    unread?: boolean;
+    labels?: string[];
+  },
 ) {
   const row = await conversationRow(workspaceId, id);
-  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const update: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
   if (patch.status) update.status = patch.status;
-  if (patch.labels) update.labels = [...new Set(patch.labels.map((l) => l.trim()).filter(Boolean))].slice(0, 10);
-  if (patch.unread !== undefined) update.unread_count = patch.unread ? Math.max(1, row.unread_count) : 0;
+  if (patch.labels)
+    update.labels = [
+      ...new Set(patch.labels.map((l) => l.trim()).filter(Boolean)),
+    ].slice(0, 10);
+  if (patch.unread !== undefined)
+    update.unread_count = patch.unread ? Math.max(1, row.unread_count) : 0;
   if (patch.assignedUserId !== undefined) {
     if (patch.assignedUserId) {
       const { data: member } = await db()
@@ -859,31 +1406,54 @@ export async function updateConversation(
         .eq("workspace_id", workspaceId)
         .eq("user_id", patch.assignedUserId)
         .maybeSingle();
-      if (!member) throw new HttpError(400, "Dit teamlid hoort niet bij deze werkruimte.");
+      if (!member)
+        throw new HttpError(400, "Dit teamlid hoort niet bij deze werkruimte.");
     }
     update.assigned_user_id = patch.assignedUserId;
   }
-  const { error } = await db().from("inbox_conversations").update(update).eq("id", row.id);
+  const { error } = await db()
+    .from("inbox_conversations")
+    .update(update)
+    .eq("id", row.id);
   if (error) throw error;
 }
 
 // Attachment proxy: Gmail attachments and WhatsApp media need the stored
 // token, so the browser fetches them through Mavix.
-export async function attachment(workspaceId: string, messageId: string, index: number) {
-  if (!/^[0-9a-f-]{36}$/.test(messageId) || !Number.isInteger(index) || index < 0 || index > 50)
+export async function attachment(
+  workspaceId: string,
+  messageId: string,
+  index: number,
+) {
+  if (
+    !/^[0-9a-f-]{36}$/.test(messageId) ||
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index > 50
+  )
     throw new HttpError(404, "Bijlage niet gevonden.");
   const { data: msg } = await db()
     .from("inbox_messages")
-    .select("provider,provider_message_id,attachments")
+    .select("provider,provider_account_id,provider_message_id,attachments")
     .eq("workspace_id", workspaceId)
     .eq("id", messageId)
     .maybeSingle();
   const a = (msg?.attachments as Attachment[] | undefined)?.[index];
   if (!msg || !a?.ref) throw new HttpError(404, "Bijlage niet gevonden.");
   if (msg.provider === "gmail") {
-    if (!/^[\w-]{1,1000}$/.test(a.ref) || !msg.provider_message_id) throw new HttpError(404, "Bijlage niet gevonden.");
-    const d = await gmail(workspaceId, `/messages/${encodeURIComponent(msg.provider_message_id)}/attachments/${encodeURIComponent(a.ref)}`);
-    return { data: Buffer.from(String(d.data || ""), "base64url"), mimeType: a.mimeType || "application/octet-stream", name: a.name };
+    if (!/^[\w-]{1,1000}$/.test(a.ref) || !msg.provider_message_id)
+      throw new HttpError(404, "Bijlage niet gevonden.");
+    const d = await gmail(
+      workspaceId,
+      `/messages/${encodeURIComponent(msg.provider_message_id)}/attachments/${encodeURIComponent(a.ref)}`,
+      {},
+      msg.provider_account_id,
+    );
+    return {
+      data: Buffer.from(String(d.data || ""), "base64url"),
+      mimeType: a.mimeType || "application/octet-stream",
+      name: a.name,
+    };
   }
   if (msg.provider === "whatsapp") {
     const media = await whatsappMedia(workspaceId, a.ref);
@@ -903,22 +1473,33 @@ export async function conversationForAi(workspaceId: string, id: string) {
     .neq("direction", "note")
     .order("provider_created_at", { ascending: false })
     .limit(30);
-  const { data: profile } = await db().from("business_profiles").select("data").eq("workspace_id", workspaceId).maybeSingle();
+  const { data: profile } = await db()
+    .from("business_profiles")
+    .select("data")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
   return {
     channel: row.provider,
     subject: row.subject,
     customerName: toConversationView(row).contact.name,
     messages: (data || []).reverse().map((m) => ({
-      from: m.direction === "inbound" ? ("customer" as const) : ("business" as const),
+      from:
+        m.direction === "inbound"
+          ? ("customer" as const)
+          : ("business" as const),
       text: String(m.body || "").slice(0, 2000),
       attachments: ((m.attachments as Attachment[]) || []).map((a) => a.name),
       at: m.provider_created_at as string,
     })),
-    profile: ((profile?.data as { profile?: unknown })?.profile || {}) as Record<string, unknown>,
+    profile: ((profile?.data as { profile?: unknown })?.profile ||
+      {}) as Record<string, unknown>,
   };
 }
 
-export async function metaConnected(workspaceId: string, provider: MetaProvider) {
+export async function metaConnected(
+  workspaceId: string,
+  provider: MetaProvider,
+) {
   try {
     await metaConnection(workspaceId, provider);
     return true;

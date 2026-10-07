@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MessagesSquare, Plug } from "lucide-react";
+import { MessagesSquare, PenLine, Plug } from "lucide-react";
+import { NewEmailDialog } from "@/components/inbox/new-email";
 
 import { BrandIcon } from "@/components/brand-icon";
 import { isBrowserDemo } from "@/lib/demo";
@@ -56,6 +57,10 @@ export default function InboxPage() {
   const [demoData, setDemoData] = useState<ReturnType<typeof demoThreads>>([]);
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [unreadTotal, setUnreadTotal] = useState(0);
+  const [composing, setComposing] = useState(false);
+  const [notice, setNotice] = useState("");
+  // Older Gmail (beyond the stored list): imported page by page on request.
+  const [gmailOlder, setGmailOlder] = useState<{ busy: boolean; done: boolean }>({ busy: false, done: false });
 
   useEffect(() => {
     setDemo(isBrowserDemo());
@@ -164,20 +169,50 @@ export default function InboxPage() {
   }, [ready, demo, loadList, loadDetail, selected]);
   useEffect(() => {
     if (!ready || demo || !gmailReady) return;
+    // Polling, not real-time: on open, every minute while visible and when the
+    // window regains focus. The server throttles (25 s) and serialises syncs.
     const sync = () => {
       if (document.visibilityState !== "visible") return;
       fetch("/api/inbox/sync", { method: "POST" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => {
+        .then(async (r) => {
+          const d = await r.json().catch(() => null);
+          // A revoked/expired connection changes the channel state: refresh it.
+          if (!r.ok) return void loadList(false, true);
           if (d?.imported > 0) void loadList(false, true);
         })
         .catch(() => {});
     };
     sync();
     const timer = window.setInterval(sync, 60000);
-    return () => window.clearInterval(timer);
+    window.addEventListener("focus", sync);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", sync);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, demo, gmailReady]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(""), 6000);
+    return () => window.clearTimeout(t);
+  }, [notice]);
+
+  async function loadOlderGmail() {
+    setGmailOlder({ busy: true, done: false });
+    try {
+      const d = await api<{ imported: number; done: boolean; status: string }>("/api/inbox/gmail/backfill", { method: "POST", body: "{}" });
+      setGmailOlder({ busy: false, done: d.done });
+      if (d.status === "busy") setNotice("Gmail wordt al bijgewerkt. Probeer het zo opnieuw.");
+      else if (!d.imported) setNotice(d.done ? "Alle oudere klantmails staan in je Inbox." : "Geen oudere klantmails gevonden op deze pagina.");
+      // Imported mail lands after the current end of the list; the regular
+      // "Meer laden" (stored cursor) then pages through it.
+      await loadList(false, true);
+    } catch (e) {
+      setGmailOlder({ busy: false, done: false });
+      setError(e instanceof Error ? e.message : "Oudere e-mails konden niet worden geladen.");
+    }
+  }
 
   function select(id: string) {
     setSelected(id);
@@ -366,22 +401,64 @@ export default function InboxPage() {
 
   const linked = (channels || []).filter((c) => c.state !== "not_connected");
   const problems = linked.filter((c) => PROBLEM[c.state]);
-  const nothingLinked = !demo && channels !== null && linked.length === 0;
+  const nothingLinked = !demo && channels !== null && linked.length === 0 && channel !== "gmail";
+  const gmail = channels?.find((c) => c.channel === "gmail");
+  const gmailConnected = gmail?.state === "connected";
+  // E-mail is always offered as a filter, so Gmail can be connected from here.
+  const filterChannels = [...linked.map((c) => c.channel), ...(linked.some((c) => c.channel === "gmail") ? [] : (["gmail"] as Channel[]))];
+  const gmailEmpty =
+    channel !== "gmail" || demo ? undefined : !gmail || gmail.state === "not_connected" ? (
+      <div className="ib-list-connect">
+        <BrandIcon brand="gmail" size={22} />
+        <p>Koppel Gmail om klantmails in Mavix te beheren.</p>
+        <Link className="button primary" href="/account/integraties">
+          Koppel Gmail
+        </Link>
+      </div>
+    ) : !gmailConnected ? (
+      <div className="ib-list-connect">
+        <BrandIcon brand="gmail" size={22} />
+        <p>{gmail.state === "reconnect" ? "Je Gmail-koppeling is verlopen." : "Gmail heeft opnieuw toestemming nodig."}</p>
+        <Link className="button primary" href="/account/integraties">
+          Opnieuw koppelen
+        </Link>
+      </div>
+    ) : debounced ? undefined : (
+      <p className="ib-list-empty">Geen e-mails gevonden.</p>
+    );
 
   return (
     <div className="ib" data-view={view} data-details={detailsOpen ? "open" : "closed"}>
       <header className="ib-head">
-        <h1>Inbox</h1>
-        <p>Al je klantgesprekken op één plek.</p>
+        <div>
+          <h1>Inbox</h1>
+          <p>Al je klantgesprekken op één plek.</p>
+        </div>
+        {!demo && gmailConnected && (
+          <button type="button" className="button primary ib-new-mail" onClick={() => setComposing(true)}>
+            <PenLine size={15} aria-hidden="true" />
+            Nieuwe e-mail
+          </button>
+        )}
       </header>
       {demo && <p className="ib-demo">Testmodus: dit zijn voorbeeldgesprekken. Berichten worden niet echt verstuurd.</p>}
       {problems.map((p) => (
         <p key={p.channel} className="ib-problem" role="status">
           <BrandIcon brand={p.channel} size={14} />
-          {capabilities[p.channel].label} {PROBLEM[p.state]}.
-          <Link href="/account/integraties">Oplossen</Link>
+          {p.channel === "gmail" && p.state === "reconnect"
+            ? "Je Gmail-koppeling is verlopen. Bestaande e-mails blijven zichtbaar, nieuwe komen pas binnen na opnieuw koppelen."
+            : `${capabilities[p.channel].label} ${PROBLEM[p.state]}.`}
+          <Link href="/account/integraties">{p.channel === "gmail" ? "Opnieuw koppelen" : "Oplossen"}</Link>
         </p>
       ))}
+      {notice && (
+        <p className="ib-notice" role="status">
+          {notice}
+          <button type="button" onClick={() => setNotice("")} aria-label="Melding sluiten">
+            ×
+          </button>
+        </p>
+      )}
       {error && (
         <p className="ib-error ib-page-error" role="alert">
           {error}
@@ -410,7 +487,7 @@ export default function InboxPage() {
           <ConversationList
             conversations={list}
             unread={unread}
-            channels={linked.map((c) => c.channel)}
+            channels={demo ? linked.map((c) => c.channel) : filterChannels}
             selectedId={selected}
             channel={channel}
             status={status}
@@ -422,6 +499,12 @@ export default function InboxPage() {
             onQuery={setQuery}
             onSelect={select}
             onMore={() => void loadList(true)}
+            empty={gmailEmpty}
+            extraMore={
+              !demo && gmailConnected && !gmailOlder.done && !debounced && status !== "resolved" && (channel === "" || channel === "gmail")
+                ? { label: "Oudere e-mails laden", busy: gmailOlder.busy, onClick: () => void loadOlderGmail() }
+                : null
+            }
           />
           {shown ? (
             <Thread
@@ -450,6 +533,17 @@ export default function InboxPage() {
           )}
           <ContextPanel detail={shown} onClose={toggleDetails} onUpdate={(p) => void update(p)} onSummary={() => ai("summary")} />
         </div>
+      )}
+      {composing && (
+        <NewEmailDialog
+          from={gmail?.account || ""}
+          onClose={() => setComposing(false)}
+          onSent={(conversationId) => {
+            setComposing(false);
+            setNotice("E-mail verstuurd via Gmail.");
+            void loadList(false, true).then(() => conversationId && select(conversationId));
+          }}
+        />
       )}
     </div>
   );

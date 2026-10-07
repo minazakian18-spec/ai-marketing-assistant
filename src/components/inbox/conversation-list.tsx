@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { ListFilter, Search, X } from "lucide-react";
 import { Menu, type MenuItem } from "@/components/menu";
 import { BrandIcon } from "@/components/brand-icon";
@@ -40,6 +41,8 @@ export function ConversationList({
   onQuery,
   onSelect,
   onMore,
+  empty,
+  extraMore,
 }: {
   conversations: ConversationView[];
   channels: Channel[];
@@ -55,6 +58,10 @@ export function ConversationList({
   onQuery: (q: string) => void;
   onSelect: (id: string) => void;
   onMore: () => void;
+  /** Replaces the default empty text (e.g. a Gmail connect prompt). */
+  empty?: ReactNode;
+  /** Second-stage paging after the stored list ends (older Gmail). */
+  extraMore?: { label: string; busy: boolean; onClick: () => void } | null;
 }) {
   const filtered = channel !== "" || status !== "open";
   const items: MenuItem[] = [
@@ -130,13 +137,16 @@ export function ConversationList({
           </li>
         ))}
       </ul>
-      {!loading && !conversations.length && (
-        <p className="ib-list-empty">{query ? "Geen gesprekken gevonden." : filtered ? "Geen gesprekken met dit filter." : "Nog geen gesprekken."}</p>
-      )}
+      {!loading && !conversations.length && (empty || <p className="ib-list-empty">{query ? "Geen gesprekken gevonden." : filtered ? "Geen gesprekken met dit filter." : "Nog geen gesprekken."}</p>)}
       {loading && !conversations.length && <p className="ib-list-empty">Gesprekken laden…</p>}
       {hasMore && (
         <button type="button" className="button secondary ib-more" onClick={onMore} disabled={loading}>
-          {loading ? "Laden…" : "Meer gesprekken"}
+          {loading ? "Laden…" : "Meer laden"}
+        </button>
+      )}
+      {!hasMore && extraMore && !loading && (
+        <button type="button" className="button secondary ib-more" onClick={extraMore.onClick} disabled={extraMore.busy}>
+          {extraMore.busy ? "Oudere e-mails ophalen…" : extraMore.label}
         </button>
       )}
     </aside>

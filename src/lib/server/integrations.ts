@@ -1,24 +1,228 @@
-import {calendarToken} from './calendar-credentials';
-import 'server-only';
-import {adminClient,appUrl} from './supabase';
-import {HttpError} from './access';
-import {encrypt,decrypt} from './crypto';
-export type Provider='google_business'|'gmail'|'instagram'|'google_calendar';
-export const scopes={google_business:['openid','email','https://www.googleapis.com/auth/business.manage'],gmail:['openid','email','https://www.googleapis.com/auth/gmail.send','https://www.googleapis.com/auth/gmail.readonly'],instagram:['instagram_business_basic','instagram_business_manage_messages'],google_calendar:['openid','email','https://www.googleapis.com/auth/calendar.events','https://www.googleapis.com/auth/calendar.calendarlist.readonly']};
-export type Credentials={access_token:string;refresh_token?:string;expires_in?:number;scope?:string};
-export const callback=(provider:Provider)=>appUrl()+'/api/integrations/'+provider+'/callback';
-export async function googleToken(body:Record<string,string>):Promise<Credentials>{const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...body,client_id:process.env.GOOGLE_CLIENT_ID!,client_secret:process.env.GOOGLE_CLIENT_SECRET!}),cache:'no-store'});if(!r.ok)throw new HttpError(502,'Google-autorisatie is verlopen of geweigerd. Verbind opnieuw.');return r.json();}
-export async function connectionToken(workspaceId:string,provider:Provider){if(provider==='google_calendar')return calendarToken(workspaceId);const db=adminClient();const {data:c,error}=await db.from('integration_connections').select('*').eq('workspace_id',workspaceId).eq('provider',provider).single();if(error||!c?.encrypted_credentials)throw new HttpError(409,'Verbind eerst je account.');let token=decrypt<Credentials>(c.encrypted_credentials,workspaceId+':'+provider);if(!c.expires_at||new Date(c.expires_at).getTime()<Date.now()+60000){if(!token.refresh_token||provider==='instagram'){await db.from('integration_connections').update({status:'reconnect_required'}).eq('id',c.id);throw new HttpError(409,'Verbind je account opnieuw.');}try{const refreshed=await googleToken({grant_type:'refresh_token',refresh_token:token.refresh_token});token={...token,...refreshed};const {error}=await db.from('integration_connections').update({encrypted_credentials:encrypt(token,workspaceId+':'+provider),expires_at:new Date(Date.now()+(token.expires_in||3600)*1000).toISOString()}).eq('id',c.id);if(error)throw new Error('save');}catch{await db.from('integration_connections').update({status:'reconnect_required'}).eq('id',c.id);throw new HttpError(409,'Verbind je account opnieuw.');}}return {token,c};}
-export async function googleRequest(workspaceId:string,provider:Provider,url:string,options:RequestInit={}){const {token,c}=await connectionToken(workspaceId,provider);const r=await fetch(url,{...options,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token.access_token,...options.headers},cache:'no-store'});if(!r.ok){const status=r.status===401?'reconnect_required':r.status===403?'permission_missing':'error';await adminClient().from('integration_connections').update({status}).eq('id',c.id);throw new HttpError(502,'De provider kon de actie niet uitvoeren. Controleer de verbinding.');}return r.status===204?{}:r.json();}
-export async function businessLocations(workspaceId:string){const accounts=await googleRequest(workspaceId,'google_business','https://mybusinessaccountmanagement.googleapis.com/v1/accounts');const result: {id:string;account:string;name:string}[]=[];for(const account of accounts.accounts||[]){let page='';do{const params=new URLSearchParams({readMask:'name,title',pageSize:'100',...(page?{pageToken:page}:{})});const list=await googleRequest(workspaceId,'google_business','https://mybusinessbusinessinformation.googleapis.com/v1/'+account.name+'/locations?'+params);for(const location of list.locations||[])result.push({id:location.name,account:account.name,name:location.title});page=list.nextPageToken||'';}while(page);}return result;}
-export async function listReviews(workspaceId:string,pageToken=''){const {c}=await connectionToken(workspaceId,'google_business');if(!c.metadata.location||!c.metadata.account)throw new HttpError(409,'Kies eerst je bedrijfslocatie.');return googleRequest(workspaceId,'google_business',`https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews?`+new URLSearchParams({pageSize:'50',...(pageToken?{pageToken}:{})}));}
-export async function fetchReview(workspaceId:string,id:string){if(!/^[\w-]+$/.test(id))throw new HttpError(400,'Ongeldige review.');const {c}=await connectionToken(workspaceId,'google_business');return googleRequest(workspaceId,'google_business',`https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews/${id}`);}
-export async function replyToReview(workspaceId:string,id:string,comment:string){if(!/^[\w-]+$/.test(id)||!comment.trim()||comment.length>4096)throw new HttpError(400,'Ongeldig antwoord.');const {c}=await connectionToken(workspaceId,'google_business');return googleRequest(workspaceId,'google_business',`https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews/${id}/reply`,{method:'PUT',body:JSON.stringify({comment})});}
-export async function sendGmail(workspaceId:string,raw:string){return googleRequest(workspaceId,'gmail','https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',body:JSON.stringify({raw})});}
-function encodeSubject(subject:string){return /^[\x20-\x7e]*$/.test(subject)?subject:'=?UTF-8?B?'+Buffer.from(subject,'utf8').toString('base64')+'?=';}
-// RFC 2822 message, base64url-encoded for the Gmail API's `raw` field. `to`
-// is validated by the caller; subject/body are user input so newlines are
-// stripped from the subject line to prevent header injection into the
-// message we hand to Gmail.
-function buildRawMessage(to:string,subject:string,body:string){const lines=[`To: ${to}`,`Subject: ${encodeSubject(subject.replace(/[\r\n]+/g,' '))}`,'MIME-Version: 1.0','Content-Type: text/plain; charset="UTF-8"','Content-Transfer-Encoding: 8bit','',body];return Buffer.from(lines.join('\r\n'),'utf8').toString('base64url');}
-export async function sendTestEmail(workspaceId:string,to:string,subject:string,body:string){return sendGmail(workspaceId,buildRawMessage(to,subject,body));}
+import { sendNewGmail } from "./gmail";
+import { gmailToken } from "./gmail-credentials";
+import { gmailRequest } from "./gmail-api";
+import { calendarToken } from "./calendar-credentials";
+import "server-only";
+import { adminClient, appUrl } from "./supabase";
+import { HttpError } from "./access";
+import { encrypt, decrypt } from "./crypto";
+export type Provider =
+  "google_business" | "gmail" | "instagram" | "google_calendar";
+export const scopes = {
+  google_business: [
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/business.manage",
+  ],
+  gmail: [
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.readonly",
+  ],
+  instagram: ["instagram_business_basic", "instagram_business_manage_messages"],
+  google_calendar: [
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+  ],
+};
+export type Credentials = {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+  scope?: string;
+};
+export const callback = (provider: Provider) =>
+  appUrl() + "/api/integrations/" + provider + "/callback";
+export async function googleToken(
+  body: Record<string, string>,
+): Promise<Credentials> {
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      ...body,
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+    cache: "no-store",
+  });
+  if (!r.ok)
+    throw new HttpError(
+      502,
+      "Google-autorisatie is verlopen of geweigerd. Verbind opnieuw.",
+    );
+  return r.json();
+}
+export async function connectionToken(workspaceId: string, provider: Provider) {
+  if (provider === "gmail") return gmailToken(workspaceId);
+  if (provider === "google_calendar") return calendarToken(workspaceId);
+  const db = adminClient();
+  const { data: c, error } = await db
+    .from("integration_connections")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", provider)
+    .single();
+  if (error || !c?.encrypted_credentials)
+    throw new HttpError(409, "Verbind eerst je account.");
+  let token = decrypt<Credentials>(
+    c.encrypted_credentials,
+    workspaceId + ":" + provider,
+  );
+  if (!c.expires_at || new Date(c.expires_at).getTime() < Date.now() + 60000) {
+    if (!token.refresh_token || provider === "instagram") {
+      await db
+        .from("integration_connections")
+        .update({ status: "reconnect_required" })
+        .eq("id", c.id);
+      throw new HttpError(409, "Verbind je account opnieuw.");
+    }
+    try {
+      const refreshed = await googleToken({
+        grant_type: "refresh_token",
+        refresh_token: token.refresh_token,
+      });
+      token = { ...token, ...refreshed };
+      const { error } = await db
+        .from("integration_connections")
+        .update({
+          encrypted_credentials: encrypt(token, workspaceId + ":" + provider),
+          expires_at: new Date(
+            Date.now() + (token.expires_in || 3600) * 1000,
+          ).toISOString(),
+        })
+        .eq("id", c.id);
+      if (error) throw new Error("save");
+    } catch {
+      await db
+        .from("integration_connections")
+        .update({ status: "reconnect_required" })
+        .eq("id", c.id);
+      throw new HttpError(409, "Verbind je account opnieuw.");
+    }
+  }
+  return { token, c };
+}
+export async function googleRequest(
+  workspaceId: string,
+  provider: Provider,
+  url: string,
+  options: RequestInit = {},
+) {
+  const { token, c } = await connectionToken(workspaceId, provider);
+  const r = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token.access_token,
+      ...options.headers,
+    },
+    cache: "no-store",
+  });
+  if (!r.ok) {
+    const status =
+      r.status === 401
+        ? "reconnect_required"
+        : r.status === 403
+          ? "permission_missing"
+          : "error";
+    await adminClient()
+      .from("integration_connections")
+      .update({ status })
+      .eq("id", c.id);
+    throw new HttpError(
+      502,
+      "De provider kon de actie niet uitvoeren. Controleer de verbinding.",
+    );
+  }
+  return r.status === 204 ? {} : r.json();
+}
+export async function businessLocations(workspaceId: string) {
+  const accounts = await googleRequest(
+    workspaceId,
+    "google_business",
+    "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
+  );
+  const result: { id: string; account: string; name: string }[] = [];
+  for (const account of accounts.accounts || []) {
+    let page = "";
+    do {
+      const params = new URLSearchParams({
+        readMask: "name,title",
+        pageSize: "100",
+        ...(page ? { pageToken: page } : {}),
+      });
+      const list = await googleRequest(
+        workspaceId,
+        "google_business",
+        "https://mybusinessbusinessinformation.googleapis.com/v1/" +
+          account.name +
+          "/locations?" +
+          params,
+      );
+      for (const location of list.locations || [])
+        result.push({
+          id: location.name,
+          account: account.name,
+          name: location.title,
+        });
+      page = list.nextPageToken || "";
+    } while (page);
+  }
+  return result;
+}
+export async function listReviews(workspaceId: string, pageToken = "") {
+  const { c } = await connectionToken(workspaceId, "google_business");
+  if (!c.metadata.location || !c.metadata.account)
+    throw new HttpError(409, "Kies eerst je bedrijfslocatie.");
+  return googleRequest(
+    workspaceId,
+    "google_business",
+    `https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews?` +
+      new URLSearchParams({
+        pageSize: "50",
+        ...(pageToken ? { pageToken } : {}),
+      }),
+  );
+}
+export async function fetchReview(workspaceId: string, id: string) {
+  if (!/^[\w-]+$/.test(id)) throw new HttpError(400, "Ongeldige review.");
+  const { c } = await connectionToken(workspaceId, "google_business");
+  return googleRequest(
+    workspaceId,
+    "google_business",
+    `https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews/${id}`,
+  );
+}
+export async function replyToReview(
+  workspaceId: string,
+  id: string,
+  comment: string,
+) {
+  if (!/^[\w-]+$/.test(id) || !comment.trim() || comment.length > 4096)
+    throw new HttpError(400, "Ongeldig antwoord.");
+  const { c } = await connectionToken(workspaceId, "google_business");
+  return googleRequest(
+    workspaceId,
+    "google_business",
+    `https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews/${id}/reply`,
+    { method: "PUT", body: JSON.stringify({ comment }) },
+  );
+}
+export async function sendGmail(workspaceId: string, raw: string) {
+  return gmailRequest(workspaceId, "/messages/send", {
+    method: "POST",
+    body: JSON.stringify({ raw }),
+  });
+}
+export async function sendTestEmail(
+  workspaceId: string,
+  to: string,
+  subject: string,
+  body: string,
+) {
+  return sendNewGmail(workspaceId, { to, subject, body });
+}

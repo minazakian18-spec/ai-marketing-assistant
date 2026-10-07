@@ -4,7 +4,7 @@ import { RefreshCw, X } from "lucide-react";
 import { PageHeading, IconButton } from "@/components/ui";
 import { BrandIcon, type Brand } from "@/components/brand-icon";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
-import { GoogleCalendarCard } from "@/components/account/google-calendar-card";
+import { CALENDAR_CARD, GMAIL_CARD, GoogleIntegrationCard } from "@/components/account/google-integration-card";
 import { isBrowserDemo } from "@/lib/demo";
 
 type Connection = {
@@ -70,7 +70,10 @@ const GMAIL_READ = "https://www.googleapis.com/auth/gmail.readonly";
 const NOTICES: Record<string, string> = {
   "connected=instagram": "Instagram is verbonden. Nieuwe berichten verschijnen in de Inbox.",
   "connected=messenger": "Messenger is verbonden. Nieuwe berichten verschijnen in de Inbox.",
-  "connected=gmail": "Gmail is verbonden.",
+  "connected=gmail": "Gmail is gekoppeld. Je klantmails verschijnen zo in de Inbox.",
+  "error=offline_access": "Google gaf geen blijvende toegang. Koppel opnieuw; trek zo nodig eerst de toegang van Mavix in je Google-account in.",
+  "error=expired": "De koppelpoging is verlopen of al gebruikt. Probeer het opnieuw.",
+  "error=failed": "Koppelen is niet gelukt. Probeer het later opnieuw.",
   "select=messenger": "Kies welke Facebook-pagina je wilt koppelen (via Beheren bij Facebook Messenger).",
   "error=denied": "Je hebt geen toestemming gegeven. Er is niets gekoppeld.",
   "error=permission": "Niet alle benodigde toestemmingen zijn gegeven. Verbind opnieuw en sta alle gevraagde toegang toe.",
@@ -240,7 +243,8 @@ export default function IntegrationsPage() {
 
       <ul className="int-list ui-card">
         {visible.map((item) => {
-          if (item.id === "google_calendar") return <GoogleCalendarCard key={item.id} demo={demo} onNotice={setNotice} />;
+          if (item.id === "google_calendar" || item.id === "gmail")
+            return <GoogleIntegrationCard key={item.id} config={item.id === "gmail" ? GMAIL_CARD : CALENDAR_CARD} demo={demo} onNotice={setNotice} />;
           const c = conn(item);
           const state = loaded ? stateOf(item, c) : item.planned ? "planned" : "disconnected";
           const linked = !item.planned && state !== "disconnected";
