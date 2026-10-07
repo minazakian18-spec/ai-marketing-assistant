@@ -562,7 +562,10 @@
 .cal-create .ui-menu-trigger { display: inline-flex; gap: 8px; width: auto; height: 42px; padding: 0 14px 0 12px; border: 1px solid var(--app-border-strong); border-radius: 21px; background: #fff; font-size: 14px; font-weight: 600; color: var(--app-text); box-shadow: 0 1px 2px rgba(21, 20, 26, 0.06); }
 .cal-create .ui-menu-trigger:hover, .cal-create .ui-menu-trigger[aria-expanded="true"] { background: var(--app-hover); }
 .cal-create .ui-menu-trigger > svg:first-child { color: var(--app-accent); }
-.cal-create .ui-menu-list { min-width: 230px; }
+/* The sidebar scrolls (and clips), so the menu takes the sidebar width. */
+.cal-create { display: block; flex: 1; min-width: 0; }
+.cal-create .ui-menu-list { min-width: 0; width: 100%; }
+.cal-create .ui-menu-list [role="menuitem"] { white-space: normal; text-align: left; }
 .cal-sidebar-close, .cal-sidebar-open { display: none; }
 .cal-group h2 { margin: 0 0 6px; padding: 0 6px; font-size: 12.5px; font-weight: 650; color: var(--app-text); }
 .cal-checks { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
@@ -611,6 +614,22 @@
 .cal-arrows { display: flex; }
 .cal-title { margin: 0 0 0 4px; font-size: 19px !important; font-weight: 500 !important; text-transform: capitalize; white-space: nowrap; }
 .cal-loading { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--app-muted); }
+/* "Wat wil je plannen?" menu at the clicked slot */
+.plan-scrim { position: fixed; inset: 0; z-index: 70; }
+.plan-menu { position: fixed; z-index: 71; width: 248px; padding: 6px; border: 1px solid var(--app-border); border-radius: 10px; background: #fff; box-shadow: 0 12px 32px rgba(20, 18, 30, 0.16); }
+.plan-head { display: grid; gap: 1px; margin: 0; padding: 6px 8px 8px; border-bottom: 1px solid var(--app-border); }
+.plan-head strong { font-size: 13.5px; }
+.plan-head span { font-size: 12px; color: var(--app-muted); }
+.plan-group { margin: 6px 0 2px; padding: 4px 8px 0; border-top: 1px solid var(--app-border); font-size: 11px; font-weight: 650; letter-spacing: 0.03em; text-transform: uppercase; color: var(--app-muted); }
+.plan-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 7px; background: none; font-size: 13.5px; text-align: left; color: var(--app-text); cursor: pointer; }
+.plan-item:hover:not(:disabled), .plan-item:focus-visible { background: var(--app-hover); outline: none; }
+.plan-item svg { flex-shrink: 0; color: var(--app-text-2); }
+.plan-item span { display: grid; flex: 1; }
+.plan-item small { font-size: 12px; color: var(--app-muted); }
+.plan-item em { font-size: 11px; font-style: normal; color: var(--app-muted); }
+.plan-item:disabled { color: var(--app-muted); cursor: default; }
+.plan-item:disabled svg { color: #c4c4cc; }
+.ag-status { flex-shrink: 0; margin-left: auto; font-size: 11.5px; color: var(--app-muted); }
 .cal-banner { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--app-border); font-size: 13px; }
 .cal-banner p { flex: 1; margin: 0; line-height: 1.45; }
 .main-shell .cal-banner .button { min-height: 32px; padding: 5px 12px; }

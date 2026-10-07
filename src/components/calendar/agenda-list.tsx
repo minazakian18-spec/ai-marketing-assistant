@@ -1,6 +1,7 @@
 "use client";
 import { addDaysLocal, dayKey, formatTime, onDay, sortEntries, type Entry } from "./model";
 import { EntryIcon } from "./entry-icon";
+import { statusMeta } from "@/lib/calendar-data";
 
 function dayTitle(day: Date, now: Date) {
   const key = dayKey(day);
@@ -42,6 +43,7 @@ export function AgendaList({
                     <EntryIcon entry={x} />
                     {x.title}
                   </span>
+                  {x.item && <small className="ag-status">{statusMeta(x.item.status).label}</small>}
                 </button>
               </li>
             ))}

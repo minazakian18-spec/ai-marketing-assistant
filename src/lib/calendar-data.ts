@@ -50,7 +50,7 @@ function postToItem(p: Post): CalendarItem {
     caption: p.caption,
     createdBy: p.source === "autopilot" ? "mavix-ai" : "user",
     automated: p.source === "autopilot",
-    href: "/social?post=" + encodeURIComponent(p.id),
+    href: "/social?tab=assist&post=" + encodeURIComponent(p.id),
     variant: p.variant,
     source: { kind: "post", id: p.id },
   };

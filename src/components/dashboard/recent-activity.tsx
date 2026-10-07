@@ -7,7 +7,7 @@ import { relativeTime, type Activity } from "@/lib/dashboard-data";
 export function RecentActivity({ items }: { items: Activity[] }) {
   return (
     <Card className="dash-card">
-      <SectionHeader title="Recente activiteit" icon={<History size={16} />} />
+      <SectionHeader title="Recente activiteit" description="Wat er onlangs in je werkruimte gebeurde." icon={<History size={16} />} />
       {items.length ? (
         <ul className="dash-list">
           {items.map((a) => (
@@ -28,8 +28,8 @@ export function RecentActivity({ items }: { items: Activity[] }) {
           ))}
         </ul>
       ) : (
-        <EmptyState icon={<History size={18} />} title="Nog geen activiteit">
-          Zodra je content maakt, goedkeurt of inplant, zie je dat hier.
+        <EmptyState icon={<History size={18} />} title="Hier komt je tijdlijn">
+          Maak, keur goed of plan je eerste content in en je ziet het hier meteen terug.
         </EmptyState>
       )}
     </Card>

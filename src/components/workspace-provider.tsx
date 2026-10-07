@@ -165,9 +165,26 @@ export function WorkspaceProvider({
       {ready ? (
         children
       ) : (
-        <p role="status">
-          {error ? "Werkruimte niet beschikbaar." : "Werkruimte laden…"}
-        </p>
+        <div className="ws-boot" role="status" aria-live="polite">
+          {error ? (
+            <>
+              <strong>Je werkruimte is even niet bereikbaar</strong>
+              <p>Controleer je verbinding en probeer het opnieuw.</p>
+              <button type="button" className="button secondary" onClick={() => window.location.reload()}>
+                Opnieuw proberen
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="ws-boot-mark" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+              <p>Je werkruimte wordt geladen…</p>
+            </>
+          )}
+        </div>
       )}
       {toast && <Toast message={toast} onClose={close} />}
     </Context.Provider>

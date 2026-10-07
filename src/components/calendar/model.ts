@@ -104,10 +104,23 @@ export function googleEntries(events: ClientEvent[], calendars: GoogleCalendar[]
   });
 }
 
+// Scan-friendly status colours: planned content in Mavix purple, waiting for
+// approval lighter, failed/blocked red, published history muted.
+const STATUS_COLOR: Record<CalendarItem["status"], string> = {
+  scheduled: "#6d28d9",
+  approved: "#6d28d9",
+  review: "#a78bfa",
+  published: "#8b8b96",
+  failed: "#d92d20",
+  blocked: "#d92d20",
+  rejected: "#8b8b96",
+};
+
 // Mavix content is scheduled in Amsterdam wall-clock time; convert to instants.
+// Only content with a planned date appears; rejected content is not planned.
 export function mavixEntries(items: CalendarItem[]): Entry[] {
   return items
-    .filter((i) => i.date)
+    .filter((i) => i.date && i.status !== "rejected")
     .map((i) => {
       const start = zonedToUtc(i.date, i.time || "09:00", MAVIX_TZ);
       return {
@@ -117,7 +130,7 @@ export function mavixEntries(items: CalendarItem[]): Entry[] {
         start,
         end: start + 30 * 60000,
         allDay: false,
-        color: "#6d28d9",
+        color: STATUS_COLOR[i.status],
         editable: true,
         channel: i.channel,
         item: i,

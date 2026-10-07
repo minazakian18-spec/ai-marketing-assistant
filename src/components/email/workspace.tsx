@@ -9,6 +9,7 @@ import {
   ContentLibrary,
 } from "@/components/channel/workspace-ui";
 import { workspaceView, modeName } from "@/lib/workspace-navigation";
+import { readPlanningContext } from "@/lib/calendar/planning";
 import { recipients } from "@/lib/contact-data";
 import {
   PenLine,
@@ -43,6 +44,9 @@ function Workspace() {
   const campaigns = data.email?.campaigns || [];
   const initial = campaigns.find((c) => c.id === search.get("campaign"));
   const tab = workspaceView(search.get("tab"), !!search.get("campaign"));
+  // Date/time handed over from the calendar; date-only picks use the default
+  // send time from the e-mail settings.
+  const planning = readPlanningContext(new URLSearchParams(search.toString()), () => settings.time || "10:00");
   const items = campaigns.map((c) => ({
     id: c.id,
     title: c.title,
@@ -259,8 +263,11 @@ function Workspace() {
             <EmailCreate
               key={initial?.id || "new"}
               initial={initial}
-              initialDate={search.get("date") || undefined}
+              initialDate={planning.dateTime || undefined}
               initialAudience={search.get("audience") || undefined}
+              fromCalendar={planning.fromCalendar}
+              returnDate={planning.returnDate}
+              initialPreview={search.get("view") === "preview"}
               profile={data.profile}
               onSave={persist}
             />

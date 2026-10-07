@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Film, ImagePlus, Instagram, Loader2, Mail, PanelLeft, Plug, Plus, RefreshCw, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Loader2, PanelLeft, Plug, Plus, RefreshCw, X } from "lucide-react";
+import { PLAN_OPTIONS, planningHref } from "@/lib/calendar/planning";
+import { PlanMenu, PLAN_ICONS } from "@/components/calendar/plan-menu";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Menu } from "@/components/menu";
 import { BrandIcon } from "@/components/brand-icon";
@@ -146,6 +148,8 @@ export default function CalendarPage() {
   const [connecting, setConnecting] = useState(false);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [popover, setPopover] = useState<ClientEvent | null>(null);
+  const [plan, setPlan] = useState<{ start: Date; end: Date; allDay: boolean; dateOnly: boolean; at: { x: number; y: number } } | null>(null);
+  const lastPointer = useRef({ x: 0, y: 0 });
   const [selected, setSelected] = useState<CalendarItem | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [toast, setToast] = useState("");
@@ -183,9 +187,18 @@ export default function CalendarPage() {
     if (calendarError === "denied") setToast("Je hebt geen toestemming gegeven. Google Agenda is niet gekoppeld.");
     if (calendarError === "offline_access")
       setToast("Google gaf geen blijvende toegang. Koppel opnieuw; trek eventueel eerst de toegang van Mavix in je Google-account in.");
+    // Coming back from Social/E-mail: open the week of the planned day.
+    const back = params.get("date");
+    if (back && /^\d{4}-\d{2}-\d{2}$/.test(back)) setAnchor(fromKey(back));
     if (params.toString()) window.history.replaceState(null, "", "/calendar");
     const t = window.setInterval(() => setNow(new Date()), 60000);
-    return () => window.clearInterval(t);
+    // Where the last click happened, so the planning menu opens next to it.
+    const pointer = (e: PointerEvent) => (lastPointer.current = { x: e.clientX, y: e.clientY });
+    document.addEventListener("pointerdown", pointer, true);
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener("pointerdown", pointer, true);
+    };
   }, []);
 
   const loadStatus = useCallback(async () => {
@@ -475,9 +488,13 @@ export default function CalendarPage() {
     if (entry.kind === "mavix" && entry.item) return setSelected(entry.item);
     if (entry.google) setPopover(entry.google);
   }
-  function create(start: Date, end: Date, allDay: boolean) {
-    setEditor({ mode: "create", start, end, allDay });
+  // Clicking an empty slot first asks what to plan (appointment or content).
+  function create(start: Date, end: Date, allDay: boolean, dateOnly = allDay) {
+    setPlan({ start, end, allDay, dateOnly, at: lastPointer.current });
   }
+  const planSlot = (p: NonNullable<typeof plan>) => (p.dateOnly ? { date: dayKey(p.start) } : zonedParts(p.start.getTime(), MAVIX_TZ));
+  const planLabel = (p: NonNullable<typeof plan>) =>
+    p.start.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" }) + (p.dateOnly ? "" : " · " + timeKey(p.start));
   function createNow() {
     const s = new Date();
     s.setMinutes(0, 0, 0);
@@ -548,7 +565,6 @@ export default function CalendarPage() {
   const needsReconnect = conn.state === "ready" && !connected && !teamOwned && !!status && status !== "disconnected";
   const googleLabel = conn.state === "ready" && conn.email ? "Google Agenda · " + conn.email : "Google Agenda";
   const popoverCalendar = popover ? allCalendars.find((c) => c.id === popover.calendarId) : null;
-  const contentLink = (type: string) => "/social?tab=assist&type=" + type;
 
   return (
     <div className="cal-page">
@@ -567,15 +583,18 @@ export default function CalendarPage() {
                   <ChevronDown size={14} />
                 </>
               }
-              items={[
-                { label: "Afspraak", icon: <CalendarPlus size={15} />, onSelect: createNow },
-                { type: "separator" },
-                { type: "heading", label: "Content plannen" },
-                { label: "Instagram-post", icon: <Instagram size={15} />, onSelect: () => router.push(contentLink("Post")) },
-                { label: "Instagram-story · binnenkort", icon: <ImagePlus size={15} />, disabled: true, onSelect: () => {} },
-                { label: "Instagram-reel · binnenkort", icon: <Film size={15} />, disabled: true, onSelect: () => {} },
-                { label: "E-mail of nieuwsbrief", icon: <Mail size={15} />, onSelect: () => router.push("/email?tab=assist") },
-              ]}
+              items={PLAN_OPTIONS.flatMap((o, i) => {
+                const Icon = PLAN_ICONS[o.kind];
+                const item = {
+                  label: o.label + (o.soon ? " · binnenkort" : ""),
+                  icon: <Icon size={15} />,
+                  disabled: o.soon,
+                  onSelect: () => (o.kind === "event" ? createNow() : router.push(planningHref(o.kind)!)),
+                };
+                return o.group === "marketing" && PLAN_OPTIONS[i - 1]?.group !== "marketing"
+                  ? [{ type: "separator" as const }, { type: "heading" as const, label: "Marketing" }, item]
+                  : [item];
+              })}
             />
             <button type="button" className="ui-icon-button cal-sidebar-close" aria-label="Paneel sluiten" onClick={() => setPanelOpen(false)}>
               <X size={16} />
@@ -823,7 +842,7 @@ export default function CalendarPage() {
                 entries={entries}
                 now={now}
                 onSelect={select}
-                onCreate={(day) => create(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9), new Date(day.getFullYear(), day.getMonth(), day.getDate(), 10), false)}
+                onCreate={(day) => create(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9), new Date(day.getFullYear(), day.getMonth(), day.getDate(), 10), false, true)}
                 onMoveDay={moveDay}
                 onShowDay={(day) => {
                   setAnchor(day);
@@ -842,6 +861,18 @@ export default function CalendarPage() {
         </section>
       </div>
 
+      {plan && (
+        <PlanMenu
+          slot={planSlot(plan)}
+          label={planLabel(plan)}
+          at={plan.at}
+          onClose={() => setPlan(null)}
+          onAppointment={() => {
+            setEditor({ mode: "create", start: plan.start, end: plan.end, allDay: plan.allDay });
+            setPlan(null);
+          }}
+        />
+      )}
       {popover && popoverCalendar && (
         <EventPopover
           event={popover}

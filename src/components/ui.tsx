@@ -25,19 +25,24 @@ export function SectionHeader({
   icon,
   count,
   action,
+  description,
 }: {
   title: string;
   icon?: ReactNode;
   count?: number;
   action?: ReactNode;
+  description?: string;
 }) {
   return (
-    <header className="ui-section-header">
-      <h2>
-        {icon}
-        {title}
-        {count !== undefined && <span className="ui-count">{count}</span>}
-      </h2>
+    <header className={"ui-section-header" + (description ? " has-description" : "")}>
+      <div className="ui-section-title">
+        <h2>
+          {icon && <span className="ui-section-icon">{icon}</span>}
+          {title}
+          {count !== undefined && <span className="ui-count">{count}</span>}
+        </h2>
+        {description && <p>{description}</p>}
+      </div>
       {action}
     </header>
   );

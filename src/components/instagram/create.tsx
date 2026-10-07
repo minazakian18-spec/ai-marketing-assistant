@@ -27,6 +27,7 @@ import { generateInstagramContent } from "@/lib/api-client";
 import { readImages } from "@/lib/local-images";
 import { instagramGoals, type InstagramGoal } from "@/lib/ai/instagram-instruction";
 import { PostVisual } from "./shared";
+import { PlanningNotice } from "@/components/calendar/planning-notice";
 const quick = [
   ["Post", "Create Post", ImageIcon],
   ["Carousel", "Create Carousel", Layers],
@@ -53,12 +54,18 @@ export function CreateStudio({
   editPost,
   initialDate,
   initialType,
+  fromCalendar = false,
+  returnDate,
+  focusPreview = false,
   onPersist,
 }: {
   profile: Profile;
   editPost?: Post;
   initialDate?: string;
   initialType?: string;
+  fromCalendar?: boolean;
+  returnDate?: string;
+  focusPreview?: boolean;
   onPersist: (post: Post) => Promise<boolean>;
 }) {
   const [type, setType] = useState<ContentType>(
@@ -97,6 +104,10 @@ export function CreateStudio({
       setVideoMode(editPost.videoMode || "Short AI Reel");
     }
   }, [editPost]);
+  // "Bekijken" from the calendar: bring the preview into view.
+  useEffect(() => {
+    if (editPost && focusPreview) document.querySelector(".ig-preview")?.scrollIntoView({ block: "start" });
+  }, [editPost, focusPreview]);
   const video = ["Reel", "Animate Image", "Photos to Reel"].includes(type);
   const products = profile.productList?.length
     ? profile.productList.filter((p) => p.active).map((p) => p.name)
@@ -142,11 +153,14 @@ export function CreateStudio({
         }),
       );
       if (again && post) next.id = post.id;
+      // Keep the chosen publishing moment (e.g. from the calendar) on the
+      // concept, so it shows up in the calendar as waiting for approval.
+      if (date) next.date = date;
       if (await onPersist(next)) {
         setPost(next);
         setCaption(next.caption);
         setHashtags(next.hashtags);
-        setDate(initialDate || "");
+        setDate(next.date || "");
         setMessage(
           "Mockconcept opgeslagen. Je vindt het in de goedkeuringswachtrij.",
         );
@@ -181,13 +195,15 @@ export function CreateStudio({
         approve
           ? "Goedgekeurd. " +
               (date
-                ? "Je content is lokaal ingepland."
+                ? "Je content is lokaal ingepland en staat in de kalender."
                 : "Kies een datum in de kalender.")
           : "Wijzigingen opgeslagen als concept.",
       );
     }
   }
   return (
+    <>
+    {fromCalendar && <PlanningNotice action="Publiceren" dateTime={date} returnDate={returnDate} existing={!!editPost} />}
     <div className="ig-create-grid">
       <div>
         <section className="panel ig-prompt-card">
@@ -504,7 +520,7 @@ export function CreateStudio({
                 />
               </label>
               <label>
-                Geplande datum/tijd (optioneel)
+                {fromCalendar ? "Publiceren (datum en tijd)" : "Geplande datum/tijd (optioneel)"}
                 <input
                   type="datetime-local"
                   value={date}
@@ -548,5 +564,6 @@ export function CreateStudio({
       </aside>
       {notice && <Toast tone="info" message={notice} onClose={() => setNotice("")} />}
     </div>
+    </>
   );
 }

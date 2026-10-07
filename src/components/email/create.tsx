@@ -32,6 +32,7 @@ import { formalityOptions, type Formality } from "@/lib/brand-model";
 import type { Profile } from "@/lib/types";
 import { Toggle } from "@/components/instagram/shared";
 import { EmailStatus, EmailPerformance } from "./shared";
+import { PlanningNotice } from "@/components/calendar/planning-notice";
 const quickIcons = [
   Mail,
   Newspaper,
@@ -56,12 +57,18 @@ export function EmailCreate({
   initial,
   initialDate,
   initialAudience,
+  fromCalendar = false,
+  returnDate,
+  initialPreview = false,
   onSave,
 }: {
   profile: Profile;
   initial?: EmailCampaign;
   initialDate?: string;
   initialAudience?: string;
+  fromCalendar?: boolean;
+  returnDate?: string;
+  initialPreview?: boolean;
   onSave: (c: EmailCampaign) => Promise<boolean>;
 }) {
   const [prompt, setPrompt] = useState(initial?.prompt || "");
@@ -78,7 +85,7 @@ export function EmailCreate({
   const [cta, setCta] = useState("");
   const [website, setWebsite] = useState(false);
   const [campaign, setCampaign] = useState<EmailCampaign | undefined>(initial);
-  const [editing, setEditing] = useState(!!initial);
+  const [editing, setEditing] = useState(!!initial && !initialPreview);
   const [view, setView] = useState("desktop");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -115,14 +122,19 @@ export function EmailCreate({
         }),
       );
       if (regenerate && campaign) next.id = campaign.id;
-      const withDate =
-        !regenerate && initialDate ? { ...next, date: initialDate } : next;
+      // Keep the planned send moment: from the calendar for a new concept,
+      // or the current one when regenerating.
+      const planned = regenerate ? campaign?.date || "" : initialDate || "";
+      const withDate = planned ? { ...next, date: planned } : next;
       if (await onSave(withDate)) {
         setCampaign(withDate);
         setEditing(false);
-        setScheduling(false);
+        // Coming from the calendar: show the prefilled send moment right away.
+        setScheduling(fromCalendar && !!withDate.date);
         setMessage(
-          "Concept gemaakt. Controleer de inhoud.",
+          fromCalendar && withDate.date
+            ? "Concept gemaakt. Controleer de inhoud en bevestig het verzendmoment."
+            : "Concept gemaakt. Controleer de inhoud.",
         );
       }
     } catch {
@@ -156,7 +168,7 @@ export function EmailCreate({
       setScheduling(false);
       setMessage(
         status === "scheduled"
-          ? "Campagne lokaal ingepland. Er wordt niets verstuurd."
+          ? "Campagne lokaal ingepland en zichtbaar in de kalender. Er wordt niets verstuurd."
           : status === "approved"
             ? "Campagne goedgekeurd. Je kunt nu een verzendtijd kiezen."
             : "Wijzigingen opgeslagen als concept.",
@@ -164,6 +176,8 @@ export function EmailCreate({
     }
   }
   return (
+    <>
+    {fromCalendar && <PlanningNotice action="Versturen" dateTime={campaign ? campaign.date : initialDate || ""} returnDate={returnDate} existing={!!initial} />}
     <div className="ig-create-grid email-create-grid">
       <div>
         <form
@@ -649,5 +663,6 @@ export function EmailCreate({
         </p>
       </section>
     </div>
+    </>
   );
 }

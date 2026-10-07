@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type 
 import { ArrowUp, FileText, Globe, ImagePlus, Paperclip, Telescope, X } from "lucide-react";
 import { IconButton } from "@/components/ui";
 import type { AgentAttachment } from "@/lib/agent-handoff";
+import { RotatingPrompt } from "@/components/rotating-prompt";
 
 const MAX_FILES = 5;
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -31,6 +32,7 @@ export function AgentComposer({
   busy = false,
   autoFocus = false,
   tools = {},
+  suggestions,
 }: {
   onSubmit: (text: string, attachments: AgentAttachment[], options: { webSearch: boolean; deepResearch: boolean }) => void;
   placeholder?: string;
@@ -38,8 +40,12 @@ export function AgentComposer({
   busy?: boolean;
   autoFocus?: boolean;
   tools?: ComposerTools;
+  /** Example prompts that animate in the empty input; Tab takes the current one. */
+  suggestions?: string[];
 }) {
   const [text, setText] = useState("");
+  const [suggestion, setSuggestion] = useState("");
+  const rotating = !!suggestions?.length;
   const [files, setFiles] = useState<AgentAttachment[]>([]);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -145,23 +151,31 @@ export function AgentComposer({
       <label className="sr-only" htmlFor={"composer-" + size}>
         Bericht aan Mavi
       </label>
-      <textarea
-        id={"composer-" + size}
-        ref={area}
-        rows={size === "large" ? 2 : 1}
-        value={text}
-        maxLength={2000}
-        autoFocus={autoFocus}
-        placeholder={placeholder}
-        onChange={(e) => setText(e.target.value)}
-        onPaste={paste}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            submit();
-          }
-        }}
-      />
+      <div className="composer-field">
+        <textarea
+          id={"composer-" + size}
+          ref={area}
+          rows={size === "large" ? 2 : 1}
+          value={text}
+          maxLength={2000}
+          autoFocus={autoFocus}
+          placeholder={rotating ? "" : placeholder}
+          onChange={(e) => setText(e.target.value)}
+          onPaste={paste}
+          onKeyDown={(e) => {
+            if (e.key === "Tab" && !e.shiftKey && rotating && !text && suggestion) {
+              e.preventDefault();
+              setText(suggestion);
+              return;
+            }
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        {rotating && <RotatingPrompt prompts={suggestions!} hidden={!!text || files.length > 0} onCurrent={setSuggestion} />}
+      </div>
       {error && (
         <p className="composer-error" role="alert">
           {error}
@@ -185,7 +199,17 @@ export function AgentComposer({
               <Telescope size={17} />
             </IconButton>
           )}
-          {size === "large" && <span className="composer-hint">Sleep bestanden hierheen of plak een afbeelding</span>}
+          {size === "large" && (
+            <span className="composer-hint">
+              {rotating && !text ? (
+                <>
+                  <kbd>Tab</kbd> neemt het voorbeeld over · sleep of plak bestanden
+                </>
+              ) : (
+                "Sleep bestanden hierheen of plak een afbeelding"
+              )}
+            </span>
+          )}
         </div>
         <button type="submit" className="composer-send" aria-label="Versturen" disabled={busy || (!text.trim() && !files.length)}>
           <ArrowUp size={17} />

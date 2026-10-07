@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Brand } from "@/components/brand";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, UserRound, X } from "lucide-react";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { AccountMenu } from "@/components/account/account-menu";
 import { accountLinks } from "@/components/account/account-nav";
@@ -137,12 +137,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             className="sidebar-user"
             onClick={() => setOpen(false)}
           >
-            <span className="sidebar-user-avatar">
-              {data.account.photo ? (
-                <img src={data.account.photo} alt="" />
-              ) : (
-                (fullName[0] || data.account.email[0] || "M").toUpperCase()
-              )}
+            <span className="sidebar-user-avatar" aria-hidden="true">
+              {data.account.photo ? <img src={data.account.photo} alt="" /> : <UserRound size={16} strokeWidth={1.75} />}
             </span>
             <span className="sidebar-user-text">
               <strong>{fullName || "Mijn account"}</strong>

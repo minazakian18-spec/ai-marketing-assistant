@@ -84,6 +84,7 @@ export function UpcomingPlanning({ content, calendarConnected }: { content: Plan
     <Card className="dash-card">
       <SectionHeader
         title="Aankomende planning"
+        description={"De komende " + DAYS + " dagen in één oogopslag."}
         icon={<CalendarClock size={16} />}
         action={
           <Link className="text-link dash-link" href="/calendar">
@@ -118,16 +119,16 @@ export function UpcomingPlanning({ content, calendarConnected }: { content: Plan
       ) : (
         <EmptyState
           icon={<CalendarDays size={18} />}
-          title="Niets gepland"
+          title="Je planning is nog leeg"
           action={
             <Link className="text-link dash-link" href="/calendar">
-              Content plannen
+              Plan je eerste moment <ArrowUpRight size={14} />
             </Link>
           }
         >
           {calendarConnected
             ? "De komende " + DAYS + " dagen staat er niets in je kalender of contentplanning."
-            : "Plan content in de kalender of koppel Google Calendar om je afspraken hier te zien."}
+            : "Plan content in de kalender of koppel Google Agenda om ook je afspraken hier te zien."}
         </EmptyState>
       )}
       {calendarError && <p className="dash-note">Google Calendar kon niet worden geladen.</p>}

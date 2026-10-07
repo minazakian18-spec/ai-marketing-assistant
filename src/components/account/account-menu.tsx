@@ -3,9 +3,20 @@ import Link from "next/link";
 import { usePresence } from "@/components/use-presence";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, UserRound } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { accountLinks } from "./account-nav";
+
+// Profile button mark: the uploaded photo when there is one, otherwise a
+// clean person icon (never a letter placeholder).
+function ProfileMark({ photo, large = false }: { photo?: string; large?: boolean }) {
+  return (
+    <span className={"account-avatar" + (large ? " is-large" : "")} aria-hidden="true">
+      {/* eslint-disable-next-line @next/next/no-img-element -- local data URL */}
+      {photo ? <img src={photo} alt="" /> : <UserRound size={large ? 18 : 17} strokeWidth={1.75} />}
+    </span>
+  );
+}
 export function AccountMenu() {
   const { data, ready, logout } = useWorkspace();
   const [open, setOpen] = useState(false);
@@ -49,14 +60,8 @@ export function AccountMenu() {
         aria-controls="account-dropdown"
         onClick={() => setOpen(!open)}
       >
-        <span className="avatar small">
-          {data.account.photo ? (
-            <img src={data.account.photo} alt="" />
-          ) : (
-            (data.account.firstName[0] || "M").toUpperCase()
-          )}
-        </span>
-        <ChevronDown size={14} />
+        <ProfileMark photo={data.account.photo} />
+        <ChevronDown size={14} aria-hidden="true" />
       </button>
       {present && (
         <div
@@ -67,6 +72,7 @@ export function AccountMenu() {
           aria-hidden={!open}
         >
           <div className="account-menu-heading">
+            <ProfileMark photo={data.account.photo} large />
             <strong>
               {[data.account.firstName, data.account.lastName]
                 .filter(Boolean)

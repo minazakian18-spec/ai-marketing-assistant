@@ -12,7 +12,9 @@ import {
   Sparkles,
   Instagram,
   Mail,
+  Eye,
 } from "lucide-react";
+import { contentHref } from "@/lib/calendar/planning";
 import { usePresence } from "@/components/use-presence";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
 import { statusMeta, type CalendarItem } from "@/lib/calendar-data";
@@ -91,28 +93,36 @@ export function CalendarDetailPanel({
             <img className="cal-panel-media" src={shown.mediaUrl} alt="" />
           )}
           <div className="cal-panel-field">
-            Kanaal
+            Platform
             <strong>
               <Icon size={14} /> {shown.channel} · {shown.contentType}
             </strong>
           </div>
           <h2>{shown.title}</h2>
           {shown.caption && (
-            <p className="cal-panel-caption">{shown.caption}</p>
+            <div className="cal-panel-field">
+              {shown.channel === "E-mail" ? "Onderwerp" : "Caption"}
+              <p className="cal-panel-caption">{shown.caption}</p>
+            </div>
           )}
           <div className="cal-panel-field">
-            Datum en tijd
+            {shown.channel === "E-mail" ? "Versturen" : "Publiceren"}
             <strong>
               {shown.date
                 ? new Date(
                     shown.date + "T" + (shown.time || "00:00"),
                   ).toLocaleDateString("nl-NL", {
+                    weekday: "long",
                     day: "numeric",
                     month: "long",
                     year: "numeric",
                   }) + (shown.time ? " · " + shown.time : "")
                 : "Nog niet ingepland"}
             </strong>
+          </div>
+          <div className="cal-panel-field">
+            Status
+            <strong>{meta.label}</strong>
           </div>
           <div className="cal-panel-field">
             Gemaakt door
@@ -167,9 +177,14 @@ export function CalendarDetailPanel({
             </>
           )}
           {shown.href && (
-            <Link className="button secondary" href={shown.href}>
-              <Pencil size={15} /> Bewerken
-            </Link>
+            <>
+              <Link className="button secondary" href={contentHref(shown.href, "view", shown.date)}>
+                <Eye size={15} /> Bekijken
+              </Link>
+              <Link className="button secondary" href={contentHref(shown.href, "edit", shown.date)}>
+                <Pencil size={15} /> Bewerken
+              </Link>
+            </>
           )}
           <button
             className="button secondary"

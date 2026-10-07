@@ -8,6 +8,7 @@ import {
   ContentLibrary,
 } from "@/components/channel/workspace-ui";
 import { workspaceView, modeName } from "@/lib/workspace-navigation";
+import { readPlanningContext, weekdayOf } from "@/lib/calendar/planning";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -44,6 +45,12 @@ function Workspace() {
   const editPost = data.posts.find((p) => p.id === search.get("post"));
   const settings = data.instagram || defaultInstagram;
   const tab = workspaceView(search.get("tab"), !!search.get("post"));
+  // Date/time handed over from the calendar; all-day picks use the default
+  // posting time for that weekday from the Instagram settings.
+  const planning = readPlanningContext(
+    new URLSearchParams(search.toString()),
+    (d) => settings.times?.[weekdayOf(d)] || "18:00",
+  );
   const items = data.posts.map((p) => ({
     id: p.id,
     title: p.prompt,
@@ -258,8 +265,11 @@ function Workspace() {
             <CreateStudio
               key={editPost?.id || "new"}
               editPost={editPost}
-              initialDate={search.get("date") || undefined}
+              initialDate={planning.dateTime || undefined}
               initialType={search.get("type") || undefined}
+              fromCalendar={planning.fromCalendar}
+              returnDate={planning.returnDate}
+              focusPreview={search.get("view") === "preview"}
               profile={data.profile}
               onPersist={persist}
             />

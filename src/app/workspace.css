@@ -1671,3 +1671,15 @@ body:has(.app-shell) .mkt-auth-banner {
 .main-shell .invoice-scroll {
   position: relative;
 }
+
+/* Social/E-mail opened from the calendar: the moment being planned. */
+.plan-notice { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 10px 12px 10px 14px; border: 1px solid #e4dcfa; border-radius: 10px; background: #faf8ff; }
+.plan-notice > svg { flex-shrink: 0; color: var(--app-accent); }
+.plan-notice > div { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.plan-notice strong { font-size: 13.5px; color: var(--app-text); }
+.plan-notice span { font-size: 13px; color: var(--app-text-2); }
+.plan-notice .button { flex-shrink: 0; min-height: 34px; padding: 6px 12px; }
+@media (max-width: 640px) {
+  .plan-notice { flex-wrap: wrap; }
+  .plan-notice .button { margin-left: 30px; }
+}

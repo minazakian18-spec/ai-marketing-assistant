@@ -10,6 +10,7 @@ import {
   type Entry,
 } from "./model";
 import { EntryIcon } from "./entry-icon";
+import { statusMeta } from "@/lib/calendar-data";
 
 const HOUR = 48;
 const SNAP = 15;
@@ -188,7 +189,7 @@ export function TimeGrid({
                         }
                         onSelect(entry);
                       }}
-                      aria-label={`${entry.title}, ${formatTime(entry.start)} tot ${formatTime(entry.end)}`}
+                      aria-label={`${entry.title}, ${formatTime(entry.start)} tot ${formatTime(entry.end)}${entry.item ? ", " + statusMeta(entry.item.status).label : ""}`}
                     >
                       <span className="tg-event-title">
                         <EntryIcon entry={entry} />
