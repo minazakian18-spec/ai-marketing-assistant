@@ -166,12 +166,14 @@ test("POST without a configured App Secret answers 503 so Meta retries, and stor
   assert.ok(f.logs.some((l) => l.includes("meta_webhook_not_configured") && l.includes("META_CLIENT_SECRET")));
 });
 
-test("Instagram webhooks keep using the Instagram app secret", async (t) => {
+test("the Instagram app secret is only accepted for Instagram events", async (t) => {
   const f = setup(t);
   const event = { object: "instagram", entry: [] };
   const body = JSON.stringify(event);
   assert.equal((await f.deliver(event, sign(body, "instagram-secret-fixture"))).status, 200);
-  assert.equal((await f.deliver(event, sign(body))).status, 401);
+  assert.equal((await f.deliver(event, sign(body, "other-secret"))).status, 401);
+  const wa = whatsappEvent("111111");
+  assert.equal((await f.deliver(wa, sign(JSON.stringify(wa), "instagram-secret-fixture"))).status, 401);
 });
 
 test("malformed and oversized bodies are rejected before any processing", async (t) => {

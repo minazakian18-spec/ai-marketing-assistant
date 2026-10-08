@@ -433,10 +433,10 @@ async function workspacesFor(provider: MetaProvider, accountId: string) {
     .eq("provider_account_id", accountId)
     .in("status", ["connected", "permission_missing"]);
   const ids = (data || []).map((d) => d.workspace_id as string);
-  // A WhatsApp number belongs to exactly one workspace (unique index). Should
-  // an older duplicate still exist, deliver to nobody rather than leak a
-  // customer's messages into another workspace.
-  if (provider === "whatsapp" && ids.length > 1) {
+  // A WhatsApp number or Instagram account belongs to exactly one workspace
+  // (unique indexes). Should an older duplicate still exist, deliver to nobody
+  // rather than leak a customer's messages into another workspace.
+  if ((provider === "whatsapp" || provider === "instagram") && ids.length > 1) {
     log("inbox_webhook_ambiguous_account", { provider, workspaces: ids.length });
     return [];
   }

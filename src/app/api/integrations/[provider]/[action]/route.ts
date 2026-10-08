@@ -26,8 +26,14 @@ import { cleanupCalendar } from "@/lib/server/calendar";
 import {
   authorizeUrl,
   completeInstagram,
+  completeInstagramFacebook,
   completeMessenger,
+  INSTAGRAM_TAKEN,
+  instagramMode,
+  InstagramTokenTypeError,
+  listInstagramAccounts,
   listPages,
+  selectInstagramAccount,
   metaConfigured,
   metaScopes,
   missingMetaConfig,
@@ -134,12 +140,20 @@ export async function POST(request: Request, { params }: Context) {
     const db = adminClient();
     if (action === "connect") {
       if (provider === "instagram" || provider === "messenger") {
-        if (!metaConfigured(provider))
+        if (!metaConfigured(provider)) {
+          console.error(
+            JSON.stringify({
+              event: "meta_not_configured",
+              provider,
+              missing: missingMetaConfig(provider),
+            }),
+          );
           throw new HttpError(
             503,
             (provider === "instagram" ? "Instagram" : "Messenger") +
               "-koppeling vereist nog Meta-appconfiguratie.",
           );
+        }
         const { state } = await newState(
           provider,
           auth.workspaceId,
@@ -298,6 +312,14 @@ export async function POST(request: Request, { params }: Context) {
       await audit(auth.workspaceId, auth.user.id, "integration_disconnected");
       return NextResponse.json({ ok: true });
     }
+    if (action === "select" && provider === "instagram") {
+      const { account } = z
+        .object({ account: z.string().regex(/^\d{1,30}$/) })
+        .parse(await request.json());
+      await selectInstagramAccount(auth.workspaceId, account);
+      await audit(auth.workspaceId, auth.user.id, "integration_connected");
+      return NextResponse.json({ ok: true });
+    }
     if (action === "select" && provider === "messenger") {
       const { page } = z
         .object({ page: z.string().regex(/^\d{1,30}$/) })
@@ -422,6 +444,39 @@ export async function GET(request: Request, { params }: Context) {
         })),
       });
     }
+    if (action === "accounts" && provider === "instagram") {
+      const { data: c } = await db
+        .from("integration_connections")
+        .select("encrypted_credentials,metadata")
+        .eq("workspace_id", auth.workspaceId)
+        .eq("provider", "instagram")
+        .maybeSingle();
+      if (!c?.encrypted_credentials || c.metadata?.authMode !== "facebook")
+        throw new HttpError(409, "Verbind eerst Instagram via Facebook.");
+      const creds = decrypt<MetaCredentials>(
+        c.encrypted_credentials,
+        auth.workspaceId + ":instagram",
+      );
+      if (!creds.user_token)
+        throw new HttpError(
+          409,
+          "Verbind Instagram opnieuw om een ander account te kiezen.",
+        );
+      // Never return Page tokens to the browser.
+      return NextResponse.json(
+        {
+          accounts: (await listInstagramAccounts(creds.user_token)).map(
+            (a) => ({
+              id: a.id,
+              username: a.username,
+              name: a.name,
+              pageName: a.pageName,
+            }),
+          ),
+        },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
     if (action !== "callback") throw new HttpError(404, "Niet gevonden.");
     const url = new URL(request.url);
     if (provider === "instagram" || provider === "messenger") {
@@ -433,6 +488,40 @@ export async function GET(request: Request, { params }: Context) {
       const code = url.searchParams.get("code");
       if (!code) return back("error=denied&provider=" + provider);
       try {
+        if (provider === "instagram" && instagramMode() === "facebook") {
+          const fb = await completeInstagramFacebook(code);
+          const accounts = await listInstagramAccounts(fb.userToken);
+          // Nothing usable: keep whatever this workspace had before.
+          if (!accounts.length)
+            return back("error=no_instagram_account&provider=instagram");
+          const { error } = await db.from("integration_connections").upsert(
+            {
+              workspace_id: auth.workspaceId,
+              provider,
+              connected_user: auth.user.id,
+              provider_account_id: null,
+              display_name: null,
+              status: "selection_required",
+              encrypted_credentials: encrypt(
+                {
+                  access_token: fb.userToken,
+                  user_token: fb.userToken,
+                  obtained_at: Date.now(),
+                },
+                auth.workspaceId + ":instagram",
+              ),
+              scopes: fb.granted,
+              expires_at: fb.dataAccessExpiresAt,
+              metadata: { authMode: "facebook" },
+            },
+            { onConflict: "workspace_id,provider" },
+          );
+          if (error) throw error;
+          await audit(auth.workspaceId, auth.user.id, "integration_authorized");
+          if (accounts.length > 1) return back("select=instagram");
+          await selectInstagramAccount(auth.workspaceId, accounts[0].id);
+          return back("connected=instagram");
+        }
         if (provider === "instagram") {
           const ig = await completeInstagram(code);
           const { error } = await db.from("integration_connections").upsert(
@@ -455,6 +544,7 @@ export async function GET(request: Request, { params }: Context) {
             },
             { onConflict: "workspace_id,provider" },
           );
+          if (error?.code === "23505") throw new HttpError(409, INSTAGRAM_TAKEN);
           if (error) throw error;
           await audit(auth.workspaceId, auth.user.id, "integration_authorized");
           return back("connected=instagram");
@@ -497,8 +587,27 @@ export async function GET(request: Request, { params }: Context) {
             : "error=no_pages&provider=messenger",
         );
       } catch (e) {
+        if (e instanceof InstagramTokenTypeError) {
+          // Configuration issued e.g. a System-user token: refuse, store nothing.
+          console.error(
+            JSON.stringify({
+              event: "instagram_config_token_type",
+              tokenType: e.tokenType.slice(0, 40),
+            }),
+          );
+          return back("error=token_type&provider=instagram");
+        }
         if (e instanceof HttpError && e.status === 403)
           return back("error=permission&provider=" + provider);
+        if (provider === "instagram" && e instanceof HttpError) {
+          if (e.status === 409 && e.message === INSTAGRAM_TAKEN)
+            return back("error=instagram_taken&provider=instagram");
+          return back(
+            (e.status === 400 && e.message.includes("verlopen")
+              ? "error=expired"
+              : "error=failed") + "&provider=instagram",
+          );
+        }
         throw e;
       }
     }

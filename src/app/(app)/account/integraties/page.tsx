@@ -14,6 +14,7 @@ type Connection = {
   scopes?: string[];
   last_synced_at?: string | null;
   expires_at?: string | null;
+  metadata?: { authMode?: string } | null;
 };
 type Category = "communication" | "social" | "planning" | "reviews" | "commerce" | "ads";
 type Integration = {
@@ -59,6 +60,11 @@ const SCOPE_LABEL: Record<string, string> = {
   "https://www.googleapis.com/auth/business.manage": "Bedrijfsprofiel en reviews beheren",
   instagram_business_basic: "Basisgegevens van je Instagram-account",
   instagram_business_manage_messages: "Instagram-berichten lezen en beantwoorden",
+  instagram_basic: "Basisgegevens van je Instagram-account",
+  instagram_manage_messages: "Instagram-berichten lezen en beantwoorden",
+  instagram_content_publish: "Posts en Reels publiceren (binnenkort)",
+  pages_read_engagement: "Gegevens van je Facebook-pagina lezen",
+  business_management: "Pagina's in je Meta Business Portfolio vinden",
   pages_show_list: "Je Facebook-pagina's bekijken",
   pages_manage_metadata: "Berichtmeldingen voor je pagina instellen",
   pages_messaging: "Messenger-berichten beantwoorden",
@@ -74,6 +80,11 @@ const NOTICES: Record<string, string> = {
   "error=expired": "De koppelpoging is verlopen of al gebruikt. Probeer het opnieuw.",
   "error=failed": "Koppelen is niet gelukt. Probeer het later opnieuw.",
   "select=messenger": "Kies welke Facebook-pagina je wilt koppelen (via Beheren bij Facebook Messenger).",
+  "select=instagram": "Kies welk Instagram-account je wilt koppelen.",
+  "error=no_instagram_account":
+    "Er is geen professioneel Instagram-account gevonden. Koppel je Instagram Business- of Creator-account aan een Facebook-pagina die je beheert en probeer opnieuw.",
+  "error=instagram_taken": "Dit Instagram-account is al gekoppeld aan een andere Mavix-werkruimte. Ontkoppel het daar eerst.",
+  "error=token_type": "Instagram kan nog niet worden gekoppeld: de Meta-configuratie van Mavix is onjuist ingesteld. Neem contact op met de beheerder.",
   "error=denied": "Je hebt geen toestemming gegeven. Er is niets gekoppeld.",
   "error=permission": "Niet alle benodigde toestemmingen zijn gegeven. Verbind opnieuw en sta alle gevraagde toegang toe.",
   "error=no_pages": "Er is geen Facebook-pagina gevonden waarop je berichten mag beheren.",
@@ -122,6 +133,7 @@ export default function IntegrationsPage() {
   const [busy, setBusy] = useState(false);
   const [locations, setLocations] = useState<{ id: string; account: string; name: string }[] | null>(null);
   const [pages, setPages] = useState<{ id: string; name: string }[] | null>(null);
+  const [igAccounts, setIgAccounts] = useState<{ id: string; username: string; name: string; pageName: string }[] | null>(null);
   const [wa, setWa] = useState({ phoneNumberId: "", wabaId: "", token: "" });
   const [test, setTest] = useState({ to: "", subject: "", body: "", result: "" });
 
@@ -150,6 +162,15 @@ export default function IntegrationsPage() {
       .then((list) => {
         if (list.some((c) => c.provider === "messenger" && c.status === "selection_required") && q.get("select") === "messenger")
           setManage(INTEGRATIONS.find((i) => i.id === "messenger")!);
+        if (list.some((c) => c.provider === "instagram" && c.status === "selection_required") && q.get("select") === "instagram")
+        {
+          setManage(INTEGRATIONS.find((i) => i.id === "instagram")!);
+          void fetch("/api/integrations/instagram/accounts").then(async (r) => {
+            const d = await r.json();
+            if (r.ok) setIgAccounts(d.accounts);
+            else setError(d.error);
+          });
+        }
       })
       .catch((e) => {
         setError(e.message);
@@ -163,7 +184,7 @@ export default function IntegrationsPage() {
     setBusy(true);
     setError("");
     try {
-      const get = act === "locations" || act === "pages";
+      const get = act === "locations" || act === "pages" || act === "accounts";
       const r = await fetch(`/api/integrations/${provider}/${act}`, {
         method: get ? "GET" : "POST",
         ...(!get ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) } : {}),
@@ -185,9 +206,11 @@ export default function IntegrationsPage() {
     setError("");
     setLocations(null);
     setPages(null);
+    setIgAccounts(null);
     setManage(item);
     const c = conn(item);
     if (item.provider === "messenger" && c?.status === "selection_required") void call("messenger", "pages").then((d) => d && setPages(d.pages));
+    if (item.provider === "instagram" && c?.status === "selection_required") void call("instagram", "accounts").then((d) => d && setIgAccounts(d.accounts));
   }
 
   async function connectWhatsApp(e: FormEvent) {
@@ -327,7 +350,10 @@ export default function IntegrationsPage() {
                   {mc.expires_at && m.provider === "instagram" && (
                     <>
                       <dt>Toegang geldig tot</dt>
-                      <dd>{dateTime(mc.expires_at)} (wordt automatisch verlengd)</dd>
+                      <dd>
+                        {dateTime(mc.expires_at)}
+                        {mc.metadata?.authMode === "facebook" ? " (verbind daarna opnieuw)" : " (wordt automatisch verlengd)"}
+                      </dd>
                     </>
                   )}
                   <dt>Rechten</dt>
@@ -385,6 +411,34 @@ export default function IntegrationsPage() {
                     </div>
                   ) : (
                     <p className="int-hint">Er is geen pagina gevonden waarop je berichten mag beheren.</p>
+                  )}
+                </div>
+              )}
+
+              {m.provider === "instagram" && mc?.metadata?.authMode === "facebook" && (
+                <div className="int-section">
+                  <h3>Instagram-account</h3>
+                  {igAccounts === null ? (
+                    <button type="button" className="button secondary" disabled={busy} onClick={() => void call("instagram", "accounts").then((d) => d && setIgAccounts(d.accounts))}>
+                      {ms === "selection" ? "Account kiezen" : "Ander account kiezen"}
+                    </button>
+                  ) : igAccounts.length ? (
+                    <div className="int-choices">
+                      {igAccounts.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className="button secondary"
+                          disabled={busy}
+                          onClick={() => void call("instagram", "select", { account: a.id }).then((d) => d && (setIgAccounts(null), setNotice("Instagram is verbonden. Nieuwe berichten verschijnen in de Inbox.")))}
+                        >
+                          {a.username ? "@" + a.username : a.name}
+                          {a.pageName && <small className="int-sub"> via {a.pageName}</small>}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="int-hint">Geen professioneel Instagram-account gevonden dat aan een van je Facebook-pagina&apos;s is gekoppeld.</p>
                   )}
                 </div>
               )}

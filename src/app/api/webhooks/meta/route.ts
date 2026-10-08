@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { verifyChallenge, verifyMetaSignature } from "@/lib/inbox/core";
-import { webhookSecret } from "@/lib/server/meta";
+import { webhookSecrets } from "@/lib/server/meta";
 import { processMetaWebhook } from "@/lib/server/inbox";
 
 // One public webhook for Instagram, Messenger and WhatsApp (Meta).
@@ -40,10 +40,12 @@ export async function POST(request: Request) {
     return new Response(null, { status: 400 });
   }
   const object = String((payload as { object?: string })?.object || "");
-  const secret = webhookSecret(object);
-  if (!secret)
-    return notConfigured(object === "instagram" ? "INSTAGRAM_APP_SECRET" : "META_CLIENT_SECRET", object.slice(0, 40));
-  if (!verifyMetaSignature(raw, request.headers.get("x-hub-signature-256"), secret)) {
+  // Instagram events: Meta app secret (Facebook Login) or, for older
+  // connections, the Instagram app secret. Others: the Meta app secret.
+  const secrets = webhookSecrets(object);
+  if (!secrets.length) return notConfigured("META_CLIENT_SECRET", object.slice(0, 40));
+  const signature = request.headers.get("x-hub-signature-256");
+  if (!secrets.some((secret) => verifyMetaSignature(raw, signature, secret))) {
     console.warn(JSON.stringify({ event: "meta_webhook_rejected", object: object.slice(0, 40) }));
     return new Response(null, { status: 401 });
   }
