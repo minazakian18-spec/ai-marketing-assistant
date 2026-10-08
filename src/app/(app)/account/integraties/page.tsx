@@ -4,7 +4,7 @@ import { RefreshCw, X } from "lucide-react";
 import { PageHeading, IconButton } from "@/components/ui";
 import { BrandIcon, type Brand } from "@/components/brand-icon";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
-import { CALENDAR_CARD, GMAIL_CARD, GoogleIntegrationCard } from "@/components/account/google-integration-card";
+import { BUSINESS_CARD, CALENDAR_CARD, GMAIL_CARD, GoogleIntegrationCard } from "@/components/account/google-integration-card";
 import { isBrowserDemo } from "@/lib/demo";
 
 type Connection = {
@@ -43,8 +43,7 @@ const INTEGRATIONS: Integration[] = [
   { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", category: "social", provider: "instagram" },
   { id: "linkedin", brand: "linkedin", name: "LinkedIn", description: "Posts plannen voor je bedrijfspagina.", category: "social", planned: true },
   { id: "google_calendar", brand: "google_calendar", name: "Google Agenda", description: "Je afspraken naast je Mavix-planning, in twee richtingen gesynchroniseerd.", category: "planning", provider: "google_calendar" },
-  { id: "google_business", brand: "google_business", name: "Google Bedrijfsprofiel", description: "Je bedrijfslocatie en -gegevens op Google.", category: "reviews", provider: "google_business" },
-  { id: "google_reviews", brand: "google_reviews", name: "Google Reviews", description: "Reviews lezen en beantwoorden. Werkt via je Google Bedrijfsprofiel.", category: "reviews", provider: "google_business" },
+  { id: "google_business", brand: "google_business", name: "Google Bedrijfsprofiel", description: "Bedrijfsprofiel en Google-reviews, met één koppeling.", category: "reviews", provider: "google_business" },
   { id: "shopify", brand: "shopify", name: "Shopify", description: "Producten en bestellingen gebruiken in je marketing.", category: "commerce", planned: true },
   { id: "google_ads", brand: "google_ads", name: "Google Ads", description: "Campagneresultaten en zoektermen bekijken.", category: "ads", planned: true },
   { id: "meta_ads", brand: "meta_ads", name: "Meta Ads", description: "Resultaten van Facebook- en Instagram-advertenties.", category: "ads", planned: true },
@@ -78,6 +77,10 @@ const NOTICES: Record<string, string> = {
   "error=denied": "Je hebt geen toestemming gegeven. Er is niets gekoppeld.",
   "error=permission": "Niet alle benodigde toestemmingen zijn gegeven. Verbind opnieuw en sta alle gevraagde toegang toe.",
   "error=no_pages": "Er is geen Facebook-pagina gevonden waarop je berichten mag beheren.",
+  "connected=google_business": "Google Bedrijfsprofiel is gekoppeld. Je reviews staan nu onder Reviews.",
+  "select=google_business": "Google-account gekoppeld. Kies hieronder je bedrijfslocatie.",
+  "error=no_locations": "Google-account gekoppeld, maar er is geen bedrijfslocatie gevonden die je mag beheren.",
+  "error=api_access": "Google Bedrijfsprofiel is nog niet beschikbaar voor dit Mavix-project. API-toegang moet eerst door Google worden goedgekeurd.",
 };
 
 type State = "connected" | "disconnected" | "reconnect" | "permission" | "selection" | "error" | "planned";
@@ -113,6 +116,8 @@ export default function IntegrationsPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [manage, setManage] = useState<Integration | null>(null);
+  // After OAuth with several locations: open the Google Bedrijfsprofiel picker.
+  const [gbpPicker, setGbpPicker] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [busy, setBusy] = useState(false);
   const [locations, setLocations] = useState<{ id: string; account: string; name: string }[] | null>(null);
@@ -135,6 +140,7 @@ export default function IntegrationsPage() {
     const q = new URLSearchParams(window.location.search);
     const key = [...q.entries()].map(([k, v]) => k + "=" + v).find((k) => NOTICES[k]);
     if (key) setNotice(NOTICES[key]);
+    if (q.get("select") === "google_business") setGbpPicker(true);
     if (q.toString()) window.history.replaceState(null, "", "/account/integraties");
     if (isDemo) {
       setLoaded(true);
@@ -243,8 +249,16 @@ export default function IntegrationsPage() {
 
       <ul className="int-list ui-card">
         {visible.map((item) => {
-          if (item.id === "google_calendar" || item.id === "gmail")
-            return <GoogleIntegrationCard key={item.id} config={item.id === "gmail" ? GMAIL_CARD : CALENDAR_CARD} demo={demo} onNotice={setNotice} />;
+          if (item.id === "google_calendar" || item.id === "gmail" || item.id === "google_business")
+            return (
+              <GoogleIntegrationCard
+                key={item.id}
+                config={item.id === "gmail" ? GMAIL_CARD : item.id === "google_business" ? BUSINESS_CARD : CALENDAR_CARD}
+                demo={demo}
+                onNotice={setNotice}
+                openPicker={item.id === "google_business" && gbpPicker}
+              />
+            );
           const c = conn(item);
           const state = loaded ? stateOf(item, c) : item.planned ? "planned" : "disconnected";
           const linked = !item.planned && state !== "disconnected";
@@ -332,7 +346,6 @@ export default function IntegrationsPage() {
                   </dd>
                 </dl>
               )}
-              {m.id === "google_reviews" && <p className="int-hint">Google Reviews gebruikt dezelfde koppeling als Google Bedrijfsprofiel.</p>}
               {m.provider === "gmail" && ms === "permission" && (
                 <p className="int-hint">Mavix heeft leestoegang nodig om klantmails in de Inbox te tonen. Versturen blijft werken.</p>
               )}

@@ -2,6 +2,7 @@
 import { AgentSurface } from "@/components/agent/agent-surface";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { ReviewsSnapshot } from "@/components/dashboard/reviews-snapshot";
 import { DashboardTodos } from "@/components/dashboard/todos";
 import { UpcomingPlanning, type PlanItem } from "@/components/dashboard/upcoming-planning";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -54,6 +55,7 @@ export default function Dashboard() {
       <div className="dash-columns">
         <DashboardTodos todos={todos} />
         <div className="dash-stack">
+          {status("google_business") === "connected" && <ReviewsSnapshot />}
           <UpcomingPlanning content={planned} calendarConnected={status("google_calendar") === "connected"} />
           <RecentActivity items={activity} />
         </div>

@@ -1,4 +1,5 @@
 import { handleCalendarIntegration } from "@/lib/server/calendar-oauth";
+import { handleBusinessIntegration } from "@/lib/server/google-business-oauth";
 import { oauthStateMatches } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -18,7 +19,6 @@ import {
   scopes,
   callback,
   googleToken,
-  businessLocations,
   sendTestEmail,
   type Provider,
 } from "@/lib/server/integrations";
@@ -118,6 +118,8 @@ export async function POST(request: Request, { params }: Context) {
       route.provider === "google-calendar"
     )
       return handleCalendarIntegration(request, route.action);
+    if (route.provider === "google_business")
+      return handleBusinessIntegration(request, route.action);
     sameOrigin(request);
     if (!PROVIDERS.includes(route.provider))
       throw new HttpError(404, "Niet gevonden.");
@@ -271,25 +273,6 @@ export async function POST(request: Request, { params }: Context) {
       await audit(auth.workspaceId, auth.user.id, "integration_disconnected");
       return NextResponse.json({ ok: true });
     }
-    if (action === "select" && provider === "google_business") {
-      const body = await request.json();
-      const location = (await businessLocations(auth.workspaceId)).find(
-        (l) => l.id === body.location && l.account === body.account,
-      );
-      if (!location) throw new HttpError(403, "Geen toegang tot deze locatie.");
-      const { error } = await db
-        .from("integration_connections")
-        .update({
-          metadata: { account: location.account, location: location.id },
-          display_name: location.name,
-          status: "connected",
-        })
-        .eq("workspace_id", auth.workspaceId)
-        .eq("provider", provider);
-      if (error) throw error;
-      await audit(auth.workspaceId, auth.user.id, "integration_connected");
-      return NextResponse.json({ ok: true });
-    }
     if (action === "select" && provider === "messenger") {
       const { page } = z
         .object({ page: z.string().regex(/^\d{1,30}$/) })
@@ -350,6 +333,8 @@ export async function GET(request: Request, { params }: Context) {
       route.provider === "google-calendar"
     )
       return handleCalendarIntegration(request, route.action);
+    if (route.provider === "google_business")
+      return handleBusinessIntegration(request, route.action);
     if (!PROVIDERS.includes(route.provider))
       throw new HttpError(404, "Niet gevonden.");
     const provider = route.provider as Provider | "messenger" | "whatsapp",
@@ -387,10 +372,6 @@ export async function GET(request: Request, { params }: Context) {
         { headers: { "Cache-Control": "private, no-store" } },
       );
     }
-    if (action === "locations" && provider === "google_business")
-      return NextResponse.json({
-        locations: await businessLocations(auth.workspaceId),
-      });
     if (action === "pages" && provider === "messenger") {
       const { data: c } = await db
         .from("integration_connections")

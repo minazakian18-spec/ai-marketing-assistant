@@ -2,6 +2,7 @@ import { sendNewGmail } from "./gmail";
 import { gmailToken } from "./gmail-credentials";
 import { gmailRequest } from "./gmail-api";
 import { calendarToken } from "./calendar-credentials";
+import { businessToken, rawReviewsPage } from "./google-business";
 import "server-only";
 import { adminClient, appUrl } from "./supabase";
 import { HttpError } from "./access";
@@ -59,6 +60,7 @@ export async function googleToken(
 export async function connectionToken(workspaceId: string, provider: Provider) {
   if (provider === "gmail") return gmailToken(workspaceId);
   if (provider === "google_calendar") return calendarToken(workspaceId);
+  if (provider === "google_business") return businessToken(workspaceId);
   const db = adminClient();
   const { data: c, error } = await db
     .from("integration_connections")
@@ -106,111 +108,11 @@ export async function connectionToken(workspaceId: string, provider: Provider) {
   }
   return { token, c };
 }
-export async function googleRequest(
-  workspaceId: string,
-  provider: Provider,
-  url: string,
-  options: RequestInit = {},
-) {
-  const { token, c } = await connectionToken(workspaceId, provider);
-  const r = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + token.access_token,
-      ...options.headers,
-    },
-    cache: "no-store",
-  });
-  if (!r.ok) {
-    const status =
-      r.status === 401
-        ? "reconnect_required"
-        : r.status === 403
-          ? "permission_missing"
-          : "error";
-    await adminClient()
-      .from("integration_connections")
-      .update({ status })
-      .eq("id", c.id);
-    throw new HttpError(
-      502,
-      "De provider kon de actie niet uitvoeren. Controleer de verbinding.",
-    );
-  }
-  return r.status === 204 ? {} : r.json();
-}
-export async function businessLocations(workspaceId: string) {
-  const accounts = await googleRequest(
-    workspaceId,
-    "google_business",
-    "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
-  );
-  const result: { id: string; account: string; name: string }[] = [];
-  for (const account of accounts.accounts || []) {
-    let page = "";
-    do {
-      const params = new URLSearchParams({
-        readMask: "name,title",
-        pageSize: "100",
-        ...(page ? { pageToken: page } : {}),
-      });
-      const list = await googleRequest(
-        workspaceId,
-        "google_business",
-        "https://mybusinessbusinessinformation.googleapis.com/v1/" +
-          account.name +
-          "/locations?" +
-          params,
-      );
-      for (const location of list.locations || [])
-        result.push({
-          id: location.name,
-          account: account.name,
-          name: location.title,
-        });
-      page = list.nextPageToken || "";
-    } while (page);
-  }
-  return result;
-}
+// Google Business Profile (accounts, locations, reviews, replies) lives in
+// google-business.ts with hardened requests and API-access detection. This
+// wrapper keeps the research module's raw review reader.
 export async function listReviews(workspaceId: string, pageToken = "") {
-  const { c } = await connectionToken(workspaceId, "google_business");
-  if (!c.metadata.location || !c.metadata.account)
-    throw new HttpError(409, "Kies eerst je bedrijfslocatie.");
-  return googleRequest(
-    workspaceId,
-    "google_business",
-    `https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews?` +
-      new URLSearchParams({
-        pageSize: "50",
-        ...(pageToken ? { pageToken } : {}),
-      }),
-  );
-}
-export async function fetchReview(workspaceId: string, id: string) {
-  if (!/^[\w-]+$/.test(id)) throw new HttpError(400, "Ongeldige review.");
-  const { c } = await connectionToken(workspaceId, "google_business");
-  return googleRequest(
-    workspaceId,
-    "google_business",
-    `https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews/${id}`,
-  );
-}
-export async function replyToReview(
-  workspaceId: string,
-  id: string,
-  comment: string,
-) {
-  if (!/^[\w-]+$/.test(id) || !comment.trim() || comment.length > 4096)
-    throw new HttpError(400, "Ongeldig antwoord.");
-  const { c } = await connectionToken(workspaceId, "google_business");
-  return googleRequest(
-    workspaceId,
-    "google_business",
-    `https://mybusiness.googleapis.com/v4/${c.metadata.account}/${c.metadata.location}/reviews/${id}/reply`,
-    { method: "PUT", body: JSON.stringify({ comment }) },
-  );
+  return rawReviewsPage(workspaceId, pageToken);
 }
 export async function sendGmail(workspaceId: string, raw: string) {
   return gmailRequest(workspaceId, "/messages/send", {

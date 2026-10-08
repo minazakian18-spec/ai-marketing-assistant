@@ -61,7 +61,7 @@ export function buildTodos(i: TodoInput): Todo[] {
         id: "gbp-location",
         title: "Kies je bedrijfslocatie",
         detail: "Nog één stap om je Google-reviews in Mavix te zien.",
-        href: "/account/integraties",
+        href: "/account/integraties?select=google_business",
         cta: "Locatie kiezen",
         done: false,
         urgent: true,

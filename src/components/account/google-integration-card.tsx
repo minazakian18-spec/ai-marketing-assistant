@@ -1,30 +1,35 @@
 "use client";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Loader2, RefreshCw, X } from "lucide-react";
+import { Loader2, MapPin, RefreshCw, X } from "lucide-react";
 import { BrandIcon, type Brand } from "@/components/brand-icon";
 import { IconButton } from "@/components/ui";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
 import { isBrowserDemo } from "@/lib/demo";
+import type { BusinessLocation } from "@/lib/reviews/google";
 
-// Shape of GET /api/integrations/{google_calendar|gmail}/status.
+// Shape of GET /api/integrations/{google_calendar|gmail|google_business}/status.
 type Status = {
   status: string;
   connected: boolean;
   accountEmail: string | null;
   mine?: boolean;
   lastSyncedAt?: string | null;
+  location?: { name: string; address: string } | null;
 };
+type Place = { name: string; address: string } | null;
 type View =
   | { kind: "loading" }
   | { kind: "load-error"; message: string }
   | { kind: "disconnected" }
-  | { kind: "connected"; email: string; lastSyncedAt?: string | null }
+  | { kind: "connected"; email: string; lastSyncedAt?: string | null; place: Place }
   | { kind: "team" }
+  | { kind: "selection"; email: string | null }
+  | { kind: "api"; email: string | null }
   | { kind: "reconnect"; reason: "expired" | "permission" | "other"; email: string | null };
 
 export type GoogleCardConfig = {
-  provider: "google_calendar" | "gmail";
+  provider: "google_calendar" | "gmail" | "google_business";
   brand: Brand;
   name: string;
   rights: string[];
@@ -38,7 +43,12 @@ export type GoogleCardConfig = {
   };
   /** Extra guidance in the Beheren dialog for a working connection. */
   manageHint: ReactNode;
+  /** Google Business Profile: choose a business location after OAuth. */
+  locations?: boolean;
 };
+
+export const API_ACCESS_TEXT =
+  "Google Bedrijfsprofiel is nog niet beschikbaar voor dit Mavix-project. API-toegang moet eerst door Google worden goedgekeurd.";
 
 export const CALENDAR_CARD: GoogleCardConfig = {
   provider: "google_calendar",
@@ -81,12 +91,35 @@ export const GMAIL_CARD: GoogleCardConfig = {
   ),
 };
 
+export const BUSINESS_CARD: GoogleCardConfig = {
+  provider: "google_business",
+  brand: "google_business",
+  name: "Google Bedrijfsprofiel",
+  rights: ["Je Google-account herkennen (e-mailadres)", "Je bedrijfsprofielen en locaties bekijken", "Reviews lezen en beantwoorden"],
+  copy: {
+    disconnected: "Beheer je bedrijfsprofiel en reviews rechtstreeks vanuit Mavix.",
+    connected: "Je Google-reviews staan in Mavix en je antwoordt direct vanuit Reviews.",
+    expired: "Je koppeling met Google Bedrijfsprofiel is verlopen.",
+    permission: "Mavix mist toegang tot je bedrijfsprofiel. Koppel opnieuw en sta beheer toe.",
+    disconnect:
+      "Mavix verwijdert de opgeslagen toegang en de gekozen locatie. Je bedrijfsprofiel, reviews en antwoorden bij Google blijven gewoon bestaan. Gmail, Google Agenda en inloggen met Google blijven werken.",
+  },
+  manageHint: (
+    <>
+      Je reviews en antwoorden vind je onder <Link href="/reviews?tab=inbox">Reviews</Link>. Google blijft de bron: wat je plaatst, staat direct op Google.
+    </>
+  ),
+  locations: true,
+};
+
 const dateTime = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "Nog niet";
 
 function viewOf(s: Status): View {
   if (s.status === "disconnected") return { kind: "disconnected" };
-  if (s.connected) return { kind: "connected", email: s.accountEmail || "", lastSyncedAt: s.lastSyncedAt };
+  if (s.connected) return { kind: "connected", email: s.accountEmail || "", lastSyncedAt: s.lastSyncedAt, place: s.location || null };
+  if (s.status === "selection_required") return { kind: "selection", email: s.accountEmail };
+  if (s.status === "api_access_required") return { kind: "api", email: s.accountEmail };
   if (s.status === "connected" && s.mine === false) return { kind: "team" };
   return {
     kind: "reconnect",
@@ -96,9 +129,20 @@ function viewOf(s: Status): View {
 }
 
 // One Google integration row with real states (status endpoint per provider):
-// loading, not connected, connecting, connected, team member, reconnect and
-// load error. Tokens never reach the browser; only status and e-mail address.
-export function GoogleIntegrationCard({ config, demo, onNotice }: { config: GoogleCardConfig; demo: boolean; onNotice: (message: string) => void }) {
+// loading, not connected, connecting, connected, team member, location choice,
+// API access pending, reconnect and load error. Tokens never reach the browser.
+export function GoogleIntegrationCard({
+  config,
+  demo,
+  onNotice,
+  openPicker = false,
+}: {
+  config: GoogleCardConfig;
+  demo: boolean;
+  onNotice: (message: string) => void;
+  /** Open the location picker right away (after OAuth with several locations). */
+  openPicker?: boolean;
+}) {
   const base = "/api/integrations/" + config.provider + "/";
   const [view, setView] = useState<View>({ kind: "loading" });
   const [connecting, setConnecting] = useState(false);
@@ -106,10 +150,11 @@ export function GoogleIntegrationCard({ config, demo, onNotice }: { config: Goog
   const [error, setError] = useState("");
   const [manage, setManage] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [picker, setPicker] = useState<null | { loading: boolean; error: string; list: BusinessLocation[]; choice: string; saving: boolean }>(null);
 
   const request = useCallback(
-    async <T,>(path: string, method: "GET" | "POST" = "GET"): Promise<T> => {
-      const r = await fetch(base + path, method === "POST" ? { method, headers: { "Content-Type": "application/json" }, body: "{}" } : { cache: "no-store" });
+    async <T,>(path: string, method: "GET" | "POST" = "GET", body: unknown = {}): Promise<T> => {
+      const r = await fetch(base + path, method === "POST" ? { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : { cache: "no-store" });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "Er ging iets mis. Probeer het opnieuw.");
       return d as T;
@@ -125,11 +170,27 @@ export function GoogleIntegrationCard({ config, demo, onNotice }: { config: Goog
     }
   }, [request]);
 
+  const openLocations = useCallback(async () => {
+    setManage(false);
+    setPicker({ loading: true, error: "", list: [], choice: "", saving: false });
+    try {
+      const { locations } = await request<{ locations: BusinessLocation[] }>("locations");
+      setPicker({ loading: false, error: "", list: locations, choice: locations.length === 1 ? locations[0].location : "", saving: false });
+      void load(); // A working call may have cleared an "API access" state.
+    } catch (e) {
+      setPicker({ loading: false, error: (e as Error).message, list: [], choice: "", saving: false });
+      void load();
+    }
+  }, [request, load]);
+
   useEffect(() => {
     // The page learns about test mode after mount, so check the cookie here too.
     if (isBrowserDemo()) setView({ kind: "disconnected" });
     else void load();
   }, [load]);
+  useEffect(() => {
+    if (openPicker && config.locations && !isBrowserDemo()) void openLocations();
+  }, [openPicker, config.locations, openLocations]);
 
   async function connect() {
     setConnecting(true);
@@ -140,6 +201,21 @@ export function GoogleIntegrationCard({ config, demo, onNotice }: { config: Goog
     } catch (e) {
       setError((e as Error).message);
       setConnecting(false);
+    }
+  }
+
+  async function chooseLocation() {
+    if (!picker) return;
+    const pick = picker.list.find((l) => l.location === picker.choice);
+    if (!pick) return setPicker({ ...picker, error: "Kies eerst een locatie." });
+    setPicker({ ...picker, saving: true, error: "" });
+    try {
+      await request("select", "POST", { account: pick.account, location: pick.location });
+      setPicker(null);
+      onNotice(pick.title + " is gekoppeld. Je reviews staan nu onder Reviews.");
+      void load();
+    } catch (e) {
+      setPicker({ ...picker, saving: false, error: (e as Error).message });
     }
   }
 
@@ -160,34 +236,42 @@ export function GoogleIntegrationCard({ config, demo, onNotice }: { config: Goog
   }
 
   const busy = connecting || disconnecting;
-  const linked = view.kind === "connected" || view.kind === "team" || view.kind === "reconnect";
+  const linked = view.kind === "connected" || view.kind === "team" || view.kind === "reconnect" || view.kind === "selection" || view.kind === "api";
   const state =
     view.kind === "connected"
       ? { cls: "connected", text: "Verbonden" }
       : view.kind === "team"
         ? { cls: "selection", text: "Teamlid" }
-        : view.kind === "reconnect"
-          ? { cls: view.reason === "permission" ? "permission" : "reconnect", text: view.reason === "permission" ? "Toestemming nodig" : view.reason === "expired" ? "Verlopen" : "Fout bij koppeling" }
-          : view.kind === "load-error"
-            ? { cls: "error", text: "Niet beschikbaar" }
-            : view.kind === "loading"
-              ? { cls: "loading", text: "Laden…" }
-              : { cls: "disconnected", text: "Niet verbonden" };
+        : view.kind === "selection"
+          ? { cls: "selection", text: "Locatie nodig" }
+          : view.kind === "api"
+            ? { cls: "permission", text: "Wacht op Google" }
+            : view.kind === "reconnect"
+              ? { cls: view.reason === "permission" ? "permission" : "reconnect", text: view.reason === "permission" ? "Toestemming nodig" : view.reason === "expired" ? "Verlopen" : "Fout bij koppeling" }
+              : view.kind === "load-error"
+                ? { cls: "error", text: "Niet beschikbaar" }
+                : view.kind === "loading"
+                  ? { cls: "loading", text: "Laden…" }
+                  : { cls: "disconnected", text: "Niet verbonden" };
 
   const description =
     view.kind === "connected"
       ? config.copy.connected
       : view.kind === "team"
         ? config.copy.team || config.copy.connected
-        : view.kind === "reconnect"
-          ? view.reason === "expired"
-            ? config.copy.expired
-            : view.reason === "permission"
-              ? config.copy.permission
-              : "Er is een probleem met de koppeling. Koppel opnieuw."
-          : view.kind === "load-error"
-            ? view.message
-            : config.copy.disconnected;
+        : view.kind === "selection"
+          ? "Google-account gekoppeld. Kies je bedrijfslocatie."
+          : view.kind === "api"
+            ? API_ACCESS_TEXT
+            : view.kind === "reconnect"
+              ? view.reason === "expired"
+                ? config.copy.expired
+                : view.reason === "permission"
+                  ? config.copy.permission
+                  : "Er is een probleem met de koppeling. Koppel opnieuw."
+              : view.kind === "load-error"
+                ? view.message
+                : config.copy.disconnected;
 
   const connectButton = (label: string, primary = true) => (
     <button type="button" className={"button " + (primary ? "primary" : "secondary")} disabled={demo || busy || view.kind === "loading"} onClick={() => void connect()}>
@@ -195,7 +279,13 @@ export function GoogleIntegrationCard({ config, demo, onNotice }: { config: Goog
       {connecting ? "Doorsturen…" : label}
     </button>
   );
+  const disconnectButton = (
+    <button type="button" className="button danger-text" onClick={() => setConfirm(true)} disabled={busy}>
+      {disconnecting ? "Ontkoppelen…" : "Ontkoppelen"}
+    </button>
+  );
   const titleId = "gi-modal-" + config.provider;
+  const email = view.kind === "connected" ? view.email : view.kind === "reconnect" || view.kind === "selection" || view.kind === "api" ? view.email : null;
 
   return (
     <li className="int-row int-gc" aria-busy={view.kind === "loading" || busy}>
@@ -204,8 +294,15 @@ export function GoogleIntegrationCard({ config, demo, onNotice }: { config: Goog
       </span>
       <div className="int-info">
         <strong>{config.name}</strong>
-        <p className={view.kind === "reconnect" || view.kind === "load-error" ? "int-warn" : undefined}>{description}</p>
-        {(view.kind === "connected" || (view.kind === "reconnect" && view.email)) && <small>{view.email}</small>}
+        <p className={view.kind === "reconnect" || view.kind === "load-error" || view.kind === "api" ? "int-warn" : undefined}>{description}</p>
+        {view.kind === "connected" && view.place && (
+          <small className="int-place">
+            <MapPin size={12} aria-hidden="true" />
+            {view.place.name}
+            {email ? " · " + email : ""}
+          </small>
+        )}
+        {email && !(view.kind === "connected" && view.place) && <small>{email}</small>}
         {error && !manage && (
           <p role="alert" className="int-error int-inline-error">
             {error}
@@ -226,14 +323,27 @@ export function GoogleIntegrationCard({ config, demo, onNotice }: { config: Goog
             <button type="button" className="button secondary" onClick={() => setManage(true)} disabled={busy}>
               Beheren
             </button>
-            <button type="button" className="button danger-text" onClick={() => setConfirm(true)} disabled={busy}>
-              {disconnecting ? "Ontkoppelen…" : "Ontkoppelen"}
-            </button>
+            {disconnectButton}
           </>
         ) : view.kind === "team" ? (
           <button type="button" className="button secondary" onClick={() => setManage(true)} disabled={busy}>
             Beheren
           </button>
+        ) : view.kind === "selection" ? (
+          <>
+            <button type="button" className="button primary" onClick={() => void openLocations()} disabled={demo || busy}>
+              Locatie kiezen
+            </button>
+            {disconnectButton}
+          </>
+        ) : view.kind === "api" ? (
+          <>
+            <button type="button" className="button secondary" onClick={() => void openLocations()} disabled={demo || busy}>
+              <RefreshCw size={14} aria-hidden="true" />
+              Opnieuw controleren
+            </button>
+            {disconnectButton}
+          </>
         ) : view.kind === "reconnect" ? (
           connectButton("Opnieuw koppelen")
         ) : (
@@ -263,7 +373,16 @@ export function GoogleIntegrationCard({ config, demo, onNotice }: { config: Goog
               )}
               <dl className="int-details">
                 <dt>Account</dt>
-                <dd>{view.kind === "connected" ? view.email : view.kind === "reconnect" ? view.email || "—" : "Privé (teamlid)"}</dd>
+                <dd>{view.kind === "team" ? "Privé (teamlid)" : email || "—"}</dd>
+                {view.kind === "connected" && view.place && (
+                  <>
+                    <dt>Locatie</dt>
+                    <dd>
+                      {view.place.name}
+                      {view.place.address && <span className="int-sub">{view.place.address}</span>}
+                    </dd>
+                  </>
+                )}
                 <dt>Status</dt>
                 <dd>{state.text}</dd>
                 {view.kind === "connected" && view.lastSyncedAt !== undefined && (
@@ -285,10 +404,76 @@ export function GoogleIntegrationCard({ config, demo, onNotice }: { config: Goog
               <p className="int-hint">Ontkoppelen verwijdert de opgeslagen toegang in Mavix. Er wordt niets in je Google-account verwijderd.</p>
             </div>
             <footer>
-              <button type="button" className="button danger-text" onClick={() => setConfirm(true)} disabled={busy}>
-                {disconnecting ? "Ontkoppelen…" : "Ontkoppelen"}
-              </button>
+              {disconnectButton}
+              {config.locations && view.kind === "connected" && (
+                <button type="button" className="button secondary" onClick={() => void openLocations()} disabled={busy}>
+                  Andere locatie kiezen
+                </button>
+              )}
               {connectButton(view.kind === "team" ? "Eigen account koppelen" : "Opnieuw koppelen", view.kind !== "connected")}
+            </footer>
+          </div>
+        </>
+      )}
+
+      {picker && (
+        <>
+          <div className="int-scrim" onClick={() => !picker.saving && setPicker(null)} aria-hidden="true" />
+          <div className="int-modal" role="dialog" aria-modal="true" aria-labelledby={titleId + "-loc"}>
+            <header>
+              <BrandIcon brand={config.brand} size={26} />
+              <div>
+                <h2 id={titleId + "-loc"}>Kies je bedrijfslocatie</h2>
+                <span className="int-sub">Mavix beheert de reviews van deze locatie.</span>
+              </div>
+              <IconButton label="Sluiten" onClick={() => setPicker(null)} disabled={picker.saving}>
+                <X size={16} />
+              </IconButton>
+            </header>
+            <div className="int-modal-body">
+              {picker.loading ? (
+                <div className="int-loc-skeleton" role="status" aria-label="Locaties laden">
+                  <span />
+                  <span />
+                </div>
+              ) : picker.error && !picker.list.length ? (
+                <p role="alert" className={picker.error === API_ACCESS_TEXT ? "int-hint int-warn" : "int-error"}>
+                  {picker.error}
+                </p>
+              ) : !picker.list.length ? (
+                <p className="int-hint">
+                  Er is geen bedrijfslocatie gevonden voor dit Google-account. Controleer in Google Bedrijfsprofiel of je eigenaar of beheerder bent, of koppel een ander Google-account.
+                </p>
+              ) : (
+                <fieldset className="int-locations" disabled={picker.saving}>
+                  <legend className="sr-only">Bedrijfslocaties</legend>
+                  {picker.list.map((l) => (
+                    <label key={l.location} className={"int-location" + (picker.choice === l.location ? " is-chosen" : "")}>
+                      <input type="radio" name="gbp-location" value={l.location} checked={picker.choice === l.location} onChange={() => setPicker({ ...picker, choice: l.location, error: "" })} />
+                      <span>
+                        <strong>{l.title}</strong>
+                        {l.address && <small>{l.address}</small>}
+                      </span>
+                      {l.closed && <em>Permanent gesloten</em>}
+                      {!l.closed && l.verified === false && <em>Niet geverifieerd</em>}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+              {picker.error && picker.list.length > 0 && (
+                <p role="alert" className="int-error">
+                  {picker.error}
+                </p>
+              )}
+            </div>
+            <footer>
+              <button type="button" className="button secondary" onClick={() => setPicker(null)} disabled={picker.saving}>
+                Annuleren
+              </button>
+              <button type="button" className="button primary" onClick={() => void chooseLocation()} disabled={picker.loading || picker.saving || !picker.choice}>
+                {picker.saving ? <Loader2 size={14} className="int-spin" aria-hidden="true" /> : null}
+                {picker.saving ? "Controleren bij Google…" : "Locatie koppelen"}
+              </button>
             </footer>
           </div>
         </>

@@ -20,8 +20,8 @@ export function ReviewSettings({
           <div>
             <h2>Google Business Profile</h2>
             <p>
-              Koppel je profiel via Integraties. Het automatisch ophalen van
-              je echte reviews in deze werkruimte volgt in een volgende fase.
+              Testmodus: met een echt account koppel je je profiel via
+              Integraties en beheer je hier je echte Google-reviews.
             </p>
           </div>
         </div>

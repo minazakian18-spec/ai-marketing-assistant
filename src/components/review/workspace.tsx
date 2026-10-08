@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { LayoutDashboard, Inbox, Sparkles, Settings, Plug } from "lucide-react";
@@ -14,11 +14,14 @@ import { ReviewOverview } from "./overview";
 import { ReviewInbox } from "./inbox";
 import { ReviewAutoReply } from "./auto-reply";
 import { ReviewSettings } from "./settings";
+import { LiveReviews } from "./live";
+import { ReplyPreferences } from "./reply-preferences";
+import { isBrowserDemo } from "@/lib/demo";
 
 type ReviewTab = "overview" | "inbox" | "auto-reply" | "settings";
 const tabs: [ReviewTab, string, typeof LayoutDashboard][] = [
   ["overview", "Overzicht", LayoutDashboard],
-  ["inbox", "Inbox", Inbox],
+  ["inbox", "Reviews", Inbox],
   ["auto-reply", "Auto Reply", Sparkles],
   ["settings", "Instellingen", Settings],
 ];
@@ -54,6 +57,10 @@ function Workspace() {
   const settings = data.review.settings;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  // Real workspaces show real Google reviews only; sample reviews and the
+  // Auto Reply simulation are test-mode only.
+  const [demo, setDemo] = useState<boolean | null>(null);
+  useEffect(() => setDemo(isBrowserDemo()), []);
   const raw = search.get("tab");
   const tab: ReviewTab = (
     ["overview", "inbox", "auto-reply", "settings"] as const
@@ -128,13 +135,15 @@ function Workspace() {
     }, 550);
   }
 
-  if (!ready) return <p role="status">Reviews laden…</p>;
+  if (!ready || demo === null) return <p role="status">Reviews laden…</p>;
+  const visibleTabs = demo ? tabs : tabs.filter(([key]) => key !== "auto-reply");
+  const active: ReviewTab = !demo && tab === "auto-reply" ? "overview" : tab;
   return (
     <div className="rv-workspace">
       <PageHeading
         eyebrow="Marketing"
         title="Reviews"
-        description="Beheer en beantwoord je Google-reviews vanuit één plek."
+        description="Lees en beantwoord je Google-reviews vanuit één plek. Wat je plaatst, staat direct op Google."
         action={
           <Link className="button secondary" href="/account/integraties">
             <Plug size={15} />
@@ -142,17 +151,17 @@ function Workspace() {
           </Link>
         }
       />
-      <p className="ws-notice">
-        Je ziet voorbeeldreviews. Koppel Google Business Profile om je echte
-        reviews hier te beheren.{" "}
-        <Link href="/account/integraties">Google Business Profile koppelen</Link>
-      </p>
+      {demo && (
+        <p className="ws-notice">
+          Testmodus: je ziet voorbeeldreviews. Met een echt account beheer je hier je echte Google-reviews.
+        </p>
+      )}
       <nav className="ws-tabs" aria-label="Reviews onderdelen">
-        {tabs.map(([key, label, Icon]) => (
+        {visibleTabs.map(([key, label, Icon]) => (
           <Link
             key={key}
             href={"/reviews?tab=" + key}
-            aria-current={tab === key ? "page" : undefined}
+            aria-current={active === key ? "page" : undefined}
           >
             <Icon size={16} />
             {label}
@@ -164,8 +173,10 @@ function Workspace() {
           {message}
         </p>
       )}
-      <div className="workspace-tab-enter" key={tab}>
-        {tab === "overview" && (
+      <div className="workspace-tab-enter" key={active}>
+        {!demo && (active === "overview" || active === "inbox") && <LiveReviews tab={active} />}
+        {!demo && active === "settings" && <ReplyPreferences settings={settings} onChange={updateSettings} />}
+        {demo && tab === "overview" && (
           <ReviewOverview
             reviews={reviews}
             mode={settings.mode}
@@ -176,7 +187,7 @@ function Workspace() {
             onSaveResponse={saveResponse}
           />
         )}
-        {tab === "inbox" && (
+        {demo && tab === "inbox" && (
           <ReviewInbox
             reviews={reviews}
             onApprove={approve}
@@ -185,7 +196,7 @@ function Workspace() {
             onSaveResponse={saveResponse}
           />
         )}
-        {tab === "auto-reply" && (
+        {demo && tab === "auto-reply" && (
           <ReviewAutoReply
             settings={settings}
             onChange={updateSettings}
@@ -193,7 +204,7 @@ function Workspace() {
             busy={busy}
           />
         )}
-        {tab === "settings" && (
+        {demo && tab === "settings" && (
           <ReviewSettings settings={settings} onChange={updateSettings} />
         )}
       </div>
