@@ -22,12 +22,13 @@ export const graph=(path:string)=>'https://graph.facebook.com/'+version()+path;
 export const igGraph=(path:string)=>'https://graph.instagram.com/'+version()+path;
 export const metaCallback=(provider:'instagram'|'messenger')=>appUrl()+'/api/integrations/'+provider+'/callback';
 
-export function metaConfigured(provider:MetaProvider){
- if(!process.env.OAUTH_ENCRYPTION_KEY)return false;
- if(provider==='instagram')return !!(process.env.INSTAGRAM_APP_ID&&process.env.INSTAGRAM_APP_SECRET);
- if(provider==='messenger')return !!(process.env.META_CLIENT_ID&&process.env.META_CLIENT_SECRET);
- return !!process.env.META_CLIENT_SECRET;
+// Names (never values) of the environment variables a channel still needs.
+// Only for server logs; customers get a generic Dutch message.
+export function missingMetaConfig(provider:MetaProvider){
+ const need=['OAUTH_ENCRYPTION_KEY',...(provider==='instagram'?['INSTAGRAM_APP_ID','INSTAGRAM_APP_SECRET']:provider==='messenger'?['META_CLIENT_ID','META_CLIENT_SECRET']:['META_CLIENT_SECRET','META_WEBHOOK_VERIFY_TOKEN'])];
+ return need.filter(n=>!process.env[n]);
 }
+export const metaConfigured=(provider:MetaProvider)=>missingMetaConfig(provider).length===0;
 // Webhook signatures: Instagram Business Login events are signed with the
 // Instagram app secret, Page and WhatsApp events with the Meta app secret.
 export const webhookSecret=(object:string)=>object==='instagram'?(process.env.INSTAGRAM_APP_SECRET||''):(process.env.META_CLIENT_SECRET||'');
@@ -97,13 +98,28 @@ export async function selectPage(workspaceId:string,pageId:string){
  return page.name;
 }
 
-// WhatsApp: verify the number with the given token and subscribe the app to
-// the WhatsApp Business Account's webhooks.
-export async function connectWhatsApp(input:{phoneNumberId:string;wabaId:string;token:string}){
+// WhatsApp: the number must be one of the phone numbers Meta lists for the
+// given WhatsApp Business Account (read with the supplied token). Nothing is
+// subscribed or stored before this check passes.
+type WaInput={phoneNumberId:string;wabaId:string;token:string};
+const invalidInput=(e:unknown)=>e instanceof HttpError&&e.status!==429&&!(e as {provider?:{retryable?:boolean}}).provider?.retryable;
+export async function verifyWhatsAppNumber(input:WaInput){
  const auth={headers:{Authorization:'Bearer '+input.token}};
- const number=await metaJson(graph('/'+input.phoneNumberId+'?fields=display_phone_number,verified_name'),auth,'whatsapp').catch(e=>{throw e instanceof HttpError&&e.status!==429?new HttpError(400,'Mavix kon dit WhatsApp-nummer niet controleren. Controleer de Phone Number ID en het token.'):e;});
- await metaJson(graph('/'+input.wabaId+'/subscribed_apps'),{method:'POST',...auth},'whatsapp').catch(e=>{throw e instanceof HttpError&&e.status!==429?new HttpError(400,'Mavix kon zich niet abonneren op dit WhatsApp Business-account. Controleer de WABA ID en de rechten van het token.'):e;});
- return {display:String(number.verified_name||number.display_phone_number||'WhatsApp'),phone:String(number.display_phone_number||'')};
+ // Temporary Meta problems (rate limits, 5xx) keep their own message; anything
+ // else means the IDs or the token's access are wrong.
+ const rethrow=(message:string)=>(e:unknown)=>{throw invalidInput(e)?new HttpError(400,message):e;};
+ let url:string|undefined=graph('/'+input.wabaId+'/phone_numbers?fields=id,display_phone_number,verified_name&limit=100');
+ for(let i=0;url&&i<5;i++){
+  const d:{data?:{id?:string;display_phone_number?:string;verified_name?:string}[];paging?:{next?:string}}=await metaJson(url,auth,'whatsapp').catch(rethrow('Mavix kon dit WhatsApp Business-account niet controleren. Controleer de WABA ID en of het token toegang heeft (whatsapp_business_management).'));
+  const number=(d.data||[]).find(n=>String(n.id)===input.phoneNumberId);
+  if(number)return {display:String(number.verified_name||number.display_phone_number||'WhatsApp'),phone:String(number.display_phone_number||'')};
+  url=d.paging?.next&&d.paging.next.startsWith('https://graph.facebook.com/')?d.paging.next:undefined;
+ }
+ throw new HttpError(400,'Deze Phone Number ID hoort niet bij het opgegeven WhatsApp Business-account. Controleer beide ID\'s in WhatsApp Manager.');
+}
+// Subscribe the Meta app to the WhatsApp Business Account's webhooks.
+export async function subscribeWhatsApp(input:WaInput){
+ await metaJson(graph('/'+input.wabaId+'/subscribed_apps'),{method:'POST',headers:{Authorization:'Bearer '+input.token}},'whatsapp').catch(e=>{throw invalidInput(e)?new HttpError(400,'Mavix kon zich niet abonneren op dit WhatsApp Business-account. Controleer de rechten van het token.'):e;});
 }
 
 // Decrypted credentials for a Meta connection. Instagram long-lived tokens

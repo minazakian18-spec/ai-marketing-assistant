@@ -27,11 +27,13 @@ import {
   authorizeUrl,
   completeInstagram,
   completeMessenger,
-  connectWhatsApp,
   listPages,
   metaConfigured,
   metaScopes,
+  missingMetaConfig,
   selectPage,
+  subscribeWhatsApp,
+  verifyWhatsAppNumber,
   type MetaCredentials,
 } from "@/lib/server/meta";
 import {
@@ -52,6 +54,8 @@ const whatsappInput = z.object({
     .max(1000)
     .regex(/^[\w.\-|]+$/),
 });
+const WHATSAPP_TAKEN =
+  "Dit WhatsApp-nummer is al gekoppeld aan een andere Mavix-werkruimte. Ontkoppel het daar eerst.";
 const PROVIDERS = [
   "google_business",
   "gmail",
@@ -144,14 +148,34 @@ export async function POST(request: Request, { params }: Context) {
         return NextResponse.json({ url: authorizeUrl(provider, state) });
       }
       if (provider === "whatsapp") {
-        if (!metaConfigured("whatsapp"))
+        const missing = missingMetaConfig("whatsapp");
+        if (missing.length) {
+          // Variable names only, never values.
+          console.error(
+            JSON.stringify({ event: "whatsapp_not_configured", missing }),
+          );
           throw new HttpError(
             503,
-            "WhatsApp-koppeling vereist nog Meta-appconfiguratie.",
+            "WhatsApp kan nog niet worden gekoppeld: de Meta-configuratie van Mavix is nog niet compleet. Neem contact op met de beheerder.",
           );
+        }
         await limited("whatsapp-connect:" + auth.workspaceId, 5);
         const input = whatsappInput.parse(await request.json());
-        const number = await connectWhatsApp(input);
+        const number = await verifyWhatsAppNumber(input);
+        // One WhatsApp number belongs to one workspace: its webhooks are
+        // routed by phone number id. The unique index in
+        // 202610080001_whatsapp_unique_number.sql enforces this under races.
+        const { data: taken, error: takenError } = await db
+          .from("integration_connections")
+          .select("workspace_id")
+          .eq("provider", "whatsapp")
+          .eq("provider_account_id", input.phoneNumberId)
+          .neq("workspace_id", auth.workspaceId)
+          .neq("status", "disconnected")
+          .limit(1);
+        if (takenError) throw takenError;
+        if (taken?.length) throw new HttpError(409, WHATSAPP_TAKEN);
+        await subscribeWhatsApp(input);
         const { error } = await db.from("integration_connections").upsert(
           {
             workspace_id: auth.workspaceId,
@@ -174,6 +198,7 @@ export async function POST(request: Request, { params }: Context) {
           },
           { onConflict: "workspace_id,provider" },
         );
+        if (error?.code === "23505") throw new HttpError(409, WHATSAPP_TAKEN);
         if (error) throw error;
         await audit(auth.workspaceId, auth.user.id, "integration_connected");
         return NextResponse.json({ ok: true });
