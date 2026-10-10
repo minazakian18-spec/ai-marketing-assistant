@@ -3,6 +3,7 @@ import { workspace, failure, limited, sameOrigin } from "@/lib/server/access";
 import { adminClient } from "@/lib/server/supabase";
 import { getGoogleReview } from "@/lib/server/google-business";
 import { generateReviewReply } from "@/lib/server/ai";
+import { metered } from "@/lib/server/ai-usage";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -18,10 +19,16 @@ export async function POST(request: Request, { params }: Context) {
     const review = await getGoogleReview(auth.workspaceId, id);
     const { data } = await adminClient().from("business_profiles").select("data").eq("workspace_id", auth.workspaceId).maybeSingle();
     const workspaceData = (data?.data || {}) as { profile?: Record<string, unknown>; review?: { settings?: { tone?: string; signature?: string } } };
-    const text = await generateReviewReply(
-      { reviewer: review.reviewer.anonymous ? "" : review.reviewer.name, rating: review.rating, comment: review.comment },
-      workspaceData.profile || {},
-      workspaceData.review?.settings || {},
+    const text = await metered(
+      auth,
+      "review_reply",
+      () =>
+        generateReviewReply(
+          { reviewer: review.reviewer.anonymous ? "" : review.reviewer.name, rating: review.rating, comment: review.comment },
+          workspaceData.profile || {},
+          workspaceData.review?.settings || {},
+        ),
+      request.headers.get("idempotency-key"),
     );
     return NextResponse.json({ text: text.slice(0, 4096) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {

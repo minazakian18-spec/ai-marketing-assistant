@@ -4,6 +4,7 @@ import { HttpError } from "./access";
 import { connectionToken, listReviews } from "./integrations";
 import { robotsAllows, safeFetchPage } from "./safe-fetch";
 import { researchSummary } from "./ai";
+import { metered } from "./ai-usage";
 import { emptyWorkspace } from "../storage";
 import type { Workspace } from "../types";
 import { analyze } from "../research/rules";
@@ -161,7 +162,7 @@ async function inboxStats(workspaceId: string, channels: string[]): Promise<Inbo
 }
 
 /* ---------- pipeline ---------- */
-export async function runResearch(workspaceId: string, id: string) {
+export async function runResearch(workspaceId: string, id: string, userId?: string) {
   try {
     await setStage(id, "collect");
     const data = await workspaceData(workspaceId);
@@ -226,7 +227,7 @@ export async function runResearch(workspaceId: string, id: string) {
     const findings = analyze(input);
     const period = researchPeriod();
     let report = buildReport(input, findings, period);
-    const ai = await researchSummary(report).catch(() => null);
+    const ai = process.env.ANTHROPIC_API_KEY && userId ? await metered({ workspaceId, user: { id: userId } }, "research", () => researchSummary(report)).catch(() => null) : null;
     if (ai) report = { ...report, summary: ai, summarySource: "ai" };
 
     const { error } = await db()

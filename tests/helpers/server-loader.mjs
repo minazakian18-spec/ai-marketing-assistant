@@ -78,6 +78,10 @@ export function memoryDb(tables) {
         predicates.push((row) => row[key] > value);
         return q;
       },
+      gte(key, value) {
+        predicates.push((row) => row[key] >= value);
+        return q;
+      },
       lt(key, value) {
         predicates.push((row) => row[key] < value);
         return q;
@@ -133,6 +137,8 @@ export function memoryDb(tables) {
       if (tables.failTable === table)
         return { data: null, error: { message: "simulated DB outage" } };
       const rows = (tables[table] ||= []);
+      // Mirrors 202610120001_private_beta_ai_usage.sql: existing workspaces are approved.
+      if (table === "workspaces") for (const row of rows) row.access_status ??= "approved";
       let selected = rows.filter((row) =>
         predicates.every((predicate) => predicate(row)),
       );

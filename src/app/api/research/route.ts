@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     await limited("research-start:" + auth.workspaceId, 5);
     const id = await startResearch(auth.workspaceId, auth.user.id);
     await audit(auth.workspaceId, auth.user.id, "research_started");
-    after(() => runResearch(auth.workspaceId, id));
+    after(() => runResearch(auth.workspaceId, id, auth.user.id));
     return NextResponse.json({ id }, { status: 202 });
   } catch (e) {
     return failure(e);

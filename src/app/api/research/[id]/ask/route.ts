@@ -3,6 +3,7 @@ import { z } from "zod";
 import { workspace, failure, limited, sameOrigin, HttpError } from "@/lib/server/access";
 import { getReport } from "@/lib/server/research";
 import { researchAnswer } from "@/lib/server/ai";
+import { metered } from "@/lib/server/ai-usage";
 import { answerFromReport } from "@/lib/research/report";
 
 type Context = { params: Promise<{ id: string }> };
@@ -18,7 +19,7 @@ export async function POST(request: Request, { params }: Context) {
     const { id } = await params;
     const { question } = input.parse(await request.json());
     const row = await getReport(auth.workspaceId, id);
-    const ai = await researchAnswer(row.report!, question).catch(() => null);
+    const ai = process.env.ANTHROPIC_API_KEY ? await metered(auth, "research", () => researchAnswer(row.report!, question)).catch(() => null) : null;
     return NextResponse.json({ answer: ai || answerFromReport(question, row.report!), source: ai ? "ai" : "report" });
   } catch (e) {
     if (e instanceof z.ZodError) return failure(new HttpError(400, "Stel een vraag van minimaal 3 tekens."));

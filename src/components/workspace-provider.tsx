@@ -12,12 +12,17 @@ import { stopDemo } from "@/lib/demo";
 import { emptyWorkspace, readWorkspace, writeWorkspace } from "@/lib/storage";
 import { syncContacts } from "@/lib/contact-data";
 import { Toast } from "@/components/toast";
+import { MaviAvatar } from "@/components/mavi";
 import { authRequest } from "@/lib/auth-client";
 import type { Workspace } from "@/lib/types";
+export type SaveState = "idle" | "saving" | "saved" | "error";
 const Context = createContext<{
   data: Workspace;
   ready: boolean;
   draftScope: string;
+  /** Server-confirmed save status ("saved" only after the server accepted it). */
+  saveState: SaveState;
+  savedAt: number;
   save: (data: Workspace, message?: string) => Promise<boolean>;
   signedOut: boolean;
   logout: () => void;
@@ -27,6 +32,8 @@ const Context = createContext<{
   data: emptyWorkspace,
   ready: false,
   draftScope: "",
+  saveState: "idle",
+  savedAt: 0,
   save: async () => false,
   signedOut: false,
   logout: () => {},
@@ -50,6 +57,10 @@ export function WorkspaceProvider({
     [error, setError] = useState(""),
     [toast, setToast] = useState("");
   const [draftScope, setDraftScope] = useState("");
+  const [access, setAccess] = useState<"" | "pending" | "suspended">("");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [savedAt, setSavedAt] = useState(0);
+  const [conflict, setConflict] = useState(false);
   const version = useRef(0),
     busy = useRef(false),
     role = useRef("MEMBER");
@@ -77,6 +88,10 @@ export function WorkspaceProvider({
     fetch("/api/workspace", { cache: "no-store" })
       .then(async (r) => {
         const result = await r.json();
+        if (!r.ok && result.access) {
+          if (active) setAccess(result.access);
+          return;
+        }
         if (!r.ok) throw new Error(result.error || "Laden mislukt.");
         if (active) {
           setData(result.data);
@@ -104,11 +119,14 @@ export function WorkspaceProvider({
     }
     busy.current = true;
     setError("");
+    setConflict(false);
+    setSaveState("saving");
     try {
       if (demo) {
         writeWorkspace(next);
         setData(next);
         setToast(message);
+        setSaveState("saved");
         return true;
       }
       const response = await fetch("/api/workspace", {
@@ -116,14 +134,19 @@ export function WorkspaceProvider({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: next, version: version.current }),
       });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
+      // Another device or tab saved first: never overwrite their work.
+      if (response.status === 409) setConflict(true);
       if (!response.ok) throw new Error(result.error || "Opslaan mislukt.");
       version.current = result.version;
       setData(next);
       setToast(message);
+      setSaveState("saved");
+      setSavedAt(Date.now());
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Opslaan mislukt.");
+      setSaveState("error");
       return false;
     } finally {
       busy.current = false;
@@ -135,6 +158,8 @@ export function WorkspaceProvider({
         data,
         ready,
         draftScope,
+        saveState,
+        savedAt,
         save,
         signedOut: false,
         logout: () => {
@@ -166,9 +191,27 @@ export function WorkspaceProvider({
       {error && (
         <div className="storage-error" role="alert">
           {error}
+          {conflict && (
+            <button type="button" onClick={() => window.location.reload()}>
+              Nieuwste versie laden
+            </button>
+          )}
         </div>
       )}
-      {ready ? (
+      {access ? (
+        <div className="ws-boot ws-access" role="status">
+          <MaviAvatar size={56} />
+          <strong>{access === "suspended" ? "Toegang gepauzeerd" : "Welkom bij de besloten beta"}</strong>
+          <p>
+            {access === "suspended"
+              ? "De toegang van deze werkruimte is gepauzeerd. Neem contact op met Mavix als je denkt dat dit niet klopt."
+              : "Je account is aangemaakt. Mavix is nog in besloten beta: zodra je toegang is goedgekeurd, kun je meteen aan de slag."}
+          </p>
+          <button type="button" className="button secondary" onClick={() => void authRequest("logout").catch(() => window.location.assign("/login"))}>
+            Uitloggen
+          </button>
+        </div>
+      ) : ready ? (
         children
       ) : (
         <div className="ws-boot" role="status" aria-live="polite">

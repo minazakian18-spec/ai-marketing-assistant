@@ -158,6 +158,7 @@ test("tone preview requires authorization and strips private fields before gener
       failure: (e) =>
         Response.json({ error: e.message }, { status: e.status || 503 }),
     },
+    "@/lib/server/ai-usage": { metered: async (_auth, feature, fn) => (assert.equal(feature, "brand_preview"), fn()) },
     "@/lib/server/ai": {
       generateTonePreview: async (p) => {
         received = p;

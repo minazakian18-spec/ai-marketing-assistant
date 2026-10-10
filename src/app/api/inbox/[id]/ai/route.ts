@@ -3,6 +3,7 @@ import { z } from "zod";
 import { workspace, failure, limited, sameOrigin, HttpError } from "@/lib/server/access";
 import { conversationForAi } from "@/lib/server/inbox";
 import { generateInboxReply, rewriteInboxReply, summarizeConversation } from "@/lib/server/ai";
+import { metered } from "@/lib/server/ai-usage";
 
 type Context = { params: Promise<{ id: string }> };
 const input = z.discriminatedUnion("action", [
@@ -26,12 +27,18 @@ export async function POST(request: Request, { params }: Context) {
     const { id } = await params;
     const body = input.parse(await request.json());
     const conversation = await conversationForAi(auth.workspaceId, id);
-    const text =
-      body.action === "reply"
-        ? await generateInboxReply(conversation, body.instruction)
-        : body.action === "rewrite"
-          ? await rewriteInboxReply(conversation, body.draft, body.style)
-          : await summarizeConversation(conversation);
+    const feature = body.action === "reply" ? "inbox_reply" : body.action === "rewrite" ? "inbox_rewrite" : "inbox_summary";
+    const text = await metered(
+      auth,
+      feature,
+      () =>
+        body.action === "reply"
+          ? generateInboxReply(conversation, body.instruction)
+          : body.action === "rewrite"
+            ? rewriteInboxReply(conversation, body.draft, body.style)
+            : summarizeConversation(conversation),
+      request.headers.get("idempotency-key"),
+    );
     return NextResponse.json({ text }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     if (e instanceof z.ZodError) return failure(new HttpError(400, "Ongeldige aanvraag."));
