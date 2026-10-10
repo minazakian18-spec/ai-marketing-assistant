@@ -14,6 +14,7 @@ import "../library.css";
 import "../contacts.css";
 import "../workspace.css";
 import "../polish.css";
+import "../design-system.css";
 // The logged-in workspace is private: never indexed.
 export const metadata: Metadata = {
   title: { default: "Werkruimte", template: "%s | Mavix" },

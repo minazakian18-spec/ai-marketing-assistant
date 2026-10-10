@@ -1,5 +1,49 @@
 "use client";
-import {useEffect,useState} from 'react';
-import {PageHeading} from '@/components/ui';
-type Invoice={number:string;date:number;amount:number;currency:string;status:string;url:string;pdf:string};
-export default function BillingPage(){const [data,setData]=useState<{subscription:{plan:string;status:string}|null;invoices:Invoice[];configured:boolean}|null>(null),[error,setError]=useState(''),[interval,setInterval]=useState('month');useEffect(()=>{fetch('/api/billing').then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);setData(d);}).catch(e=>setError(e.message));},[]);async function action(action:string,plan?:string){try{const r=await fetch('/api/billing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,plan,interval})});const d=await r.json();if(!r.ok)throw Error(d.error);window.location.assign(d.url);}catch(e){setError(e instanceof Error?e.message:'Probeer opnieuw.');}}return <><PageHeading eyebrow="ACCOUNT" title="Facturatie" description="Abonnement, bedrijfsgegevens en facturen via onze betaalprovider."/>{error&&<p role="alert">{error}</p>}{data&&<><p>{data.subscription?`${data.subscription.plan||'Abonnement'} · ${data.subscription.status}`:'Geen actief abonnement'}</p>{!data.configured?<p>Betalingen vereisen nog configuratie.</p>:<><select aria-label="Facturatieperiode" value={interval} onChange={e=>setInterval(e.target.value)}><option value="month">Maandelijks</option><option value="year">Jaarlijks</option></select>{['starter','growth','autopilot'].map(p=><button className="button primary" key={p} onClick={()=>void action('checkout',p)}>{p} kiezen</button>)}<button className="button secondary" onClick={()=>void action('portal')}>Abonnement en betaalgegevens beheren</button></>}<h2>Facturen</h2>{data.invoices.length?data.invoices.map(i=><article className="panel" key={i.number}><strong>{i.number}</strong><p>{new Date(i.date*1000).toLocaleDateString('nl-NL')} · {(i.amount/100).toLocaleString('nl-NL',{style:'currency',currency:i.currency})} · {i.status}</p>{i.url&&<a href={i.url} target="_blank" rel="noreferrer">Factuur bekijken</a>}</article>):<p>Er zijn nog geen facturen.</p>}</>}</>;}
+import Link from "next/link";
+import { BadgeCheck, Gauge, Receipt } from "lucide-react";
+import { PageHeading } from "@/components/ui";
+
+// Mavix is in a private beta: there are no paid plans, checkout or invoices
+// yet. This page says so plainly instead of showing a payment flow.
+export default function BillingPage() {
+  return (
+    <>
+      <PageHeading eyebrow="Werkruimte" title="Abonnement en facturatie" description="Mavix is in besloten beta. Je betaalt nu niets." />
+      <section className="panel account-panel">
+        <div className="section-heading">
+          <div>
+            <h2>
+              <BadgeCheck size={18} aria-hidden="true" /> Besloten beta
+            </h2>
+            <p>Je werkruimte is goedgekeurd voor de beta. Alle beschikbare functies zijn inbegrepen, zonder kosten.</p>
+          </div>
+        </div>
+        <div className="account-panel-body st-billing">
+          <div className="st-channel is-static">
+            <span>
+              <strong>Huidig plan</strong>
+              <small>Beta-toegang · geen betaalmethode nodig</small>
+            </span>
+          </div>
+          <Link href="/account/ai" className="st-channel">
+            <span>
+              <strong>
+                <Gauge size={14} aria-hidden="true" /> AI-tegoed
+              </strong>
+              <small>Bekijk je AI-gebruik en het maandtegoed van je werkruimte.</small>
+            </span>
+          </Link>
+          <div className="st-channel is-static">
+            <span>
+              <strong>
+                <Receipt size={14} aria-hidden="true" /> Facturen
+              </strong>
+              <small>Er zijn geen facturen: tijdens de beta wordt niets in rekening gebracht.</small>
+            </span>
+          </div>
+          <p className="field-note">Betaalde abonnementen komen pas na de beta. We laten het je ruim van tevoren weten; er wordt nooit automatisch iets afgeschreven.</p>
+        </div>
+      </section>
+    </>
+  );
+}

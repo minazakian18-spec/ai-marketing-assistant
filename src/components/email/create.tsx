@@ -1,57 +1,38 @@
 "use client";
-import { useState } from "react";
-import {
-  GenerationSkeleton,
-  previewMock,
-} from "@/components/generation-skeleton";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Mail,
-  Sparkles,
-  Newspaper,
-  Tag,
-  Reply,
-  HeartHandshake,
-  RefreshCw,
-  Type,
-  Lightbulb,
-  AlignLeft,
-  Monitor,
-  Smartphone,
-} from "lucide-react";
-import { generateEmailCampaign } from "@/lib/api-client";
-import {
-  emailKinds,
-  campaignError,
-  type EmailCampaign,
-  type EmailKind,
-} from "@/lib/email-model";
+import { Mail, Newspaper, Tag, Reply, HeartHandshake, RefreshCw, Wand2, Monitor, Smartphone, Save, Check, CalendarClock, Copy, Undo2, Eye, PenLine, ChevronDown } from "lucide-react";
+import { GenerationSkeleton, previewMock } from "@/components/generation-skeleton";
+import { Mavi } from "@/components/mavi";
+import { Menu } from "@/components/menu";
+import { SaveIndicator, type SaveStatus } from "@/components/save-indicator";
+import { useWorkspace } from "@/components/workspace-provider";
+import { generateEmailCampaign, editContentText, CONTENT_EDIT_LABELS, type ContentEditAction } from "@/lib/api-client";
+import { campaignError, type EmailCampaign, type EmailKind } from "@/lib/email-model";
 import { segments, recipients } from "@/lib/contact-data";
 import { emailLengths, type EmailLength } from "@/lib/ai/email-instruction";
 import { formalityOptions, type Formality } from "@/lib/brand-model";
 import type { Profile } from "@/lib/types";
-import { Toggle } from "@/components/instagram/shared";
-import { EmailStatus, EmailPerformance } from "./shared";
+import { EmailStatus } from "./shared";
 import { PlanningNotice } from "@/components/calendar/planning-notice";
-const quickIcons = [
-  Mail,
-  Newspaper,
-  Tag,
-  Reply,
-  HeartHandshake,
-  RefreshCw,
-  Type,
-  AlignLeft,
-  Lightbulb,
+
+// Content Studio for e-mail, same structure as Instagram: controls, editor,
+// realistic inbox/letter preview. AI output is always an editable draft;
+// nothing is sent from here. Edits autosave after a pause.
+
+const KINDS: { id: EmailKind; label: string; Icon: typeof Mail; starter: string }[] = [
+  { id: "Create Campaign", label: "Campagne", Icon: Mail, starter: "Een campagne voor ons bedrijf" },
+  { id: "Create Newsletter", label: "Nieuwsbrief", Icon: Newspaper, starter: "Een nieuwsbrief met ons laatste nieuws" },
+  { id: "Create Promotion", label: "Aanbieding", Icon: Tag, starter: "Een e-mail over onze bestaande aanbieding" },
+  { id: "Create Follow-up", label: "Follow-up", Icon: Reply, starter: "Een vriendelijk vervolg op een aankoop" },
+  { id: "Create Welcome Email", label: "Welkom", Icon: HeartHandshake, starter: "Een welkomstmail voor nieuwe klanten" },
+  { id: "Re-engagement Email", label: "Terugwinnen", Icon: RefreshCw, starter: "Een e-mail voor klanten die we een tijdje niet zagen" },
 ];
-const quickDescriptions = [
-  "Eén boodschap, één duidelijke actie",
-  "Houd je klanten op de hoogte",
-  "Geef een bestaande actie aandacht",
-  "Een relevant vervolg op contact",
-  "Een warm welkom voor nieuwe klanten",
-  "Maak opnieuw contact",
-];
+const kindLabel = (k: EmailKind) => KINDS.find((x) => x.id === k)?.label || "E-mail";
+const AUTOSAVE_MS = 1500;
+type Editable = Pick<EmailCampaign, "title" | "subject" | "preview" | "sender" | "audience" | "body" | "cta" | "ctaUrl" | "footer" | "hero" | "date">;
+const editable = (c: EmailCampaign): Editable => ({ title: c.title, subject: c.subject, preview: c.preview, sender: c.sender, audience: c.audience, body: c.body, cta: c.cta, ctaUrl: c.ctaUrl, footer: c.footer, hero: c.hero, date: c.date });
+
 export function EmailCreate({
   profile,
   initial,
@@ -71,40 +52,92 @@ export function EmailCreate({
   initialPreview?: boolean;
   onSave: (c: EmailCampaign) => Promise<boolean>;
 }) {
+  const { saveState } = useWorkspace();
   const [prompt, setPrompt] = useState(initial?.prompt || "");
-  const [kind, setKind] = useState<EmailKind>(
-    initial?.kind || "Create Campaign",
-  );
-  const [audience, setAudience] = useState(
-    initial?.audience || initialAudience || "Nieuwsbriefabonnees",
-  );
+  const [kind, setKind] = useState<EmailKind>(KINDS.some((k) => k.id === initial?.kind) ? initial!.kind : "Create Campaign");
+  const [audience, setAudience] = useState(initial?.audience || initialAudience || "Nieuwsbriefabonnees");
   const [product, setProduct] = useState("");
   const [offer, setOffer] = useState("");
   const [tone, setTone] = useState<Formality | "">("");
   const [length, setLength] = useState<EmailLength>("gemiddeld");
   const [cta, setCta] = useState("");
   const [website, setWebsite] = useState(false);
-  const [campaign, setCampaign] = useState<EmailCampaign | undefined>(initial);
-  const [editing, setEditing] = useState(!!initial && !initialPreview);
-  const [view, setView] = useState("desktop");
-  const [busy, setBusy] = useState(false);
+  // `saved` is the last server-confirmed version; `draft` is what the editor shows.
+  const [saved, setSaved] = useState<EmailCampaign | undefined>(initial);
+  const [draft, setDraft] = useState<Editable | undefined>(initial ? editable(initial) : undefined);
+  const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+  const [view, setView] = useState<"edit" | "preview">(initialPreview && initial ? "preview" : "edit");
+  const [more, setMore] = useState(false);
+  const [busy, setBusy] = useState<"" | "generate" | "edit">("");
+  const [status, setStatus] = useState<SaveStatus>(initial ? "saved" : "idle");
   const [message, setMessage] = useState("");
-  const [scheduling, setScheduling] = useState(false);
+  const [error, setError] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
+  const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+
   const products = profile.productList?.length
     ? profile.productList.filter((p) => p.active).map((p) => p.name)
     : (profile.products || "")
         .split("\n")
         .map((p) => p.trim())
         .filter(Boolean);
-  const patch = (part: Partial<EmailCampaign>) => {
-    if (campaign)
-      setCampaign({ ...campaign, ...part, status: "draft", reason: "" });
-    if (part.audience) setAudience(part.audience);
+  const offers = (profile.offers || "").split("\n").filter(Boolean);
+  const dirty = !!saved && !!draft && JSON.stringify(editable(saved)) !== JSON.stringify(draft);
+  const shownStatus: SaveStatus = dirty && status !== "saving" ? "dirty" : status;
+  const set = (part: Partial<Editable>) => draft && setDraft({ ...draft, ...part });
+
+  const persist = useCallback(
+    async (nextStatus?: EmailCampaign["status"]) => {
+      if (!saved || !draft) return false;
+      const next: EmailCampaign = {
+        ...saved,
+        ...draft,
+        status: nextStatus || (dirty ? "draft" : saved.status),
+        date: nextStatus === "approved" ? "" : draft.date,
+        reason: "",
+      };
+      const problem = nextStatus && nextStatus !== "draft" ? campaignError(next, nextStatus === "scheduled") : "";
+      if (problem) {
+        setError(problem);
+        return false;
+      }
+      setStatus("saving");
+      const ok = await onSave(next);
+      setStatus(ok ? "saved" : "error");
+      if (ok) {
+        setSaved(next);
+        setDraft(editable(next));
+      }
+      return ok;
+    },
+    [saved, draft, dirty, onSave],
+  );
+
+  useEffect(() => {
+    if (!dirty || busy) return;
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      if (saveState !== "saving") void persist();
+    }, AUTOSAVE_MS);
+    return () => window.clearTimeout(timer.current);
+  }, [dirty, busy, draft, persist, saveState]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  async function generate() {
     setMessage("");
-  };
-  async function generate(regenerate = false) {
-    if (!prompt.trim()) return;
-    setBusy(true);
+    setError("");
+    if (!prompt.trim()) {
+      setError("Beschrijf eerst waar de e-mail over gaat.");
+      return;
+    }
+    setBusy("generate");
     try {
       const next = await previewMock(
         generateEmailCampaign({
@@ -115,554 +148,415 @@ export function EmailCreate({
           product,
           offer,
           useWebsite: website,
-          variant: campaign ? campaign.variant + 1 : 0,
+          variant: saved ? saved.variant + 1 : 0,
           tone: tone || undefined,
           length,
           cta: cta.trim() || undefined,
         }),
       );
-      if (regenerate && campaign) next.id = campaign.id;
-      // Keep the planned send moment: from the calendar for a new concept,
-      // or the current one when regenerating.
-      const planned = regenerate ? campaign?.date || "" : initialDate || "";
-      const withDate = planned ? { ...next, date: planned } : next;
-      if (await onSave(withDate)) {
-        setCampaign(withDate);
-        setEditing(false);
-        // Coming from the calendar: show the prefilled send moment right away.
-        setScheduling(fromCalendar && !!withDate.date);
-        setMessage(
-          fromCalendar && withDate.date
-            ? "Concept gemaakt. Controleer de inhoud en bevestig het verzendmoment."
-            : "Concept gemaakt. Controleer de inhoud.",
-        );
+      // Regenerate keeps the same concept id (no duplicate drafts).
+      if (saved) {
+        next.id = saved.id;
+        next.createdAt = saved.createdAt;
+        if (draft) setHistory((h) => [...h.slice(-9), draft.body]);
       }
-    } catch {
-      setMessage("Genereren is niet gelukt. Probeer opnieuw.");
+      const planned = saved?.date || initialDate || "";
+      const withDate = planned ? { ...next, date: planned } : next;
+      setStatus("saving");
+      if (await onSave(withDate)) {
+        setSaved(withDate);
+        setDraft(editable(withDate));
+        setAlternatives([]);
+        setStatus("saved");
+        setMessage(fromCalendar && withDate.date ? "Concept gemaakt. Controleer de inhoud en bevestig het verzendmoment." : "Concept gemaakt en opgeslagen.");
+        setView("edit");
+      } else setStatus("error");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Genereren is niet gelukt. Probeer het opnieuw.");
     } finally {
-      setBusy(false);
+      setBusy("");
     }
   }
-  async function persist(status: EmailCampaign["status"]) {
-    if (!campaign) return;
-    const next = {
-      ...campaign,
-      status,
-      date:
-        status === "scheduled"
-          ? campaign.date
-          : status === "approved"
-            ? ""
-            : campaign.date,
-      reason: "",
-    };
-    const error =
-      status === "draft" ? "" : campaignError(next, status === "scheduled");
-    if (error) {
-      setMessage(error);
-      return;
-    }
-    if (await onSave(next)) {
-      setCampaign(next);
-      setEditing(false);
-      setScheduling(false);
-      setMessage(
-        status === "scheduled"
-          ? "Campagne lokaal ingepland en zichtbaar in de kalender. Er wordt niets verstuurd."
-          : status === "approved"
-            ? "Campagne goedgekeurd. Je kunt nu een verzendtijd kiezen."
-            : "Wijzigingen opgeslagen als concept.",
-      );
+
+  async function edit(action: ContentEditAction) {
+    if (!draft?.body.trim()) return;
+    setError("");
+    setMessage("");
+    setBusy("edit");
+    try {
+      const results = await editContentText(action, draft.body, "email");
+      if (action === "alternatives") setAlternatives(results);
+      else if (results[0]) {
+        setHistory((h) => [...h.slice(-9), draft.body]);
+        set({ body: results[0] });
+        setMessage("Mavix AI heeft je tekst aangepast. Controleer het resultaat.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Aanpassen is niet gelukt. Je tekst is niet gewijzigd.");
+    } finally {
+      setBusy("");
     }
   }
+  function undo() {
+    const last = history[history.length - 1];
+    if (last === undefined) return;
+    set({ body: last });
+    setHistory((h) => h.slice(0, -1));
+  }
+  async function copy() {
+    if (!draft) return;
+    try {
+      await navigator.clipboard.writeText(`Onderwerp: ${draft.subject}\n\n${draft.body}`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setError("Kopiëren is niet gelukt. Selecteer de tekst handmatig.");
+    }
+  }
+  async function finish(next: "approved" | "scheduled") {
+    setMessage("");
+    setError("");
+    if (await persist(next))
+      setMessage(next === "scheduled" ? "Ingepland en zichtbaar in de kalender. Mavix verstuurt nog geen e-mails; dit is je planning." : "Goedgekeurd. Kies een verzendmoment om in te plannen.");
+  }
+
+  const count = recipients(draft?.audience || audience).length;
+  const generating = busy === "generate";
+
   return (
     <>
-    {fromCalendar && <PlanningNotice action="Versturen" dateTime={campaign ? campaign.date : initialDate || ""} returnDate={returnDate} existing={!!initial} />}
-    <div className="ig-create-grid email-create-grid">
-      <div>
-        <form
-          className="panel ig-prompt-card"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void generate();
-          }}
-        >
-          <div className="ig-card-head">
-            <h2>
-              <Sparkles size={18} />
-              Wat wil je dat Mavix maakt?
-            </h2>
-            <span className="badge draft">Mock AI</span>
+      {fromCalendar && <PlanningNotice action="Versturen" dateTime={draft ? draft.date : initialDate || ""} returnDate={returnDate} existing={!!initial} />}
+      <div className="cs-studio">
+        <div className="cs-toolbar">
+          <div className="cs-toolbar-title">
+            <h2>{saved ? kindLabel(saved.kind) + "-concept" : "Nieuwe e-mail"}</h2>
+            {saved && <EmailStatus status={saved.status} />}
+            <SaveIndicator status={shownStatus} />
           </div>
-          <label>
-            <span className="sr-only">Je e-mailidee</span>
-            <textarea
-              required
-              maxLength={1500}
-              rows={5}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Bijvoorbeeld: Maak een nieuwsbrief over onze nieuwe collectie."
-            />
-          </label>
-          <div className="ig-two-fields">
-            <label>
-              Doelgroep kiezen
+          <div className="cs-view-switch" role="tablist" aria-label="Weergave">
+            <button type="button" role="tab" aria-selected={view === "edit"} onClick={() => setView("edit")}>
+              <PenLine size={14} aria-hidden="true" /> Bewerken
+            </button>
+            <button type="button" role="tab" aria-selected={view === "preview"} onClick={() => setView("preview")}>
+              <Eye size={14} aria-hidden="true" /> Voorbeeld
+            </button>
+          </div>
+          {saved && (
+            <div className="cs-toolbar-actions">
+              <button type="button" className="button secondary" onClick={copy}>
+                {copied ? <Check size={15} /> : <Copy size={15} />}
+                <span>{copied ? "Gekopieerd" : "Kopiëren"}</span>
+              </button>
+              <button type="button" className="button secondary" onClick={() => void persist()} disabled={status === "saving"}>
+                <Save size={15} />
+                <span>Opslaan</span>
+              </button>
+              <button type="button" className="button primary" onClick={() => void finish(draft?.date ? "scheduled" : "approved")} disabled={status === "saving"}>
+                {draft?.date ? <CalendarClock size={15} /> : <Check size={15} />}
+                <span>{draft?.date ? "Goedkeuren en inplannen" : "Goedkeuren"}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="cs-grid" data-view={view}>
+          <aside className="cs-controls" aria-label="Instellingen">
+            <fieldset className="cs-field">
+              <legend>Soort e-mail</legend>
+              <div className="cs-formats">
+                {KINDS.map(({ id, label, Icon, starter }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={kind === id}
+                    onClick={() => {
+                      setKind(id);
+                      if (!prompt.trim()) setPrompt(starter);
+                    }}
+                  >
+                    <Icon size={15} aria-hidden="true" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <label className="cs-field">
+              <span>Doelgroep</span>
               <select
-                aria-label="Doelgroep kiezen"
                 value={audience}
-                onChange={(e) => setAudience(e.target.value)}
+                onChange={(e) => {
+                  setAudience(e.target.value);
+                  set({ audience: e.target.value });
+                }}
               >
                 {segments.map((s) => (
                   <option key={s}>{s}</option>
                 ))}
               </select>
               <small>
-                {recipients(audience).length} ingeschreven voorbeeldcontacten
+                {count} ingeschreven {count === 1 ? "contact" : "contacten"} · uit <Link href="/contacten">Contacten</Link>
               </small>
             </label>
-            <label>
-              Product/dienst kiezen
-              <select
-                aria-label="Product/dienst kiezen"
-                value={product}
-                onChange={(e) => setProduct(e.target.value)}
-              >
-                <option value="">Geen product geselecteerd</option>
+            <label className="cs-field">
+              <span>Product of dienst</span>
+              <select value={product} onChange={(e) => setProduct(e.target.value)}>
+                <option value="">Geen specifiek product</option>
                 {products.map((p, i) => (
                   <option key={i}>{p}</option>
                 ))}
               </select>
             </label>
-          </div>
-          <label>
-            Bestaande aanbieding gebruiken
-            <select
-              aria-label="Bestaande aanbieding gebruiken"
-              value={offer}
-              onChange={(e) => setOffer(e.target.value)}
-            >
-              <option value="">Geen aanbieding geselecteerd</option>
-              {(profile.offers || "")
-                .split("\n")
-                .filter(Boolean)
-                .map((p, i) => (
-                  <option key={i}>{p}</option>
-                ))}
-            </select>
-          </label>
-          <div className="ig-two-fields">
-            <label>
-              Gewenste toon (optioneel)
-              <select
-                value={tone}
-                onChange={(e) => setTone(e.target.value as Formality | "")}
-              >
-                <option value="">Standaard merkstem gebruiken</option>
-                {formalityOptions.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Gewenste lengte
-              <select
-                value={length}
-                onChange={(e) => setLength(e.target.value as EmailLength)}
-              >
-                {emailLengths.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label>
-            Call-to-action (optioneel)
-            <input
-              value={cta}
-              maxLength={120}
-              placeholder="Bijvoorbeeld: Bekijk de collectie"
-              onChange={(e) => setCta(e.target.value)}
-            />
-          </label>
-          <Toggle
-            label="Website-informatie gebruiken"
-            description="Gebruikt je opgeslagen bedrijfsomschrijving; haalt geen website op."
-            disabled={!profile.website}
-            checked={website}
-            onChange={setWebsite}
-          />
-          <p className="field-note">
-            Producten en aanbiedingen komen uit{" "}
-            <Link href="/brand-hub">Brand Hub</Link>. Doelgroepen komen uit
-            de gegevens van <Link href="/contacten">Contacten</Link>.
-          </p>
-          <button
-            className="button primary full"
-            aria-busy={busy}
-            disabled={busy || !prompt.trim()}
-          >
-            <Sparkles size={16} />
-            {busy ? "Concept maken…" : "Genereren"}
-          </button>
-        </form>
-        <div className="ig-section-title">
-          <h2>Quick Create</h2>
-          <span>Kies je e-mailtype</span>
-        </div>
-        <div className="ig-quick-grid">
-          {emailKinds.slice(0, 6).map((k, i) => {
-            const Icon = quickIcons[i];
-            return (
-              <button
-                key={k}
-                aria-pressed={kind === k}
-                onClick={() => {
-                  setKind(k);
-                  if (!prompt)
-                    setPrompt(
-                      [
-                        "Maak een campagne voor ons bedrijf",
-                        "Maak een nieuwsbrief met ons laatste nieuws",
-                        "Maak een e-mail over onze bestaande aanbieding",
-                        "Maak een vriendelijk vervolg op een aankoop",
-                        "Maak een welkomstmail voor nieuwe klanten",
-                        "Maak een e-mail voor klanten die we een tijdje niet zagen",
-                      ][i],
-                    );
-                }}
-              >
-                <Icon size={21} />
-                <strong>{k}</strong>
-                <small>{quickDescriptions[i]}</small>
-              </button>
-            );
-          })}
-        </div>
-        <div className="email-mini-tools">
-          {emailKinds.slice(6).map((k, i) => {
-            const Icon = quickIcons[i + 6];
-            return (
-              <button
-                key={k}
-                aria-pressed={kind === k}
-                onClick={() => {
-                  setKind(k);
-                  if (!prompt) setPrompt("Een nieuwe update voor onze klanten");
-                }}
-              >
-                <Icon size={16} />
-                {k}
-              </button>
-            );
-          })}
-        </div>
-        {emailKinds.indexOf(kind) >= 6 && (
-          <section className="panel email-tool">
-            <h3>{kind}</h3>
-            <p className="field-note">
-              Kies een onderwerp in het invoerveld en klik Genereren. Je kunt
-              het resultaat verder bewerken.
-            </p>
-            {campaign &&
-              (kind === "Subject Lines" ? (
-                <ul>
-                  {[
-                    "Ontdek: ",
-                    "Nieuw voor jou: ",
-                    "Even bijpraten over: ",
-                  ].map((t) => (
-                    <li key={t}>
-                      <button
-                        onClick={() => {
-                          patch({ subject: t + prompt.slice(0, 80) });
-                          setEditing(true);
-                        }}
-                      >
-                        {t + prompt.slice(0, 80)}
-                      </button>
-                    </li>
+            {offers.length > 0 && (
+              <label className="cs-field">
+                <span>Aanbieding</span>
+                <select value={offer} onChange={(e) => setOffer(e.target.value)}>
+                  <option value="">Geen aanbieding</option>
+                  {offers.map((p, i) => (
+                    <option key={i}>{p}</option>
                   ))}
-                </ul>
-              ) : kind === "Preview Text" ? (
-                <p>{campaign.preview}</p>
-              ) : (
-                <ul>
-                  {[
-                    "Een product uit je Brand Hub uitlichten",
-                    "Een korte update vanuit je bedrijf",
-                    "Een praktische tip voor je doelgroep",
-                  ].map((t) => (
-                    <li key={t}>
-                      <button
-                        onClick={() => {
-                          setPrompt(t);
-                          setKind("Create Campaign");
-                        }}
-                      >
-                        {t}
-                      </button>
-                    </li>
+                </select>
+              </label>
+            )}
+            <div className="cs-field-row">
+              <label className="cs-field">
+                <span>Toon</span>
+                <select value={tone} onChange={(e) => setTone(e.target.value as Formality | "")}>
+                  <option value="">Merkstem</option>
+                  {formalityOptions.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
                   ))}
-                </ul>
-              ))}
-          </section>
-        )}
-        <EmailPerformance />
-      </div>
-      <section className="panel email-preview-panel">
-        <div className="ig-card-head">
-          <h2>E-mail preview</h2>
-          <div
-            className="email-device"
-            role="group"
-            aria-label="Previewformaat"
-          >
-            <button
-              aria-label="Desktop preview"
-              aria-pressed={view === "desktop"}
-              onClick={() => setView("desktop")}
-            >
-              <Monitor size={17} />
-            </button>
-            <button
-              aria-label="Mobiele preview"
-              aria-pressed={view === "mobile"}
-              onClick={() => setView("mobile")}
-            >
-              <Smartphone size={17} />
-            </button>
-          </div>
-        </div>
-        {busy ? (
-          <GenerationSkeleton email />
-        ) : campaign ? (
-          <>
-            <div className="email-preview-meta">
-              <EmailStatus status={campaign.status} />
-              <span>
-                {campaign.kind.replace("Create ", "")} ·{" "}
-                {recipients(campaign.audience).length} ontvangers (mock)
-              </span>
+                </select>
+              </label>
+              <label className="cs-field">
+                <span>Lengte</span>
+                <select value={length} onChange={(e) => setLength(e.target.value as EmailLength)}>
+                  {emailLengths.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
-            {editing ? (
-              <div className="email-editor">
-                <div className="ig-two-fields">
-                  {(
-                    [
-                      ["title", "Campagnetitel"],
-                      ["subject", "Onderwerpregel"],
-                      ["preview", "Preview text"],
-                      ["sender", "Afzendernaam"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <label key={key}>
-                      {label}
-                      <input
-                        aria-label={label}
-                        maxLength={200}
-                        value={campaign[key]}
-                        onChange={(e) => patch({ [key]: e.target.value })}
-                      />
-                    </label>
-                  ))}
-                </div>
-                <label>
-                  Doelgroep
-                  <select
-                    aria-label="Doelgroep"
-                    value={campaign.audience}
-                    onChange={(e) => patch({ audience: e.target.value })}
-                  >
-                    {segments.map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  E-mail body
-                  <textarea
-                    aria-label="E-mail body"
-                    rows={12}
-                    maxLength={10000}
-                    value={campaign.body}
-                    onChange={(e) => patch({ body: e.target.value })}
-                  />
-                </label>
-                <div className="ig-two-fields">
-                  <label>
-                    CTA tekst
-                    <input
-                      value={campaign.cta}
-                      onChange={(e) => patch({ cta: e.target.value })}
-                    />
-                  </label>
-                  <label>
-                    CTA URL
-                    <input
-                      type="url"
-                      value={campaign.ctaUrl}
-                      onChange={(e) => patch({ ctaUrl: e.target.value })}
-                    />
-                  </label>
-                </div>
-                <label>
-                  Footer
-                  <input
-                    value={campaign.footer}
-                    onChange={(e) => patch({ footer: e.target.value })}
-                  />
-                </label>
-                <Toggle
-                  label="Hero uit Brand Hub tonen"
-                  disabled={!profile.media?.length}
-                  checked={!!campaign.hero}
-                  onChange={(v) =>
-                    patch({ hero: v ? profile.media?.[0] || "" : "" })
+            <label className="cs-field">
+              <span>Call-to-action</span>
+              <input value={cta} maxLength={120} placeholder={profile.strategy?.ctas?.[0] || "Bijv. Bekijk het menu"} onChange={(e) => setCta(e.target.value)} />
+            </label>
+            <label className="cs-switch">
+              <input type="checkbox" checked={website} disabled={!profile.description} onChange={(e) => setWebsite(e.target.checked)} />
+              <span>
+                <strong>Bedrijfsomschrijving gebruiken</strong>
+                <small>Uit je Brand Hub; er wordt geen website opgehaald.</small>
+              </span>
+            </label>
+          </aside>
+
+          <section className="cs-editor" aria-label="Editor">
+            <form
+              className="cs-brief"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void generate();
+              }}
+            >
+              <label htmlFor="em-prompt">Waar gaat de e-mail over?</label>
+              <textarea
+                id="em-prompt"
+                rows={saved ? 2 : 4}
+                maxLength={1500}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    void generate();
                   }
-                />
-                <button
-                  className="button primary"
-                  onClick={() => persist("draft")}
-                >
-                  Wijzigingen opslaan
+                }}
+                placeholder="Bijvoorbeeld: onze nieuwe zomerpizza's, met de bestaande actie 2 halen 1 betalen."
+              />
+              <div className="cs-brief-bar">
+                <small>Mavix AI gebruikt je Brand Hub en verzint geen prijzen of acties.</small>
+                <button className="button primary" aria-busy={generating} disabled={!!busy || !prompt.trim()}>
+                  {generating ? <Mavi size={16} state="thinking" tone="brand" live /> : saved ? <RefreshCw size={15} /> : <Wand2 size={15} />}
+                  {generating ? "Bezig…" : saved ? "Opnieuw genereren" : "Genereren"}
                 </button>
+              </div>
+            </form>
+
+            {generating && !saved ? (
+              <div className="cs-result">
+                <GenerationSkeleton email />
+              </div>
+            ) : saved && draft ? (
+              <div className={"cs-result" + (generating ? " is-busy" : "")} aria-busy={generating}>
+                <label className="cs-label" htmlFor="em-subject">
+                  Onderwerpregel <small>{draft.subject.length} / 80</small>
+                </label>
+                <input id="em-subject" className="cs-input" maxLength={200} value={draft.subject} onChange={(e) => set({ subject: e.target.value })} />
+                <label className="cs-label" htmlFor="em-preview">
+                  Voorbeeldtekst <small>Zichtbaar naast het onderwerp in de inbox</small>
+                </label>
+                <input id="em-preview" className="cs-input" maxLength={200} value={draft.preview} onChange={(e) => set({ preview: e.target.value })} />
+                <div className="cs-ai-bar" role="toolbar" aria-label="Tekst aanpassen met Mavix AI">
+                  {CONTENT_EDIT_LABELS.slice(0, 3).map(([action, label]) => (
+                    <button key={action} type="button" className="cs-chip" disabled={!!busy || !draft.body.trim()} onClick={() => void edit(action)}>
+                      {label}
+                    </button>
+                  ))}
+                  <Menu
+                    label="Meer AI-acties"
+                    align="start"
+                    trigger={
+                      <span className="cs-chip cs-chip-more">
+                        <Wand2 size={13} aria-hidden="true" /> Meer
+                      </span>
+                    }
+                    items={CONTENT_EDIT_LABELS.slice(3).map(([action, label]) => ({ label, disabled: !!busy || !draft.body.trim(), onSelect: () => void edit(action) }))}
+                  />
+                  {busy === "edit" && (
+                    <span className="cs-ai-busy" role="status">
+                      <Mavi size={14} state="thinking" tone="brand" live /> Mavix AI past je tekst aan…
+                    </span>
+                  )}
+                  {history.length > 0 && busy !== "edit" && (
+                    <button type="button" className="cs-undo" onClick={undo}>
+                      <Undo2 size={13} aria-hidden="true" /> Ongedaan maken
+                    </button>
+                  )}
+                </div>
+                <label className="cs-label" htmlFor="em-body">
+                  Inhoud
+                </label>
+                <textarea id="em-body" className="cs-caption" rows={14} maxLength={10000} value={draft.body} onChange={(e) => set({ body: e.target.value })} />
+                {alternatives.length > 0 && (
+                  <div className="cs-alternatives">
+                    <p>Kies een alternatief om de inhoud te vervangen:</p>
+                    {alternatives.map((alt, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setHistory((h) => [...h.slice(-9), draft.body]);
+                          set({ body: alt });
+                          setAlternatives([]);
+                        }}
+                      >
+                        {alt}
+                      </button>
+                    ))}
+                    <button type="button" className="cs-undo" onClick={() => setAlternatives([])}>
+                      Sluiten
+                    </button>
+                  </div>
+                )}
+                <div className="cs-field-row">
+                  <div className="cs-field">
+                    <label className="cs-label" htmlFor="em-cta">
+                      Knoptekst
+                    </label>
+                    <input id="em-cta" className="cs-input" maxLength={60} value={draft.cta} onChange={(e) => set({ cta: e.target.value })} />
+                  </div>
+                  <div className="cs-field">
+                    <label className="cs-label" htmlFor="em-url">
+                      Knoplink
+                    </label>
+                    <input id="em-url" className="cs-input" type="url" placeholder="https://" value={draft.ctaUrl} onChange={(e) => set({ ctaUrl: e.target.value })} />
+                  </div>
+                </div>
+                <label className="cs-label" htmlFor="em-date">
+                  {fromCalendar ? "Verzendmoment" : "Inplannen (optioneel)"}
+                </label>
+                <input id="em-date" type="datetime-local" value={draft.date} onChange={(e) => set({ date: e.target.value })} />
+                <button type="button" className="cs-more" aria-expanded={more} onClick={() => setMore(!more)}>
+                  <ChevronDown size={14} aria-hidden="true" /> Afzender, titel en footer
+                </button>
+                {more && (
+                  <div className="cs-more-fields">
+                    <div className="cs-field-row">
+                      <div className="cs-field">
+                        <label className="cs-label" htmlFor="em-sender">
+                          Afzendernaam
+                        </label>
+                        <input id="em-sender" className="cs-input" maxLength={120} value={draft.sender} onChange={(e) => set({ sender: e.target.value })} />
+                      </div>
+                      <div className="cs-field">
+                        <label className="cs-label" htmlFor="em-title">
+                          Interne titel
+                        </label>
+                        <input id="em-title" className="cs-input" maxLength={120} value={draft.title} onChange={(e) => set({ title: e.target.value })} />
+                      </div>
+                    </div>
+                    <label className="cs-label" htmlFor="em-footer">
+                      Footer
+                    </label>
+                    <input id="em-footer" className="cs-input" maxLength={300} value={draft.footer} onChange={(e) => set({ footer: e.target.value })} />
+                    <label className="cs-switch">
+                      <input type="checkbox" checked={!!draft.hero} disabled={!profile.media?.length} onChange={(e) => set({ hero: e.target.checked ? profile.media?.[0] || "" : "" })} />
+                      <span>
+                        <strong>Headerafbeelding uit Brand Hub</strong>
+                        <small>{profile.media?.length ? "Je eerste merkbeeld bovenaan de e-mail." : "Voeg eerst beelden toe in Brand Hub."}</small>
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
             ) : (
-              <div
-                className={
-                  "email-preview-surface result-enter " +
-                  (view === "mobile" ? "mobile" : "")
-                }
-              >
-                <div className="email-envelope">
-                  <strong>{campaign.subject}</strong>
-                  <p>{campaign.preview}</p>
-                  <small>
-                    Van: {campaign.sender} · Aan: {campaign.audience}
-                  </small>
-                </div>
-                <article className="email-letter">
-                  {profile.logo ? (
-                    <img
-                      className="email-logo"
-                      src={profile.logo}
-                      alt={profile.name || "Bedrijfslogo"}
-                    />
-                  ) : (
-                    <div className="email-sender">{campaign.sender}</div>
-                  )}
-                  {campaign.hero && (
-                    <img
-                      className="email-hero"
-                      src={campaign.hero}
-                      alt="Hero uit Brand Hub"
-                    />
-                  )}
-                  <div className="email-body">{campaign.body}</div>
-                  <button
-                    className="button primary"
-                    onClick={() =>
-                      setMessage(
-                        campaign.ctaUrl
-                          ? "CTA-voorbeeld verwijst naar " + campaign.ctaUrl
-                          : "Voeg in de editor een CTA URL toe.",
-                      )
-                    }
-                  >
-                    {campaign.cta}
-                  </button>
-                  <footer>
-                    {campaign.footer}
-                    <br />
-                    <button
-                      onClick={() =>
-                        setMessage(
-                          "Afmeldlink is een placeholder; er wordt geen contact gewijzigd.",
-                        )
-                      }
-                    >
-                      Afmelden
-                    </button>{" "}
-                    · E-mailvoorkeuren
-                    <br />
-                    <small>Voorbeeldmail · er wordt niets verzonden</small>
-                  </footer>
-                </article>
+              <div className="cs-empty">
+                <Mavi size={44} tone="brand" live />
+                <h3>Begin met een korte opdracht</h3>
+                <p>Kies links het soort e-mail en de doelgroep, beschrijf de boodschap en klik op Genereren. Je krijgt een bewerkbaar concept dat automatisch wordt opgeslagen.</p>
               </div>
             )}
-            <div className="email-editor-actions">
-              <button
-                className="button secondary"
-                onClick={() => setEditing(!editing)}
-              >
-                {editing ? "Preview bekijken" : "Bewerken"}
-              </button>
-              <button
-                className="button secondary"
-                disabled={busy}
-                onClick={() => void generate(true)}
-              >
-                Opnieuw maken
-              </button>
-              <button
-                className="button primary"
-                onClick={() => persist("approved")}
-              >
-                Goedkeuren
-              </button>
-              <button
-                className="button secondary"
-                onClick={() => {
-                  setScheduling(!scheduling);
-                  setMessage(
-                    "Inplannen bevestigt ook je goedkeuring van deze inhoud.",
-                  );
-                }}
-              >
-                Inplannen
-              </button>
-            </div>
-            {scheduling && (
-              <div className="email-plan">
-                <label>
-                  Verzenddatum en tijd
-                  <input
-                    aria-label="Verzenddatum en tijd"
-                    type="datetime-local"
-                    value={campaign.date}
-                    onChange={(e) => patch({ date: e.target.value })}
-                  />
-                </label>
-                <button
-                  className="button primary"
-                  onClick={() => persist("scheduled")}
-                >
-                  Bevestigen en inplannen
+            {(message || error) && (
+              <p role={error ? "alert" : "status"} className={error ? "cs-error" : "cs-message"}>
+                {error || message}
+              </p>
+            )}
+          </section>
+
+          <aside className="cs-preview" aria-label="Voorbeeld">
+            <div className="cs-preview-head">
+              <p className="cs-preview-label">Voorbeeld in de inbox</p>
+              <div className="cs-device" role="group" aria-label="Formaat voorbeeld">
+                <button type="button" aria-label="Desktop" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")}>
+                  <Monitor size={14} />
+                </button>
+                <button type="button" aria-label="Mobiel" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")}>
+                  <Smartphone size={14} />
                 </button>
               </div>
-            )}
-          </>
-        ) : (
-          <div className="ig-empty email-preview-empty">
-            <Mail size={36} />
-            <h2>Van idee naar inbox</h2>
-            <p>
-              Maak links een concept. Hier zie je het onderwerp, de inhoud en de
-              mobiele weergave van je e-mail.
-            </p>
-            <span className="badge draft">Jouw merk, jouw boodschap</span>
-          </div>
-        )}
-        <p className="ig-feedback" role="status">
-          {message}
-        </p>
-      </section>
-    </div>
+            </div>
+            <div className={"em-mail" + (device === "mobile" ? " is-mobile" : "")}>
+              <div className="em-envelope">
+                <span className="em-from">{draft?.sender || profile.name || "Jouw bedrijf"}</span>
+                <strong>{draft?.subject || "Je onderwerpregel"}</strong>
+                <span className="em-snippet">{draft?.preview || "De voorbeeldtekst verschijnt hier."}</span>
+              </div>
+              <article className="em-letter">
+                {profile.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="em-logo" src={profile.logo} alt={profile.name || "Logo"} />
+                ) : (
+                  <div className="em-brand">{draft?.sender || profile.name || "Jouw bedrijf"}</div>
+                )}
+                {draft?.hero && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="em-hero" src={draft.hero} alt="" />
+                )}
+                <div className="em-body">{draft?.body || "De inhoud van je e-mail verschijnt hier zodra Mavix AI een concept heeft gemaakt."}</div>
+                {draft?.cta && <span className="em-cta">{draft.cta}</span>}
+                <footer>
+                  {draft?.footer || profile.name}
+                  <br />
+                  Afmelden · E-mailvoorkeuren
+                </footer>
+              </article>
+            </div>
+          </aside>
+        </div>
+      </div>
     </>
   );
 }

@@ -207,7 +207,7 @@ export function WorkspaceProvider({
               ? "De toegang van deze werkruimte is gepauzeerd. Neem contact op met Mavix als je denkt dat dit niet klopt."
               : "Je account is aangemaakt. Mavix is nog in besloten beta: zodra je toegang is goedgekeurd, kun je meteen aan de slag."}
           </p>
-          <button type="button" className="button secondary" onClick={() => void authRequest("logout").catch(() => window.location.assign("/login"))}>
+          <button type="button" className="button secondary" onClick={() => void authRequest("logout").catch(() => window.location.reload())}>
             Uitloggen
           </button>
         </div>

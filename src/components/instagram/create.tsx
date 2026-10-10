@@ -1,54 +1,60 @@
 "use client";
-import { useState, useEffect } from "react";
-import {
-  GenerationSkeleton,
-  previewMock,
-} from "@/components/generation-skeleton";
+import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import {
   ImagePlus,
-  Layers,
-  Film,
   Image as ImageIcon,
   Type,
   Lightbulb,
-  Sparkles,
-  Package,
-  Globe,
   RefreshCw,
   Save,
   Check,
-  Clock,
+  Copy,
+  Undo2,
+  Wand2,
+  Eye,
+  PenLine,
+  Heart,
+  MessageCircle,
+  Send,
+  Bookmark,
+  X,
+  CalendarClock,
 } from "lucide-react";
-import { Toast } from "@/components/toast";
-import Link from "next/link";
+import { GenerationSkeleton, previewMock } from "@/components/generation-skeleton";
+import { Mavi } from "@/components/mavi";
+import { Menu } from "@/components/menu";
+import { SaveIndicator, type SaveStatus } from "@/components/save-indicator";
+import { useWorkspace } from "@/components/workspace-provider";
 import type { Post, Profile } from "@/lib/types";
 import type { ContentType } from "@/lib/instagram-model";
-import { generateInstagramContent } from "@/lib/api-client";
+import { generateInstagramContent, editContentText, CONTENT_EDIT_LABELS, type ContentEditAction } from "@/lib/api-client";
 import { readImages } from "@/lib/local-images";
 import { instagramGoals, type InstagramGoal } from "@/lib/ai/instagram-instruction";
 import { PostVisual } from "./shared";
 import { PlanningNotice } from "@/components/calendar/planning-notice";
-const quick = [
-  ["Post", "Create Post", ImageIcon],
-  ["Carousel", "Create Carousel", Layers],
-  ["Story", "Create Story", ImagePlus],
-  ["Image", "Create Image", ImageIcon],
-  ["Reel", "Create Reel", Film],
-  ["Animate Image", "Animate Image", Sparkles],
-  ["Photos to Reel", "Photos to Reel", Layers],
-] as const;
-const contentTypes = quick.map(([id]) => id) as ContentType[];
-// Only formats Mavix can really produce today are selectable. The others are
-// shown as upcoming so customers see what is coming, without pretending.
-const VIDEO = ["Reel", "Animate Image", "Photos to Reel"];
+
+// Content Studio for Instagram: controls (left), the editor (centre, the main
+// workspace) and a realistic post preview (right). Generation, rewrites and
+// alternatives run on the server; every result lands in the editor as an
+// editable draft with undo. Edits autosave to the workspace after a pause.
+
+const FORMATS: { id: ContentType; label: string; hint: string; Icon: typeof ImageIcon }[] = [
+  { id: "Post", label: "Post", hint: "Caption, hashtags en je foto", Icon: ImageIcon },
+  { id: "Image", label: "Afbeelding", hint: "Beeldpost met korte tekst", Icon: ImagePlus },
+  { id: "Captions & Hashtags", label: "Caption", hint: "Alleen tekst en hashtags", Icon: Type },
+  { id: "Content Ideas", label: "Ideeën", hint: "5 postideeën", Icon: Lightbulb },
+];
 const UPCOMING: Record<string, string> = {
-  Carousel: "Binnenkort — carrousels met meerdere slides zijn in ontwikkeling.",
-  Story: "Binnenkort — verticale stories zijn in ontwikkeling.",
-  Reel: "Binnenkort — AI-video is in ontwikkeling.",
-  "Animate Image": "Binnenkort — AI-video is in ontwikkeling.",
-  "Photos to Reel": "Binnenkort — AI-video is in ontwikkeling.",
+  Carousel: "Carrousels met meerdere slides zijn in ontwikkeling.",
+  Story: "Verticale stories zijn in ontwikkeling.",
+  Reel: "AI-video is in ontwikkeling.",
+  "Animate Image": "AI-video is in ontwikkeling.",
+  "Photos to Reel": "AI-video is in ontwikkeling.",
 };
-const isUpcoming = (t: string) => t in UPCOMING;
+const VIDEO = ["Reel", "Animate Image", "Photos to Reel"];
+const AUTOSAVE_MS = 1500;
+
 export function CreateStudio({
   profile,
   editPost,
@@ -68,73 +74,100 @@ export function CreateStudio({
   focusPreview?: boolean;
   onPersist: (post: Post) => Promise<boolean>;
 }) {
-  const [type, setType] = useState<ContentType>(
-    initialType && contentTypes.includes(initialType as ContentType) && !isUpcoming(initialType)
-      ? (initialType as ContentType)
-      : "Post",
-  );
-  const [notice, setNotice] = useState(
-    initialType && isUpcoming(initialType) ? UPCOMING[initialType] : "",
-  );
-  const [prompt, setPrompt] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
+  const { saveState } = useWorkspace();
+  const known = FORMATS.some((f) => f.id === initialType);
+  const [type, setType] = useState<ContentType>(editPost?.contentType || (known ? (initialType as ContentType) : "Post"));
+  const [notice, setNotice] = useState(initialType && UPCOMING[initialType] ? UPCOMING[initialType] : "");
+  const [prompt, setPrompt] = useState(editPost?.prompt || "");
+  const [photos, setPhotos] = useState<string[]>(editPost?.media || []);
   const [product, setProduct] = useState("");
   const [goal, setGoal] = useState<InstagramGoal>("merkbekendheid");
   const [segmentId, setSegmentId] = useState("");
   const [cta, setCta] = useState("");
   const [website, setWebsite] = useState(false);
-  const [videoMode, setVideoMode] = useState("Short AI Reel");
-  const [duration, setDuration] = useState<5 | 10>(5);
-  const [post, setPost] = useState<Post | null>(null);
-  const [caption, setCaption] = useState("");
-  const [hashtags, setHashtags] = useState("");
-  const [date, setDate] = useState(initialDate || "");
+  const [post, setPost] = useState<Post | null>(editPost || null);
+  const [caption, setCaption] = useState(editPost?.caption || "");
+  const [hashtags, setHashtags] = useState(editPost?.hashtags || "");
+  const [date, setDate] = useState(editPost?.date || initialDate || "");
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (editPost) {
-      setPost(editPost);
-      setPrompt(editPost.prompt);
-      setType(editPost.contentType || "Post");
-      setPhotos(editPost.media || []);
-      setCaption(editPost.caption);
-      setHashtags(editPost.hashtags);
-      setDate(editPost.date);
-      setDuration(editPost.duration === 10 ? 10 : 5);
-      setVideoMode(editPost.videoMode || "Short AI Reel");
-    }
-  }, [editPost]);
-  // "Bekijken" from the calendar: bring the preview into view.
-  useEffect(() => {
-    if (editPost && focusPreview) document.querySelector(".ig-preview")?.scrollIntoView({ block: "start" });
-  }, [editPost, focusPreview]);
-  const video = ["Reel", "Animate Image", "Photos to Reel"].includes(type);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState<"" | "generate" | "edit" | "upload">("");
+  const [status, setStatus] = useState<SaveStatus>(editPost ? "saved" : "idle");
+  const [history, setHistory] = useState<{ caption: string; hashtags: string }[]>([]);
+  const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [view, setView] = useState<"edit" | "preview">(focusPreview && editPost ? "preview" : "edit");
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+
   const products = profile.productList?.length
     ? profile.productList.filter((p) => p.active).map((p) => p.name)
     : (profile.products || "")
         .split("\n")
         .map((p) => p.trim())
         .filter(Boolean);
+  const dirty = !!post && (caption !== post.caption || hashtags !== post.hashtags || date !== (post.date || ""));
+
+  // Persist the current editor state. Status only turns "saved" after the
+  // server confirmed it (onPersist resolves true).
+  const persist = useCallback(
+    async (nextStatus?: Post["status"]) => {
+      if (!post) return false;
+      if (!caption.trim()) {
+        setError("Vul een caption in voordat je opslaat.");
+        return false;
+      }
+      if (date && new Date(date).getTime() <= Date.now() && nextStatus) {
+        setError("Kies een tijdstip in de toekomst of maak de datum leeg.");
+        return false;
+      }
+      const next: Post = { ...post, caption, hashtags, date, status: nextStatus || post.status, failureReason: undefined };
+      setStatus("saving");
+      const ok = await onPersist(next);
+      setStatus(ok ? "saved" : "error");
+      if (ok) setPost(next);
+      return ok;
+    },
+    [post, caption, hashtags, date, onPersist],
+  );
+
+  // Debounced autosave of edits (never while another save runs).
+  useEffect(() => {
+    if (!dirty || busy) return;
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      if (saveState !== "saving") void persist();
+    }, AUTOSAVE_MS);
+    return () => window.clearTimeout(timer.current);
+  }, [dirty, busy, caption, hashtags, date, persist, saveState]);
+  const shownStatus: SaveStatus = dirty && status !== "saving" ? "dirty" : status;
+  // Warn before leaving with unsaved edits.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  function remember() {
+    setHistory((h) => [...h.slice(-9), { caption, hashtags }]);
+  }
+  function undo() {
+    const last = history[history.length - 1];
+    if (!last) return;
+    setCaption(last.caption);
+    setHashtags(last.hashtags);
+    setHistory((h) => h.slice(0, -1));
+    setAlternatives([]);
+  }
+
   async function generate(again = false) {
     setMessage("");
+    setError("");
     if (!prompt.trim()) {
-      setMessage("Beschrijf eerst wat je wilt maken.");
+      setError("Beschrijf eerst in een paar woorden wat je wilt maken.");
       return;
     }
-    if (isUpcoming(type)) {
-      setMessage(UPCOMING[type]);
-      return;
-    }
-    const mode = type === "Reel" ? videoMode : type;
-    if (mode === "Animate Image" && !photos.length) {
-      setMessage("Voeg één foto toe om te animeren.");
-      return;
-    }
-    if (mode === "Photos to Reel" && photos.length < 2) {
-      setMessage("Voeg minimaal twee foto’s toe voor Photos to Reel.");
-      return;
-    }
-    setBusy(true);
+    setBusy("generate");
     try {
       const next = await previewMock(
         generateInstagramContent({
@@ -144,426 +177,390 @@ export function CreateStudio({
           product,
           useWebsite: website,
           photos,
-          duration,
-          videoMode: mode,
+          duration: 5,
+          videoMode: type,
           variant: again && post ? post.variant + 1 : 0,
           goal,
           segmentId: segmentId || undefined,
           cta: cta.trim() || undefined,
         }),
       );
-      if (again && post) next.id = post.id;
-      // Keep the chosen publishing moment (e.g. from the calendar) on the
-      // concept, so it shows up in the calendar as waiting for approval.
+      // Regenerating keeps the same concept (no duplicate drafts) and the
+      // previous text stays available through "Ongedaan maken".
+      if (post) {
+        next.id = post.id;
+        next.createdAt = post.createdAt;
+        remember();
+      }
       if (date) next.date = date;
+      setStatus("saving");
       if (await onPersist(next)) {
         setPost(next);
         setCaption(next.caption);
         setHashtags(next.hashtags);
         setDate(next.date || "");
-        setMessage(
-          "Mockconcept opgeslagen. Je vindt het in de goedkeuringswachtrij.",
-        );
-      }
-    } catch {
-      setMessage("Genereren is niet gelukt. Probeer het opnieuw.");
+        setAlternatives([]);
+        setStatus("saved");
+        setMessage(again ? "Nieuwe versie gemaakt en opgeslagen als concept." : "Concept gemaakt en opgeslagen.");
+        setView("edit");
+      } else setStatus("error");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Genereren is niet gelukt. Probeer het opnieuw.");
     } finally {
-      setBusy(false);
+      setBusy("");
     }
   }
-  async function persist(approve = false) {
-    if (!post) return;
-    if (!caption.trim()) {
-      setMessage("Vul een caption in.");
-      return;
-    }
-    if (date && new Date(date).getTime() <= Date.now()) {
-      setMessage("Kies een tijdstip in de toekomst of maak de datum leeg.");
-      return;
-    }
-    const next: Post = {
-      ...post,
-      caption,
-      hashtags,
-      date,
-      status: approve ? (date ? "scheduled" : "approved") : "draft",
-      failureReason: undefined,
-    };
-    if (await onPersist(next)) {
-      setPost(next);
-      setMessage(
-        approve
-          ? "Goedgekeurd. " +
-              (date
-                ? "Je content is lokaal ingepland en staat in de kalender."
-                : "Kies een datum in de kalender.")
-          : "Wijzigingen opgeslagen als concept.",
-      );
+
+  async function edit(action: ContentEditAction) {
+    if (!caption.trim()) return;
+    setError("");
+    setMessage("");
+    setBusy("edit");
+    try {
+      const results = await editContentText(action, caption, "instagram");
+      if (action === "alternatives") setAlternatives(results);
+      else if (results[0]) {
+        remember();
+        setCaption(results[0]);
+        setMessage("Mavix AI heeft je tekst aangepast. Controleer het resultaat.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Aanpassen is niet gelukt. Je tekst is niet gewijzigd.");
+    } finally {
+      setBusy("");
     }
   }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText([caption, hashtags].filter(Boolean).join("\n\n"));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setError("Kopiëren is niet gelukt. Selecteer de tekst handmatig.");
+    }
+  }
+
+  async function approve() {
+    setMessage("");
+    setError("");
+    if (await persist(date ? "scheduled" : "approved"))
+      setMessage(date ? "Goedgekeurd en ingepland in de kalender. Publiceren naar Instagram is nog niet gekoppeld." : "Goedgekeurd. Kies een datum om het in te plannen.");
+  }
+
+  const video = VIDEO.includes(post?.contentType || type);
+  const generating = busy === "generate";
+
   return (
     <>
-    {fromCalendar && <PlanningNotice action="Publiceren" dateTime={date} returnDate={returnDate} existing={!!editPost} />}
-    <div className="ig-create-grid">
-      <div>
-        <section className="panel ig-prompt-card">
-          <div className="ig-card-head">
-            <h2>Wat wil je dat Mavix maakt?</h2>
-            <span className="badge draft">Mock AI</span>
+      {fromCalendar && <PlanningNotice action="Publiceren" dateTime={date} returnDate={returnDate} existing={!!editPost} />}
+      <div className="cs-studio">
+        <div className="cs-toolbar">
+          <div className="cs-toolbar-title">
+            <h2>{post ? "Instagram-concept" : "Nieuwe Instagram-post"}</h2>
+            <SaveIndicator status={shownStatus} />
           </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void generate();
-            }}
-          >
-            <label className="sr-only" htmlFor="ig-prompt">
-              Wat wil je dat Mavix maakt?
-            </label>
-            <textarea
-              id="ig-prompt"
-              required
-              rows={4}
-              maxLength={2000}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Bijvoorbeeld: Maak een Instagram-post over ons nieuwe product."
-            />
-            <div className="ig-source-options">
-              <label className="ig-upload">
-                <ImagePlus size={16} />
-                Foto toevoegen
-                <input
-                  type="file"
-                  multiple
-                  accept="image/png,image/jpeg,image/webp"
-                  disabled={busy}
-                  onChange={async (e) => {
-                    const files = Array.from(e.target.files || []);
-                    e.target.value = "";
-                    if (!files.length) return;
-                    setBusy(true);
-                    try {
-                      setPhotos(await readImages(files));
-                      setMessage("Foto’s toegevoegd.");
-                    } catch (error) {
-                      setMessage(
-                        error instanceof Error
-                          ? error.message
-                          : "Foto uploaden mislukt.",
-                      );
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                />
-              </label>
-              <span>
-                <Package size={16} />
-                Product kiezen
-              </span>
-              <span>
-                <Globe size={16} />
-                Website-informatie
-              </span>
+          <div className="cs-view-switch" role="tablist" aria-label="Weergave">
+            <button type="button" role="tab" aria-selected={view === "edit"} onClick={() => setView("edit")}>
+              <PenLine size={14} aria-hidden="true" /> Bewerken
+            </button>
+            <button type="button" role="tab" aria-selected={view === "preview"} onClick={() => setView("preview")}>
+              <Eye size={14} aria-hidden="true" /> Voorbeeld
+            </button>
+          </div>
+          {post && (
+            <div className="cs-toolbar-actions">
+              <button type="button" className="button secondary" onClick={copy} disabled={!caption.trim()}>
+                {copied ? <Check size={15} /> : <Copy size={15} />}
+                <span>{copied ? "Gekopieerd" : "Kopiëren"}</span>
+              </button>
+              <button type="button" className="button secondary" onClick={() => void persist()} disabled={status === "saving"}>
+                <Save size={15} />
+                <span>Opslaan</span>
+              </button>
+              <button type="button" className="button primary" onClick={() => void approve()} disabled={status === "saving"}>
+                {date ? <CalendarClock size={15} /> : <Check size={15} />}
+                <span>{date ? "Goedkeuren en inplannen" : "Goedkeuren"}</span>
+              </button>
             </div>
-            {photos.length > 0 && (
-              <div className="ig-photo-strip">
-                {photos.map((photo, i) => (
-                  <div key={i}>
-                    <img src={photo} alt={"Foto " + (i + 1)} />
-                    <button
-                      type="button"
-                      aria-label={"Verwijder foto " + (i + 1)}
-                      onClick={() =>
-                        setPhotos(photos.filter((_, n) => n !== i))
-                      }
-                    >
-                      ×
-                    </button>
-                  </div>
+          )}
+        </div>
+
+        <div className="cs-grid" data-view={view}>
+          <aside className="cs-controls" aria-label="Instellingen">
+            <fieldset className="cs-field">
+              <legend>Formaat</legend>
+              <div className="cs-formats">
+                {FORMATS.map(({ id, label, hint, Icon }) => (
+                  <button key={id} type="button" aria-pressed={type === id} aria-describedby={"fmt-" + id.replace(/\W/g, "")} onClick={() => setType(id)}>
+                    <Icon size={15} aria-hidden="true" />
+                    {label}
+                    <span id={"fmt-" + id.replace(/\W/g, "")} className="sr-only">
+                      {hint}
+                    </span>
+                  </button>
                 ))}
               </div>
-            )}
-            <div className="ig-two-fields">
-              <label>
-                Product/dienst
-                <select
-                  value={product}
-                  onChange={(e) => setProduct(e.target.value)}
-                >
-                  <option value="">Geen product geselecteerd</option>
-                  {products.map((p, i) => (
-                    <option key={i}>{p}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="ig-website-choice">
-                <input
-                  type="checkbox"
-                  disabled={!profile.website}
-                  checked={website}
-                  onChange={(e) => setWebsite(e.target.checked)}
-                />
-                Website-informatie gebruiken
-              </label>
-            </div>
-            <div className="ig-two-fields">
-              <label>
-                Doel van deze post
-                <select
-                  value={goal}
-                  onChange={(e) => setGoal(e.target.value as InstagramGoal)}
-                >
-                  {instagramGoals.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Doelgroepsegment (optioneel)
-                <select
-                  value={segmentId}
-                  onChange={(e) => setSegmentId(e.target.value)}
-                >
-                  <option value="">Geen specifiek segment</option>
-                  {(profile.segments || []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label>
-              Call-to-action (optioneel)
-              <input
-                value={cta}
-                maxLength={120}
-                placeholder="Bijvoorbeeld: Shop nu via de link in bio"
-                onChange={(e) => setCta(e.target.value)}
-              />
+              <p className="cs-hint">Binnenkort: carrousel, story en reel.</p>
+            </fieldset>
+            <label className="cs-field">
+              <span>Doel</span>
+              <select value={goal} onChange={(e) => setGoal(e.target.value as InstagramGoal)}>
+                {instagramGoals.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
             </label>
-            <p className="field-note">
-              {products.length ? "" : "Voeg producten toe in Brand Hub. "}
-              Websitegebruik neemt alleen de opgeslagen bedrijfsomschrijving
-              mee; er wordt geen website opgehaald.
-            </p>
-            <div className="ig-generate-footer">
-              <span>
-                {type}
-                {video ? " · " + duration + " sec · 9:16" : ""}
-              </span>
-              <button
-                className="button primary"
-                aria-busy={busy}
-                disabled={busy || !prompt.trim()}
-              >
-                <Sparkles size={17} />
-                {busy ? "Bezig…" : "Genereren"}
-              </button>
-            </div>
-          </form>
-        </section>
-        <section className="ig-quick">
-          <div className="ig-section-title">
-            <h2>Quick Create</h2>
-            <span>Kies je formaat</span>
-          </div>
-          <div className="ig-quick-grid">
-            {quick.map(([key, label, Icon]) => {
-              const upcoming = isUpcoming(key);
-              return (
-                <button
-                  key={key}
-                  className={upcoming ? "is-upcoming" : ""}
-                  aria-pressed={!upcoming && type === key}
-                  aria-disabled={upcoming || undefined}
-                  title={upcoming ? "In ontwikkeling" : undefined}
-                  onClick={() => {
-                    if (upcoming) return setNotice(UPCOMING[key]);
-                    setType(key);
-                    setMessage("");
-                  }}
-                >
-                  <Icon size={21} />
-                  <strong>{label}</strong>
-                  <small>{upcoming ? (VIDEO.includes(key) ? "AI-video · in ontwikkeling" : "In ontwikkeling") : "Caption & beeldconcept"}</small>
-                  {upcoming && (
-                    <span className="ig-soon">
-                      <Clock size={11} aria-hidden="true" />
-                      Binnenkort
-                    </span>
+            {type !== "Content Ideas" && (
+              <>
+                <label className="cs-field">
+                  <span>Product of dienst</span>
+                  <select value={product} onChange={(e) => setProduct(e.target.value)}>
+                    <option value="">Geen specifiek product</option>
+                    {products.map((p, i) => (
+                      <option key={i}>{p}</option>
+                    ))}
+                  </select>
+                  {!products.length && (
+                    <small>
+                      Voeg producten toe in <Link href="/brand-hub">Brand Hub</Link>.
+                    </small>
                   )}
-                </button>
-              );
-            })}
-          </div>          <div className="ig-small-tools">
-            {(
-              [
-                ["Captions & Hashtags", Type],
-                ["Content Ideas", Lightbulb],
-              ] as const
-            ).map(([key, Icon]) => (
-              <button
-                key={key}
-                aria-pressed={type === key}
-                onClick={() => setType(key)}
-              >
-                <Icon size={17} />
-                {key}
-              </button>
-            ))}
-          </div>
-        </section>
-        {video && (
-          <section className="panel ig-video-options">
-            <h2>Korte video, sterk verhaal</h2>
-            <p>
-              Een realistisch storyboard voor een korte 5–10 seconden video.
-            </p>
-            <label>
-              Videorichting
-              <select
-                value={type === "Reel" ? videoMode : type}
-                onChange={(e) => {
-                  setType("Reel");
-                  setVideoMode(e.target.value);
-                }}
-              >
-                <option>Animate Image</option>
-                <option>Photos to Reel</option>
-                <option>Short AI Reel</option>
-              </select>
-            </label>
-            <label>
-              Lengte
-              <select
-                value={duration}
-                onChange={(e) => setDuration(Number(e.target.value) as 5 | 10)}
-              >
-                <option value={5}>5 seconden</option>
-                <option value={10}>10 seconden</option>
-              </select>
-            </label>
-            <div className="ig-video-features">
-              {[
-                "Logo",
-                "Tekst overlays",
-                "Captions",
-                "CTA",
-                "Muziek",
-                "Verticaal 9:16",
-              ].map((f) => (
-                <span key={f}>{f} · later</span>
-              ))}
-            </div>
-            <p className="field-note">
-              Nu: storyboard en fotopreview. Geen videobestand of muziek. Later
-              kunnen meerdere foto’s/video’s worden gecombineerd.
-            </p>
-          </section>
-        )}
-      </div>
-      <aside className="ig-preview">
-        <div className="ig-section-title">
-          <h2>Content preview</h2>
-          <span>{post ? "Lokaal concept" : "Jouw volgende idee"}</span>
-        </div>
-        {busy ? (
-          <section className="panel">
-            <GenerationSkeleton />
-          </section>
-        ) : post ? (
-          <section
-            className="panel ig-preview-card result-enter"
-            key={post.id + post.variant}
-          >
-            <PostVisual post={post} />
-            <div className="ig-preview-body">
-              <span className="badge draft">
-                {post.contentType || "Post"} · voorbeeld
+                </label>
+                {(profile.segments || []).length > 0 && (
+                  <label className="cs-field">
+                    <span>Doelgroep</span>
+                    <select value={segmentId} onChange={(e) => setSegmentId(e.target.value)}>
+                      <option value="">Algemene doelgroep</option>
+                      {(profile.segments || []).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <label className="cs-field">
+                  <span>Call-to-action</span>
+                  <input value={cta} maxLength={120} placeholder={profile.strategy?.ctas?.[0] || "Bijv. Bestel via de link in bio"} onChange={(e) => setCta(e.target.value)} />
+                </label>
+              </>
+            )}
+            <label className="cs-switch">
+              <input type="checkbox" checked={website} disabled={!profile.description} onChange={(e) => setWebsite(e.target.checked)} />
+              <span>
+                <strong>Bedrijfsomschrijving gebruiken</strong>
+                <small>Uit je Brand Hub; er wordt geen website opgehaald.</small>
               </span>
-              {["Reel", "Animate Image", "Photos to Reel"].includes(
-                post.contentType || "",
-              ) && (
-                <div className="ig-storyboard">
-                  <strong>Storyboard · {post.duration || 5} sec · 9:16</strong>
-                  <ol>
-                    <li>Intro met jouw beeld</li>
-                    <li>Korte tekstoverlay</li>
-                    <li>Afsluiting met CTA</li>
-                  </ol>
-                  <small>Geen echte video gegenereerd.</small>
-                </div>
-              )}
-              <label>
-                Caption
-                <textarea
-                  aria-label="Caption"
-                  rows={6}
-                  maxLength={4000}
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                />
-              </label>
-              <label>
-                Hashtags
-                <textarea
-                  aria-label="Hashtags"
-                  rows={2}
-                  maxLength={1000}
-                  value={hashtags}
-                  onChange={(e) => setHashtags(e.target.value)}
-                />
-              </label>
-              <label>
-                {fromCalendar ? "Publiceren (datum en tijd)" : "Geplande datum/tijd (optioneel)"}
-                <input
-                  type="datetime-local"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
-              </label>
-              <div className="ig-preview-actions">
-                <button className="button secondary" onClick={() => persist()}>
-                  <Save size={15} />
-                  Opslaan
-                </button>
-                <button
-                  className="button secondary"
-                  disabled={busy}
-                  onClick={() => void generate(true)}
-                >
-                  <RefreshCw size={15} />
-                  Opnieuw
-                </button>
-                <button
-                  className="button primary"
-                  onClick={() => persist(true)}
-                >
-                  <Check size={15} />
-                  Goedkeuren
+            </label>
+            {type !== "Captions & Hashtags" && type !== "Content Ideas" && (
+              <div className="cs-field">
+                <span>Foto&apos;s</span>
+                <label className={"cs-upload" + (busy === "upload" ? " is-busy" : "")}>
+                  <ImagePlus size={16} aria-hidden="true" />
+                  {photos.length ? "Andere foto's kiezen" : "Foto toevoegen"}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/png,image/jpeg,image/webp"
+                    disabled={!!busy}
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files || []);
+                      e.target.value = "";
+                      if (!files.length) return;
+                      setBusy("upload");
+                      setError("");
+                      try {
+                        setPhotos(await readImages(files));
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Foto toevoegen is niet gelukt.");
+                      } finally {
+                        setBusy("");
+                      }
+                    }}
+                  />
+                </label>
+                {photos.length > 0 && (
+                  <div className="cs-photos">
+                    {photos.map((photo, i) => (
+                      <div key={i}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photo} alt={"Foto " + (i + 1)} />
+                        <button type="button" aria-label={"Verwijder foto " + (i + 1)} onClick={() => setPhotos(photos.filter((_, n) => n !== i))}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </aside>
+
+          <section className="cs-editor" aria-label="Editor">
+            <form
+              className="cs-brief"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void generate(!!post);
+              }}
+            >
+              <label htmlFor="ig-prompt">Wat wil je maken?</label>
+              <textarea
+                id="ig-prompt"
+                rows={post ? 2 : 4}
+                maxLength={2000}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    void generate(!!post);
+                  }
+                }}
+                placeholder="Bijvoorbeeld: een post over onze nieuwe pizza van de maand, voor gezinnen in het weekend."
+              />
+              <div className="cs-brief-bar">
+                <small>Mavix AI gebruikt je Brand Hub: toon, doelgroep en producten.</small>
+                <button className="button primary" aria-busy={generating} disabled={!!busy || !prompt.trim()}>
+                  {generating ? <Mavi size={16} state="thinking" tone="brand" live /> : post ? <RefreshCw size={15} /> : <Wand2 size={15} />}
+                  {generating ? "Bezig…" : post ? "Opnieuw genereren" : "Genereren"}
                 </button>
               </div>
+            </form>
+
+            {generating && !post ? (
+              <div className="cs-result">
+                <GenerationSkeleton />
+              </div>
+            ) : post ? (
+              <div className={"cs-result" + (generating ? " is-busy" : "")} aria-busy={generating}>
+                <div className="cs-ai-bar" role="toolbar" aria-label="Tekst aanpassen met Mavix AI">
+                  {CONTENT_EDIT_LABELS.slice(0, 3).map(([action, label]) => (
+                    <button key={action} type="button" className="cs-chip" disabled={!!busy || !caption.trim()} onClick={() => void edit(action)}>
+                      {label}
+                    </button>
+                  ))}
+                  <Menu
+                    label="Meer AI-acties"
+                    align="start"
+                    trigger={
+                      <span className="cs-chip cs-chip-more">
+                        <Wand2 size={13} aria-hidden="true" /> Meer
+                      </span>
+                    }
+                    items={CONTENT_EDIT_LABELS.slice(3).map(([action, label]) => ({ label, disabled: !!busy || !caption.trim(), onSelect: () => void edit(action) }))}
+                  />
+                  {busy === "edit" && (
+                    <span className="cs-ai-busy" role="status">
+                      <Mavi size={14} state="thinking" tone="brand" live /> Mavix AI past je tekst aan…
+                    </span>
+                  )}
+                  {history.length > 0 && busy !== "edit" && (
+                    <button type="button" className="cs-undo" onClick={undo}>
+                      <Undo2 size={13} aria-hidden="true" /> Ongedaan maken
+                    </button>
+                  )}
+                </div>
+                <label className="cs-label" htmlFor="ig-caption">
+                  {type === "Content Ideas" ? "Ideeën" : "Caption"}
+                  <small>{caption.length} / 2200</small>
+                </label>
+                <textarea id="ig-caption" className="cs-caption" rows={10} maxLength={4000} value={caption} onChange={(e) => setCaption(e.target.value)} />
+                {alternatives.length > 0 && (
+                  <div className="cs-alternatives">
+                    <p>Kies een alternatief om je caption te vervangen:</p>
+                    {alternatives.map((alt, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          remember();
+                          setCaption(alt);
+                          setAlternatives([]);
+                        }}
+                      >
+                        {alt}
+                      </button>
+                    ))}
+                    <button type="button" className="cs-undo" onClick={() => setAlternatives([])}>
+                      Sluiten
+                    </button>
+                  </div>
+                )}
+                {type !== "Content Ideas" && (
+                  <>
+                    <label className="cs-label" htmlFor="ig-hashtags">
+                      Hashtags
+                    </label>
+                    <textarea id="ig-hashtags" rows={2} maxLength={1000} value={hashtags} onChange={(e) => setHashtags(e.target.value)} />
+                  </>
+                )}
+                <label className="cs-label" htmlFor="ig-date">
+                  {fromCalendar ? "Publicatiemoment" : "Inplannen (optioneel)"}
+                </label>
+                <input id="ig-date" type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />
+                {video && <p className="cs-hint">Dit concept is een video-idee. Mavix maakt nog geen videobestanden.</p>}
+              </div>
+            ) : (
+              <div className="cs-empty">
+                <Mavi size={44} tone="brand" live />
+                <h3>Begin met een korte opdracht</h3>
+                <p>Kies links het formaat en doel, beschrijf wat je wilt delen en klik op Genereren. Je krijgt een bewerkbaar concept dat automatisch wordt opgeslagen.</p>
+              </div>
+            )}
+            {(message || error) && (
+              <p role={error ? "alert" : "status"} className={error ? "cs-error" : "cs-message"}>
+                {error || message}
+              </p>
+            )}
+          </section>
+
+          <aside className="cs-preview" aria-label="Voorbeeld">
+            <p className="cs-preview-label">Voorbeeld op Instagram</p>
+            <div className="ig-phone">
+              <header>
+                <span className="ig-phone-avatar" aria-hidden="true">
+                  {profile.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={profile.logo} alt="" />
+                  ) : (
+                    (profile.name || "M").slice(0, 1)
+                  )}
+                </span>
+                <strong>{(profile.name || "jouwbedrijf").toLowerCase().replace(/\s+/g, "")}</strong>
+              </header>
+              <div className="ig-phone-media">{post ? <PostVisual post={{ ...post, media: photos.length ? photos : post.media }} /> : photos[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photos[0]} alt="Gekozen foto" />
+                ) : <span className="ig-phone-placeholder">Je foto verschijnt hier</span>}</div>
+              <div className="ig-phone-actions" aria-hidden="true">
+                <Heart size={20} />
+                <MessageCircle size={20} />
+                <Send size={20} />
+                <Bookmark size={20} className="ig-phone-save" />
+              </div>
+              <div className="ig-phone-caption">
+                {caption ? (
+                  <p>
+                    <strong>{(profile.name || "jouwbedrijf").toLowerCase().replace(/\s+/g, "")}</strong> {caption}
+                  </p>
+                ) : (
+                  <p className="ig-phone-muted">Je caption verschijnt hier zodra Mavix AI een concept heeft gemaakt.</p>
+                )}
+                {hashtags && <p className="ig-phone-tags">{hashtags}</p>}
+              </div>
             </div>
-          </section>
-        ) : (
-          <section className="panel ig-preview-empty">
-            <Sparkles size={36} />
-            <h2>Van idee naar impact.</h2>
-            <p>Je caption, beeldconcept of storyboard verschijnt hier.</p>
-            <Link href="/brand-hub">Begin met je Brand Hub →</Link>
-          </section>
+          </aside>
+        </div>
+        {notice && (
+          <p className="cs-message" role="status">
+            {notice}
+          </p>
         )}
-        <p role="status" className="ig-feedback">
-          {message}
-        </p>
-      </aside>
-      {notice && <Toast tone="info" message={notice} onClose={() => setNotice("")} />}
-    </div>
+      </div>
     </>
   );
 }

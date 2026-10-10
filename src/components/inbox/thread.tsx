@@ -412,21 +412,34 @@ export function Thread({
           </p>
         )}
         {suggested && !noteMode && (
-          <p className="ib-ai-note">
-            Voorstel van Mavi. Controleer en pas het aan; er wordt niets verstuurd tot jij op Versturen drukt.
-            {undo !== null && (
-              <button
-                type="button"
-                onClick={() => {
-                  onDraft(undo);
-                  setUndo(null);
-                  setSuggested(false);
-                }}
-              >
-                Ongedaan maken
+          <div className="ib-ai-review">
+            <p className="ib-ai-note">
+              <Mavi size={14} state={suggesting ? "thinking" : "done"} tone="brand" />
+              Voorstel van Mavix AI. Controleer en pas het aan; er wordt niets verstuurd tot jij op Versturen drukt.
+              {undo !== null && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDraft(undo);
+                    setUndo(null);
+                    setSuggested(false);
+                  }}
+                >
+                  Ongedaan maken
+                </button>
+              )}
+            </p>
+            <div className="ib-ai-refine" role="group" aria-label="Voorstel verfijnen">
+              {REWRITE.filter(([s]) => s !== "formal").map(([style, label]) => (
+                <button key={style} type="button" className="ib-chip" disabled={suggesting || !draft.trim()} onClick={() => void rewrite(style)}>
+                  {label}
+                </button>
+              ))}
+              <button type="button" className="ib-chip" disabled={suggesting} onClick={() => void suggest()}>
+                <RotateCcw size={12} aria-hidden="true" /> Opnieuw genereren
               </button>
-            )}
-          </p>
+            </div>
+          </div>
         )}
         {notice && (
           <p className="ib-error" role="alert">
@@ -524,9 +537,10 @@ export function Thread({
                   </>
                 )}
                 {!noteMode && (
-                  <IconButton label="Antwoord laten voorstellen door Mavi" onClick={() => void suggest()} disabled={suggesting || blocked}>
-                    <Mavi size={16} state={suggesting ? "thinking" : "idle"} />
-                  </IconButton>
+                  <button type="button" className="ib-ai-btn" onClick={() => void suggest()} disabled={suggesting || blocked} aria-busy={suggesting}>
+                    <Mavi size={16} state={suggesting ? "thinking" : "idle"} tone="brand" live={suggesting} />
+                    {suggesting ? "Mavix AI schrijft…" : "Antwoord met Mavix AI"}
+                  </button>
                 )}
                 {!noteMode && (
                   <Menu

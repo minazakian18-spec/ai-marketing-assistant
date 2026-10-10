@@ -14,6 +14,7 @@ import {
 } from "@/lib/brand-strategy";
 import { defaultInstagram } from "@/lib/instagram-model";
 import { defaultEmail } from "@/lib/email-model";
+import { AiUsage } from "./ai-usage";
 
 export function AiPreferences() {
   const { data, save } = useWorkspace();
@@ -172,6 +173,16 @@ export function AiPreferences() {
             </p>
           </div>
         </div>
+        <div className="st-channel is-static">
+          <span>
+            <strong>Inbox</strong>
+            <small>Mavix AI stelt antwoorden voor; jij verstuurt ze altijd zelf.</small>
+          </span>
+          <span className="st-status">
+            <Check size={13} />
+            Altijd eerst goedkeuren
+          </span>
+        </div>
         {channels.map(({ name, href, settings }) => (
           <Link key={name} href={href} className="st-channel">
             <span>
@@ -192,6 +203,7 @@ export function AiPreferences() {
           </Link>
         ))}
       </section>
+      <AiUsage />
     </>
   );
 }

@@ -25,7 +25,6 @@ export default function AdminPage() {
     setRows(body.workspaces);
   }, []);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch
     void load();
   }, [load]);
   async function change(id: string, patch: { status?: Row["status"]; aiLimit?: number | null }) {
