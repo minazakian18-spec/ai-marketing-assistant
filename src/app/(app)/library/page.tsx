@@ -220,7 +220,7 @@ export default function LibraryPage() {
   const pct = quota ? Math.min(100, Math.round((used / quota) * 100)) : 0;
 
   const navButton = (active: boolean, label: string, icon: ReactNode, count: number, onClick: () => void) => (
-    <button type="button" className="lb-nav-item" aria-current={active ? "true" : undefined} onClick={onClick}>
+    <button key={label} type="button" className="lb-nav-item" aria-current={active ? "true" : undefined} onClick={onClick}>
       {icon}
       <span>{label}</span>
       <small>{count}</small>
