@@ -38,7 +38,10 @@ function isStale(row: Pick<Row, "status" | "started_at">) {
 export async function researchState(workspaceId: string) {
   const period = researchPeriod();
   const { data, error } = await db().from("research_reports").select(COLUMNS).eq("workspace_id", workspaceId).order("period", { ascending: false }).limit(12);
-  if (error) throw new HttpError(503, "Onderzoek is nog niet beschikbaar. Voer de database-migratie uit.");
+  if (error) {
+    console.error(JSON.stringify({ event: "research_not_provisioned", code: error.code || "error" }));
+    throw new HttpError(503, "Onderzoek is nog niet beschikbaar. Probeer het later opnieuw.");
+  }
   const rows = (data || []) as Row[];
   const current = rows.find((r) => r.period === period) || null;
   const usable = !current || current.status === "failed" || isStale(current);
@@ -64,7 +67,10 @@ export async function startResearch(workspaceId: string, userId: string) {
   const row = { workspace_id: workspaceId, period, status: "running", stage: "collect", requested_by: userId, next_eligible_at: nextEligibleAt(period), started_at: new Date().toISOString() };
   const { data, error } = await db().from("research_reports").insert(row).select("id").single();
   if (!error) return data.id as string;
-  if (error.code !== "23505") throw new HttpError(503, "Onderzoek is nog niet beschikbaar. Voer de database-migratie uit.");
+  if (error.code !== "23505") {
+    console.error(JSON.stringify({ event: "research_not_provisioned", code: error.code || "error" }));
+    throw new HttpError(503, "Onderzoek is nog niet beschikbaar. Probeer het later opnieuw.");
+  }
   const { data: existing } = await db().from("research_reports").select(COLUMNS).eq("workspace_id", workspaceId).eq("period", period).single();
   const ex = existing as Row;
   if (ex.status === "completed") throw new HttpError(409, "Je maandelijkse onderzoek is al uitgevoerd.");

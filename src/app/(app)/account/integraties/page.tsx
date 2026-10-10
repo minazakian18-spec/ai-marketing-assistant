@@ -4,7 +4,7 @@ import { RefreshCw, X } from "lucide-react";
 import { PageHeading, IconButton } from "@/components/ui";
 import { BrandIcon, type Brand } from "@/components/brand-icon";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
-import { BUSINESS_CARD, CALENDAR_CARD, GMAIL_CARD, GoogleIntegrationCard } from "@/components/account/google-integration-card";
+import { BUSINESS_CARD, CALENDAR_CARD, GMAIL_CARD, GoogleIntegrationCard, SEARCH_CONSOLE_CARD } from "@/components/account/google-integration-card";
 import { isBrowserDemo } from "@/lib/demo";
 
 type Connection = {
@@ -16,40 +16,39 @@ type Connection = {
   expires_at?: string | null;
   metadata?: { authMode?: string } | null;
 };
-type Category = "communication" | "social" | "planning" | "reviews" | "commerce" | "ads";
+type Group = "recommended" | "communication" | "productivity" | "other";
 type Integration = {
   id: string; // provider key in integration_connections, or a planned one
   brand: Brand;
   name: string;
   description: string;
-  category: Category;
+  group: Group;
   provider?: string; // backend provider (aliases share one connection)
   planned?: boolean;
 };
 
-const CATEGORIES: [Category | "all", string][] = [
-  ["all", "Alle integraties"],
-  ["communication", "Communicatie"],
-  ["social", "Social media"],
-  ["planning", "Planning"],
-  ["reviews", "Reviews"],
-  ["commerce", "Webshop / Commerce"],
-  ["ads", "Advertenties"],
+// Sections in the order people need them; every integration appears once.
+const GROUPS: [Group, string, string][] = [
+  ["recommended", "Aanbevolen", "De belangrijkste kanalen voor je marketing. Begin hier."],
+  ["communication", "Communicatie", "Klantgesprekken komen samen in je Inbox."],
+  ["productivity", "Productiviteit en inzicht", "Planning en je zoekresultaten in Google."],
+  ["other", "Binnenkort", "Deze koppelingen zijn in voorbereiding en nog niet te gebruiken."],
 ];
 
 const INTEGRATIONS: Integration[] = [
-  { id: "whatsapp", brand: "whatsapp", name: "WhatsApp Business", description: "Ontvang en beantwoord WhatsApp-berichten in de Inbox.", category: "communication", provider: "whatsapp" },
-  { id: "messenger", brand: "messenger", name: "Facebook Messenger", description: "Berichten aan je Facebook-pagina in de Inbox.", category: "communication", provider: "messenger" },
-  { id: "gmail", brand: "gmail", name: "Gmail", description: "E-mails versturen en klantmails in de Inbox lezen.", category: "communication", provider: "gmail" },
-  { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", category: "social", provider: "instagram" },
-  { id: "linkedin", brand: "linkedin", name: "LinkedIn", description: "Posts plannen voor je bedrijfspagina.", category: "social", planned: true },
-  { id: "google_calendar", brand: "google_calendar", name: "Google Agenda", description: "Je afspraken naast je Mavix-planning, in twee richtingen gesynchroniseerd.", category: "planning", provider: "google_calendar" },
-  { id: "google_business", brand: "google_business", name: "Google Bedrijfsprofiel", description: "Bedrijfsprofiel en Google-reviews, met één koppeling.", category: "reviews", provider: "google_business" },
-  { id: "shopify", brand: "shopify", name: "Shopify", description: "Producten en bestellingen gebruiken in je marketing.", category: "commerce", planned: true },
-  { id: "google_ads", brand: "google_ads", name: "Google Ads", description: "Campagneresultaten en zoektermen bekijken.", category: "ads", planned: true },
-  { id: "meta_ads", brand: "meta_ads", name: "Meta Ads", description: "Resultaten van Facebook- en Instagram-advertenties.", category: "ads", planned: true },
+  { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", group: "recommended", provider: "instagram" },
+  { id: "gmail", brand: "gmail", name: "Gmail", description: "E-mails versturen en klantmails in de Inbox lezen.", group: "recommended", provider: "gmail" },
+  { id: "google_business", brand: "google_business", name: "Google Bedrijfsprofiel", description: "Bedrijfsprofiel en Google-reviews, met één koppeling.", group: "recommended", provider: "google_business" },
+  { id: "whatsapp", brand: "whatsapp", name: "WhatsApp Business", description: "Ontvang en beantwoord WhatsApp-berichten in de Inbox.", group: "communication", provider: "whatsapp" },
+  { id: "messenger", brand: "messenger", name: "Facebook Messenger", description: "Berichten aan je Facebook-pagina in de Inbox.", group: "communication", provider: "messenger" },
+  { id: "google_calendar", brand: "google_calendar", name: "Google Agenda", description: "Je afspraken naast je Mavix-planning, in twee richtingen gesynchroniseerd.", group: "productivity", provider: "google_calendar" },
+  { id: "google_search_console", brand: "search_console", name: "Google Search Console", description: "Klikken, vertoningen en zoekwoorden van je website.", group: "productivity", provider: "google_search_console" },
+  { id: "linkedin", brand: "linkedin", name: "LinkedIn", description: "Posts plannen voor je bedrijfspagina.", group: "other", planned: true },
+  { id: "shopify", brand: "shopify", name: "Shopify", description: "Producten en bestellingen gebruiken in je marketing.", group: "other", planned: true },
+  { id: "google_ads", brand: "google_ads", name: "Google Ads", description: "Campagneresultaten en zoektermen bekijken.", group: "other", planned: true },
+  { id: "meta_ads", brand: "meta_ads", name: "Meta Ads", description: "Resultaten van Facebook- en Instagram-advertenties.", group: "other", planned: true },
 ];
-
+const GOOGLE_CARDS = { gmail: GMAIL_CARD, google_business: BUSINESS_CARD, google_calendar: CALENDAR_CARD, google_search_console: SEARCH_CONSOLE_CARD } as const;
 const SCOPE_LABEL: Record<string, string> = {
   openid: "Je Google-account herkennen",
   email: "Je e-mailadres bekijken",
@@ -123,7 +122,7 @@ export default function IntegrationsPage() {
   const [demo, setDemo] = useState(false);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [category, setCategory] = useState<Category | "all">("all");
+  const [group, setGroup] = useState<Group | "all">("all");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [manage, setManage] = useState<Integration | null>(null);
@@ -239,7 +238,7 @@ export default function IntegrationsPage() {
     }
   }
 
-  const visible = INTEGRATIONS.filter((i) => category === "all" || i.category === category);
+  const groups = GROUPS.filter(([g]) => group === "all" || g === group);
   const m = manage;
   const mc = m ? conn(m) : undefined;
   const ms = m ? stateOf(m, mc) : "disconnected";
@@ -262,62 +261,72 @@ export default function IntegrationsPage() {
         </p>
       )}
 
-      <div className="int-tabs" role="tablist" aria-label="Categorie">
-        {CATEGORIES.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={category === id} onClick={() => setCategory(id)}>
+      <div className="int-tabs" role="tablist" aria-label="Onderdeel">
+        <button type="button" role="tab" aria-selected={group === "all"} onClick={() => setGroup("all")}>
+          Alle integraties
+        </button>
+        {GROUPS.map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={group === id} onClick={() => setGroup(id)}>
             {label}
           </button>
         ))}
       </div>
 
-      <ul className="int-list ui-card">
-        {visible.map((item) => {
-          if (item.id === "google_calendar" || item.id === "gmail" || item.id === "google_business")
-            return (
-              <GoogleIntegrationCard
-                key={item.id}
-                config={item.id === "gmail" ? GMAIL_CARD : item.id === "google_business" ? BUSINESS_CARD : CALENDAR_CARD}
-                demo={demo}
-                onNotice={setNotice}
-                openPicker={item.id === "google_business" && gbpPicker}
-              />
-            );
-          const c = conn(item);
-          const state = loaded ? stateOf(item, c) : item.planned ? "planned" : "disconnected";
-          const linked = !item.planned && state !== "disconnected";
-          return (
-            <li key={item.id} className="int-row">
-              <span className="int-logo">
-                <BrandIcon brand={item.brand} size={24} />
-              </span>
-              <div className="int-info">
-                <strong>{item.name}</strong>
-                <p>{item.description}</p>
-                {linked && c?.display_name && <small>{c.display_name}</small>}
-              </div>
-              <span className={"int-state is-" + state}>{STATE_TEXT[state]}</span>
-              {item.planned ? (
-                <button type="button" className="button secondary" disabled>
-                  Binnenkort
-                </button>
-              ) : linked ? (
-                <button type="button" className="button secondary" onClick={() => open(item)} disabled={demo}>
-                  Beheren
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="button primary"
-                  disabled={demo || busy}
-                  onClick={() => (item.provider === "whatsapp" ? open(item) : void call(item.provider!, "connect"))}
-                >
-                  Koppelen
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {groups.map(([g, label, text]) => (
+        <section key={g} className="int-group" aria-labelledby={"int-group-" + g}>
+          <header className="int-group-head">
+            <h2 id={"int-group-" + g}>{label}</h2>
+            <p>{text}</p>
+          </header>
+          <ul className="int-list ui-card">
+            {INTEGRATIONS.filter((i) => i.group === g).map((item) => {
+              if (item.id in GOOGLE_CARDS)
+                return (
+                  <GoogleIntegrationCard
+                    key={item.id}
+                    config={GOOGLE_CARDS[item.id as keyof typeof GOOGLE_CARDS]}
+                    demo={demo}
+                    onNotice={setNotice}
+                    openPicker={item.id === "google_business" && gbpPicker}
+                  />
+                );    const c = conn(item);
+              const state = loaded ? stateOf(item, c) : item.planned ? "planned" : "disconnected";
+              const linked = !item.planned && state !== "disconnected";
+              return (
+                <li key={item.id} className="int-row">
+                  <span className="int-logo">
+                    <BrandIcon brand={item.brand} size={24} />
+                  </span>
+                  <div className="int-info">
+                    <strong>{item.name}</strong>
+                    <p>{item.description}</p>
+                    {linked && c?.display_name && <small>{c.display_name}</small>}
+                  </div>
+                  <span className={"int-state is-" + state}>{STATE_TEXT[state]}</span>
+                  {item.planned ? (
+                    <button type="button" className="button secondary" disabled>
+                      Binnenkort
+                    </button>
+                  ) : linked ? (
+                    <button type="button" className="button secondary" onClick={() => open(item)} disabled={demo}>
+                      Beheren
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="button primary"
+                      disabled={demo || busy}
+                      onClick={() => (item.provider === "whatsapp" ? open(item) : void call(item.provider!, "connect"))}
+                    >
+                      Koppelen
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
 
       {m && (
         <>

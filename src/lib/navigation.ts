@@ -45,7 +45,7 @@ export const navigationGroups: NavGroup[] = [
       { href: "/email", label: "E-mail", icon: Mail },
       { href: "/reviews", label: "Reviews", icon: Star },
       { href: "/ads", label: "Advertenties", icon: Megaphone },
-      { href: "/seo", label: "SEO", icon: Search },
+      { href: "/seo", label: "SEO Intelligence", icon: Search },
     ],
   },
   {

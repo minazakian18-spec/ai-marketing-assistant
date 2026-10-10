@@ -1,6 +1,7 @@
 import { emailSettingsError, emailCampaignValid } from "./email-model.ts";
 import { settingsError } from "./instagram-model.ts";
 import { sampleContacts, contactValid } from "./contact-data.ts";
+import { strategyValid } from "./brand-strategy.ts";
 import {
   defaultReviewSettings,
   reviewSettingsError,
@@ -151,6 +152,8 @@ export function readWorkspace(): Workspace {
     throw new Error("Ongeldige profielfoto");
   if (merged.instagram && settingsError(merged.instagram))
     throw new Error("Ongeldige Instagram-instellingen");
+  if (merged.profile.strategy && !strategyValid(merged.profile.strategy))
+    throw new Error("Ongeldige Brand Hub-gegevens");
   if (!merged.contacts.every(contactValid))
     throw new Error("Ongeldige contactgegevens");
   if (

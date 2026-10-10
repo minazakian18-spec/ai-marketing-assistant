@@ -44,8 +44,11 @@ async function resolvePublic(host: string) {
   return addrs[0];
 }
 
+type Raw = { status: number; location?: string; body: string; type: string; headers: Record<string, string>; truncated: boolean };
+const flat = (h: http.IncomingHttpHeaders) => Object.fromEntries(Object.entries(h).map(([k, v]) => [k.toLowerCase(), Array.isArray(v) ? v.join(", ") : String(v ?? "")]));
+
 function request(url: URL, addr: { address: string; family: number }, timeoutMs: number, maxBytes: number) {
-  return new Promise<{ status: number; location?: string; body: string; type: string }>((resolve, reject) => {
+  return new Promise<Raw>((resolve, reject) => {
     const mod = url.protocol === "https:" ? https : http;
     const req = mod.request(
       {
@@ -56,8 +59,13 @@ function request(url: URL, addr: { address: string; family: number }, timeoutMs:
         method: "GET",
         servername: isIP(url.hostname) ? undefined : url.hostname,
         headers: { "User-Agent": MAVIX_UA, Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5", "Accept-Language": "nl,en;q=0.8" },
-        // Pin the connection to the address we validated.
-        lookup: (_h, _o, cb) => (cb as (e: null, a: string, f: number) => void)(null, addr.address, addr.family),
+        // Pin the connection to the address we validated. Newer Node versions
+        // ask with { all: true } (happy eyeballs) and expect a list.
+        lookup: (_h, options, cb) => {
+          if ((options as { all?: boolean } | undefined)?.all)
+            (cb as (e: null, a: { address: string; family: number }[]) => void)(null, [{ address: addr.address, family: addr.family }]);
+          else (cb as (e: null, a: string, f: number) => void)(null, addr.address, addr.family);
+        },
         timeout: timeoutMs,
       },
       (res) => {
@@ -67,12 +75,12 @@ function request(url: URL, addr: { address: string; family: number }, timeoutMs:
           size += c.length;
           if (size > maxBytes) {
             req.destroy();
-            resolve({ status: res.statusCode || 0, location: res.headers.location, body: Buffer.concat(chunks).toString("utf8"), type: String(res.headers["content-type"] || "") });
+            resolve({ status: res.statusCode || 0, location: res.headers.location, body: Buffer.concat(chunks).toString("utf8"), type: String(res.headers["content-type"] || ""), headers: flat(res.headers), truncated: true });
             return;
           }
           chunks.push(c);
         });
-        res.on("end", () => resolve({ status: res.statusCode || 0, location: res.headers.location, body: Buffer.concat(chunks).toString("utf8"), type: String(res.headers["content-type"] || "") }));
+        res.on("end", () => resolve({ status: res.statusCode || 0, location: res.headers.location, body: Buffer.concat(chunks).toString("utf8"), type: String(res.headers["content-type"] || ""), headers: flat(res.headers), truncated: false }));
         res.on("error", reject);
       },
     );
@@ -82,20 +90,39 @@ function request(url: URL, addr: { address: string; family: number }, timeoutMs:
   });
 }
 
-export async function safeFetchPage(input: string, { timeoutMs = 8000, maxBytes = 1_500_000, maxRedirects = 3 } = {}) {
+/** Throws "blocked_url"/"blocked_host"/"blocked_address" for anything that is not a public http(s) URL. */
+export async function assertPublicUrl(input: string) {
+  const url = new URL(input);
+  if (!["http:", "https:"].includes(url.protocol) || (url.port && !["80", "443"].includes(url.port)) || url.username || url.password) throw new Error("blocked_url");
+  await resolvePublic(url.hostname);
+  return url;
+}
+
+/**
+ * Like safeFetchPage, with response headers and the redirect chain (every hop
+ * re-validated). Used by the SEO crawler.
+ */
+export async function safeFetch(input: string, { timeoutMs = 8000, maxBytes = 1_500_000, maxRedirects = 3 } = {}) {
   let url = new URL(/^https?:\/\//i.test(input) ? input : "https://" + input);
   const started = Date.now();
+  const chain: { url: string; status: number }[] = [];
   for (let i = 0; i <= maxRedirects; i++) {
     if (!["http:", "https:"].includes(url.protocol) || (url.port && !["80", "443"].includes(url.port)) || url.username || url.password) throw new Error("blocked_url");
     const addr = await resolvePublic(url.hostname);
     const res = await request(url, addr, timeoutMs, maxBytes);
     if (res.status >= 300 && res.status < 400 && res.location) {
+      chain.push({ url: url.toString(), status: res.status });
       url = new URL(res.location, url);
       continue;
     }
-    return { url: url.toString(), status: res.status, html: /html|xml|text/i.test(res.type) ? res.body : "", ms: Date.now() - started };
+    return { url: url.toString(), status: res.status, body: res.body, type: res.type, headers: res.headers, chain, truncated: res.truncated, ms: Date.now() - started };
   }
   throw new Error("too_many_redirects");
+}
+
+export async function safeFetchPage(input: string, { timeoutMs = 8000, maxBytes = 1_500_000, maxRedirects = 3 } = {}) {
+  const r = await safeFetch(input, { timeoutMs, maxBytes, maxRedirects });
+  return { url: r.url, status: r.status, html: /html|xml|text/i.test(r.type) ? r.body : "", ms: r.ms };
 }
 
 // Minimal robots.txt check for our user agent / "*" on a single path.

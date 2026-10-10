@@ -9,12 +9,12 @@ import { isBrowserDemo } from "@/lib/demo";
 import { INBOX_UNREAD_EVENT } from "@/lib/use-inbox-unread";
 import { capabilities, type Channel, type ConversationView, type MessageView } from "@/lib/inbox/shared";
 import { ConversationList, type StatusFilter } from "@/components/inbox/conversation-list";
-import { Thread, type ConversationPatch, type Detail, type SendPayload, type Template } from "@/components/inbox/thread";
+import { CHANNEL_NAME, ChannelRail, type ChannelState, type SortOrder } from "@/components/inbox/channel-rail";
+import { Thread, type ConversationPatch, type Detail, type RewriteStyle, type SendPayload, type Template } from "@/components/inbox/thread";
 import { ContextPanel } from "@/components/inbox/context-panel";
 import { DEMO_MEMBERS, demoDetail, demoThreads } from "@/lib/inbox/demo";
 import "../../inbox.css";
 
-type ChannelState = { channel: Channel; state: "not_connected" | "connected" | "reconsent" | "reconnect" | "selection" | "error"; account: string };
 const PROBLEM: Partial<Record<ChannelState["state"], string>> = {
   reconsent: "heeft nieuwe toestemming nodig",
   reconnect: "moet opnieuw worden verbonden",
@@ -29,7 +29,14 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return d as T;
 }
 const uuid = () => crypto.randomUUID();
+const CONNECT_TEXT: Record<Channel, string> = {
+  instagram: "Koppel je professionele Instagram-account om Direct-berichten hier te ontvangen en te beantwoorden.",
+  whatsapp: "Koppel je WhatsApp Business-nummer om klantberichten hier te ontvangen en te beantwoorden.",
+  gmail: "Koppel Gmail om klantmails in Mavix te lezen en te beantwoorden.",
+  messenger: "Koppel je Facebook-pagina om Messenger-berichten hier te ontvangen en te beantwoorden.",
+};
 const byNewest = (a: ConversationView, b: ConversationView) => b.lastMessageAt.localeCompare(a.lastMessageAt) || b.id.localeCompare(a.id);
+const byOldest = (a: ConversationView, b: ConversationView) => -byNewest(a, b);
 
 type Outgoing = { conversationId: string; payload: SendPayload; message: MessageView };
 
@@ -38,6 +45,8 @@ export default function InboxPage() {
   const [ready, setReady] = useState(false);
   const [channel, setChannel] = useState<Channel | "">("");
   const [status, setStatus] = useState<StatusFilter>("open");
+  const [sort, setSort] = useState<SortOrder>("newest");
+  const [unreadByChannel, setUnreadByChannel] = useState<Partial<Record<Channel, number>>>({});
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [conversations, setConversations] = useState<ConversationView[]>([]);
@@ -74,19 +83,27 @@ export default function InboxPage() {
   const loadList = useCallback(
     async (more = false, silent = false) => {
       if (demo) return;
-      const key = [channel, status, debounced].join("|");
+      const key = [channel, status, debounced, sort].join("|");
       if (!silent) setLoading(true);
       try {
-        const params = new URLSearchParams({ filter: status });
+        const params = new URLSearchParams({ filter: status, sort });
         if (channel) params.set("channel", channel);
         if (debounced) params.set("q", debounced);
         if (more && cursor) params.set("cursor", cursor);
-        const d = await api<{ conversations: ConversationView[]; nextCursor: string | null; channels: ChannelState[]; unread: number; userId: string }>("/api/inbox?" + params);
+        const d = await api<{
+          conversations: ConversationView[];
+          nextCursor: string | null;
+          channels: ChannelState[];
+          unread: number;
+          unreadByChannel: Record<Channel, number>;
+          userId: string;
+        }>("/api/inbox?" + params);
         if (filterKey.current !== key && more) return;
         filterKey.current = key;
         setChannels(d.channels);
         setUserId(d.userId);
         setUnreadTotal(d.unread);
+        setUnreadByChannel(d.unreadByChannel || {});
         window.dispatchEvent(new CustomEvent(INBOX_UNREAD_EVENT, { detail: d.unread }));
         setConversations((prev) => {
           if (more) return [...prev, ...d.conversations.filter((c) => !prev.some((p) => p.id === c.id))];
@@ -94,7 +111,7 @@ export default function InboxPage() {
           const fresh = new Map(d.conversations.map((c) => [c.id, c]));
           const oldest = d.conversations[d.conversations.length - 1]?.lastMessageAt || "";
           const rest = prev.filter((p) => !fresh.has(p.id) && d.nextCursor && p.lastMessageAt < oldest);
-          return [...d.conversations, ...rest].sort(byNewest);
+          return [...d.conversations, ...rest].sort(sort === "oldest" ? byOldest : byNewest);
         });
         if (more || !silent || !cursor) setCursor(d.nextCursor);
         setError("");
@@ -104,7 +121,7 @@ export default function InboxPage() {
         if (!silent) setLoading(false);
       }
     },
-    [demo, channel, status, debounced, cursor],
+    [demo, channel, status, debounced, cursor, sort],
   );
 
   const loadDetail = useCallback(async (id: string, silent = false) => {
@@ -148,7 +165,7 @@ export default function InboxPage() {
     }
     void loadList(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, demo, channel, status, debounced]);
+  }, [ready, demo, channel, status, debounced, sort]);
 
   // Live updates: refresh every 15 s while visible; Gmail is polled about
   // once a minute (Instagram/Messenger/WhatsApp arrive via webhooks).
@@ -353,6 +370,13 @@ export default function InboxPage() {
     return d.text;
   }
 
+  async function rewrite(draft: string, style: RewriteStyle) {
+    if (!detail) return null;
+    if (demo) throw new Error("Mavi-voorstellen werken alleen met een echt account.");
+    const d = await api<{ text: string }>(`/api/inbox/${detail.conversation.id}/ai`, { method: "POST", body: JSON.stringify({ action: "rewrite", draft, style }) });
+    return d.text;
+  }
+
   async function older() {
     if (!detail || !detail.messages.length) return;
     try {
@@ -390,8 +414,13 @@ export default function InboxPage() {
       .filter((c) => !channel || c.channel === channel)
       .filter((c) => (status === "resolved" ? c.status === "resolved" : status === "unread" ? c.unread > 0 : status === "mine" ? c.assignedUserId === userId : c.status !== "resolved"))
       .filter((c) => !q || (c.contact.name + " " + c.preview + " " + c.subject).toLowerCase().includes(q))
-      .sort(byNewest);
-  }, [demoData, channel, status, debounced, userId]);
+      .sort(sort === "oldest" ? byOldest : byNewest);
+  }, [demoData, channel, status, debounced, userId, sort]);
+  const demoUnread = useMemo(() => {
+    const out: Partial<Record<Channel, number>> = {};
+    for (const t of demoData) if (t.conversation.unread > 0) out[t.conversation.channel] = (out[t.conversation.channel] || 0) + 1;
+    return out;
+  }, [demoData]);
   const list = demo ? demoList : conversations;
   const unread = demo ? demoData.filter((t) => t.conversation.unread > 0).length : unreadTotal;
   function toggleDetails() {
@@ -401,32 +430,50 @@ export default function InboxPage() {
 
   const linked = (channels || []).filter((c) => c.state !== "not_connected");
   const problems = linked.filter((c) => PROBLEM[c.state]);
-  const nothingLinked = !demo && channels !== null && linked.length === 0 && channel !== "gmail";
+  const nothingLinked = !demo && channels !== null && linked.length === 0;
   const gmail = channels?.find((c) => c.channel === "gmail");
   const gmailConnected = gmail?.state === "connected";
-  // E-mail is always offered as a filter, so Gmail can be connected from here.
-  const filterChannels = [...linked.map((c) => c.channel), ...(linked.some((c) => c.channel === "gmail") ? [] : (["gmail"] as Channel[]))];
-  const gmailEmpty =
-    channel !== "gmail" || demo ? undefined : !gmail || gmail.state === "not_connected" ? (
+  // Empty states of the conversation list: per channel a connect or repair
+  // prompt, so every channel can be opened from the rail.
+  const current = channel ? channels?.find((c) => c.channel === channel) : undefined;
+  const listEmpty = demo ? undefined : channel === "" ? (
+    nothingLinked ? (
       <div className="ib-list-connect">
-        <BrandIcon brand="gmail" size={22} />
-        <p>Koppel Gmail om klantmails in Mavix te beheren.</p>
+        <div className="ib-empty-brands" aria-hidden="true">
+          {(["instagram", "whatsapp", "gmail", "messenger"] as Channel[]).map((c) => (
+            <BrandIcon key={c} brand={c} size={20} />
+          ))}
+        </div>
+        <p>Koppel Instagram, WhatsApp, Gmail of Messenger om je klantgesprekken hier te ontvangen en te beantwoorden.</p>
         <Link className="button primary" href="/account/integraties">
-          Koppel Gmail
+          <Plug size={15} />
+          Kanaal koppelen
         </Link>
       </div>
-    ) : !gmailConnected ? (
-      <div className="ib-list-connect">
-        <BrandIcon brand="gmail" size={22} />
-        <p>{gmail.state === "reconnect" ? "Je Gmail-koppeling is verlopen." : "Gmail heeft opnieuw toestemming nodig."}</p>
-        <Link className="button primary" href="/account/integraties">
-          Opnieuw koppelen
-        </Link>
-      </div>
-    ) : debounced ? undefined : (
-      <p className="ib-list-empty">Geen e-mails gevonden.</p>
-    );
-
+    ) : undefined
+  ) : !current || current.state === "not_connected" ? (
+    <div className="ib-list-connect">
+      <BrandIcon brand={channel} size={22} />
+      <p>{CONNECT_TEXT[channel]}</p>
+      <Link className="button primary" href="/account/integraties">
+        Koppel {CHANNEL_NAME[channel]}
+      </Link>
+    </div>
+  ) : current.state !== "connected" ? (
+    <div className="ib-list-connect">
+      <BrandIcon brand={channel} size={22} />
+      <p>
+        {channel === "gmail" && current.state === "reconnect"
+          ? "Je Gmail-koppeling is verlopen. Bestaande e-mails blijven zichtbaar, nieuwe komen pas binnen na opnieuw koppelen."
+          : `${CHANNEL_NAME[channel]} ${PROBLEM[current.state]}.`}
+      </p>
+      <Link className="button primary" href="/account/integraties">
+        {current.state === "selection" ? "Keuze maken" : "Opnieuw koppelen"}
+      </Link>
+    </div>
+  ) : debounced ? undefined : (
+    <p className="ib-list-empty">Nog geen gesprekken via {CHANNEL_NAME[channel]}. Nieuwe berichten verschijnen hier automatisch.</p>
+  );
   return (
     <div className="ib" data-view={view} data-details={detailsOpen ? "open" : "closed"}>
       <header className="ib-head">
@@ -465,76 +512,73 @@ export default function InboxPage() {
         </p>
       )}
 
-      {nothingLinked ? (
-        <section className="ui-card ib-empty">
-          <span className="ui-empty-icon">
-            <MessagesSquare size={20} />
-          </span>
-          <h2>Nog geen gesprekken</h2>
-          <p>Koppel WhatsApp, Instagram, Messenger of Gmail om berichten hier te ontvangen.</p>
-          <div className="ib-empty-brands" aria-hidden="true">
-            {(["whatsapp", "instagram", "messenger", "gmail"] as Channel[]).map((c) => (
-              <BrandIcon key={c} brand={c} size={20} />
-            ))}
-          </div>
-          <Link className="button primary" href="/account/integraties">
-            <Plug size={15} />
-            Kanaal koppelen
-          </Link>
-        </section>
-      ) : (
-        <div className="ib-layout ui-card">
-          <ConversationList
-            conversations={list}
-            unread={unread}
-            channels={demo ? linked.map((c) => c.channel) : filterChannels}
-            selectedId={selected}
-            channel={channel}
-            status={status}
-            query={query}
-            loading={loading}
-            hasMore={!demo && !!cursor}
-            onChannel={setChannel}
-            onStatus={setStatus}
-            onQuery={setQuery}
-            onSelect={select}
-            onMore={() => void loadList(true)}
-            empty={gmailEmpty}
-            extraMore={
-              !demo && gmailConnected && !gmailOlder.done && !debounced && status !== "resolved" && (channel === "" || channel === "gmail")
-                ? { label: "Oudere e-mails laden", busy: gmailOlder.busy, onClick: () => void loadOlderGmail() }
-                : null
-            }
+      <div className="ib-layout ui-card">
+        <ChannelRail
+          channels={channels}
+          unreadByChannel={demo ? demoUnread : unreadByChannel}
+          unreadTotal={unread}
+          channel={channel}
+          status={status}
+          sort={sort}
+          onChannel={(c) => {
+            setChannel(c);
+            setView("list");
+          }}
+          onStatus={setStatus}
+          onSort={setSort}
+        />
+        <ConversationList
+          conversations={list}
+          unread={channel ? (demo ? demoUnread : unreadByChannel)[channel] || 0 : unread}
+          selectedId={selected}
+          channel={channel}
+          status={status}
+          sort={sort}
+          query={query}
+          loading={loading}
+          hasMore={!demo && !!cursor}
+          onChannel={setChannel}
+          onStatus={setStatus}
+          onSort={setSort}
+          onQuery={setQuery}
+          onSelect={select}
+          onMore={() => void loadList(true)}
+          empty={listEmpty}
+          extraMore={
+            !demo && gmailConnected && !gmailOlder.done && !debounced && status !== "resolved" && sort === "newest" && (channel === "" || channel === "gmail")
+              ? { label: "Oudere e-mails laden", busy: gmailOlder.busy, onClick: () => void loadOlderGmail() }
+              : null
+          }
+        />
+        {shown ? (
+          <Thread
+            key={shown.conversation.id}
+            detail={shown}
+            userId={userId}
+            draft={drafts[shown.conversation.id] || ""}
+            onDraft={(v) => setDrafts((d) => ({ ...d, [shown.conversation.id]: v }))}
+            onSend={send}
+            onNote={(b) => void note(b)}
+            onRetry={(clientId) => outbox[clientId] && void deliver(clientId, outbox[clientId])}
+            canRetry={(clientId) => !!outbox[clientId]}
+            onOlder={() => void older()}
+            onBack={() => setView("list")}
+            onDetails={toggleDetails}
+            detailsOpen={detailsOpen}
+            onUpdate={(p) => void update(p)}
+            onSuggest={() => ai("reply")}
+            onRewrite={rewrite}
+            templates={templates}
+            onLoadTemplates={loadTemplates}
           />
-          {shown ? (
-            <Thread
-              detail={shown}
-              userId={userId}
-              draft={drafts[shown.conversation.id] || ""}
-              onDraft={(v) => setDrafts((d) => ({ ...d, [shown.conversation.id]: v }))}
-              onSend={send}
-              onNote={(b) => void note(b)}
-              onRetry={(clientId) => outbox[clientId] && void deliver(clientId, outbox[clientId])}
-              canRetry={(clientId) => !!outbox[clientId]}
-              onOlder={() => void older()}
-              onBack={() => setView("list")}
-              onDetails={toggleDetails}
-              detailsOpen={detailsOpen}
-              onUpdate={(p) => void update(p)}
-              onSuggest={() => ai("reply")}
-              templates={templates}
-              onLoadTemplates={loadTemplates}
-            />
-          ) : (
-            <section className="ib-thread ib-thread-empty">
-              <MessagesSquare size={22} aria-hidden="true" />
-              <p>{selected ? "Gesprek laden…" : list.length ? "Kies een gesprek om het te lezen." : "Nog geen gesprekken. Nieuwe berichten verschijnen hier automatisch."}</p>
-            </section>
-          )}
-          <ContextPanel detail={shown} onClose={toggleDetails} onUpdate={(p) => void update(p)} onSummary={() => ai("summary")} />
-        </div>
-      )}
-      {composing && (
+        ) : (
+          <section className="ib-thread ib-thread-empty">
+            <MessagesSquare size={22} aria-hidden="true" />
+            <p>{selected ? "Gesprek laden…" : list.length ? "Kies een gesprek om het te lezen." : "Nog geen gesprekken. Nieuwe berichten verschijnen hier automatisch."}</p>
+          </section>
+        )}
+        <ContextPanel detail={shown} onClose={toggleDetails} onUpdate={(p) => void update(p)} onSummary={() => ai("summary")} />
+      </div>      {composing && (
         <NewEmailDialog
           from={gmail?.account || ""}
           onClose={() => setComposing(false)}

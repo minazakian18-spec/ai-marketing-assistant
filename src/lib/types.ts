@@ -4,6 +4,7 @@ import type { Review, ReviewAutoReplySettings } from "./review-model";
 import type { LocalCalendarEvent } from "./calendar/local";
 import type { LibraryAsset } from "./library-model";
 import type { AudienceSegment, Product, BrandVoice } from "./brand-model";
+import type { BrandStrategy } from "./brand-strategy";
 export type Profile = {
   name: string;
   industry: string;
@@ -25,6 +26,8 @@ export type Profile = {
   segments?: AudienceSegment[];
   productList?: Product[];
   brandVoice?: BrandVoice;
+  /** Brand Hub setup fields (src/lib/brand-strategy.ts). */
+  strategy?: BrandStrategy;
 };
 export type Post = {
   id: string;
@@ -59,8 +62,18 @@ export type Contact = {
   company?: string;
   group?: string;
   status: ContactStatus;
-  source: "manual" | "import" | "sample";
+  source: "manual" | "import" | "sample" | "newsletter";
   createdAt: string;
+  /** Set when the contact is (or was) a newsletter subscriber (src/lib/newsletter.ts). */
+  newsletter?: ContactNewsletter;
+};
+export type ContactNewsletter = {
+  subscriberId: string;
+  status: "pending" | "subscribed" | "unsubscribed";
+  source: string;
+  subscribedAt?: string;
+  unsubscribedAt?: string;
+  privacyPolicyVersion?: string;
 };
 export type Account = {
   firstName: string;

@@ -58,10 +58,23 @@ export function contactValid(c: Record<string, unknown>): boolean {
     ["Ingeschreven", "Niet bevestigd", "Uitgeschreven"].includes(
       String(c.status),
     ) &&
-    ["manual", "import", "sample"].includes(String(c.source)) &&
+    ["manual", "import", "sample", "newsletter"].includes(String(c.source)) &&
     (c.phone === undefined || typeof c.phone === "string") &&
     (c.company === undefined || typeof c.company === "string") &&
-    (c.group === undefined || typeof c.group === "string")
+    (c.group === undefined || typeof c.group === "string") &&
+    (c.newsletter === undefined || newsletterValid(c.newsletter))
+  );
+}
+
+function newsletterValid(n: unknown) {
+  const v = n as Record<string, unknown> | null;
+  return (
+    !!v &&
+    typeof v === "object" &&
+    typeof v.subscriberId === "string" &&
+    ["pending", "subscribed", "unsubscribed"].includes(String(v.status)) &&
+    typeof v.source === "string" &&
+    ["subscribedAt", "unsubscribedAt", "privacyPolicyVersion"].every((k) => v[k] === undefined || typeof v[k] === "string")
   );
 }
 

@@ -64,7 +64,8 @@ export function buildInstagramInstruction(input: {
     contentType: input.type,
     segment: findSegment(brand, input.segmentId),
     product: findProduct(brand, input.product),
-    cta: input.cta?.trim() || "",
+    // The CTA typed for this post wins; otherwise the Brand Hub default.
+    cta: input.cta?.trim() || brand.ctas[0] || "",
     userInstruction: input.prompt,
     useWebsite: input.useWebsite,
   };
@@ -119,7 +120,7 @@ export function buildImagePromptSpec(
     cameraAngle: "Ooghoogte, natuurlijk perspectief",
     lighting: "Zacht, natuurlijk licht",
     brandColors: brand.brandVoice.colors,
-    style: brand.brandVoice.marketingStyle || "Clean en herkenbaar",
+    style: brand.brandVoice.marketingStyle || brand.designStyles.join(", ") || "Clean en herkenbaar",
     background: "Rustig, niet afleidend van het hoofdonderwerp",
     mood: goalMood(goal),
     aspectRatio: ["Story", "Reel", "Animate Image", "Photos to Reel"].includes(

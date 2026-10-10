@@ -29,7 +29,7 @@ type View =
   | { kind: "reconnect"; reason: "expired" | "permission" | "other"; email: string | null };
 
 export type GoogleCardConfig = {
-  provider: "google_calendar" | "gmail" | "google_business";
+  provider: "google_calendar" | "gmail" | "google_business" | "google_search_console";
   brand: Brand;
   name: string;
   rights: string[];
@@ -110,6 +110,25 @@ export const BUSINESS_CARD: GoogleCardConfig = {
     </>
   ),
   locations: true,
+};
+
+export const SEARCH_CONSOLE_CARD: GoogleCardConfig = {
+  provider: "google_search_console",
+  brand: "search_console",
+  name: "Google Search Console",
+  rights: ["Je Google-account herkennen (e-mailadres)", "Zoekgegevens van je websites bekijken (alleen lezen)"],
+  copy: {
+    disconnected: "Zie klikken, vertoningen en zoekwoorden van je website in SEO Intelligence.",
+    connected: "Je zoekgegevens staan in SEO Intelligence onder Zoekresultaten.",
+    expired: "Je koppeling met Search Console is verlopen.",
+    permission: "Mavix mist leestoegang tot Search Console. Koppel opnieuw en sta de toegang toe.",
+    disconnect: "Mavix verwijdert de opgeslagen toegang. In Search Console verandert niets. Andere Google-koppelingen blijven werken.",
+  },
+  manageHint: (
+    <>
+      Bekijk je zoekgegevens in <Link href="/seo">SEO Intelligence</Link>. Alleen websites waar je Google-account toegang toe heeft in Search Console zijn zichtbaar.
+    </>
+  ),
 };
 
 const dateTime = (iso?: string | null) =>

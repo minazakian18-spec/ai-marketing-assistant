@@ -114,7 +114,9 @@ export function buildImportPreview(
   });
 }
 
-export function toImportedContacts(results: ImportRowResult[]): Contact[] {
+// Imported addresses get "Niet bevestigd" unless the user confirms that these
+// people gave permission for marketing e-mail.
+export function toImportedContacts(results: ImportRowResult[], consented = false): Contact[] {
   const now = new Date().toISOString();
   return results
     .filter((r): r is ImportRowResult & { status: "valid" } =>
@@ -128,7 +130,7 @@ export function toImportedContacts(results: ImportRowResult[]): Contact[] {
       phone: r.data.phone || undefined,
       company: r.data.company || undefined,
       group: r.data.group || undefined,
-      status: "Ingeschreven" as const,
+      status: consented ? ("Ingeschreven" as const) : ("Niet bevestigd" as const),
       source: "import" as const,
       createdAt: now,
     }));

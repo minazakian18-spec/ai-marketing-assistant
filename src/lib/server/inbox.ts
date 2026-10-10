@@ -943,6 +943,8 @@ export type ListParams = {
   filter?: "open" | "unread" | "mine" | "resolved";
   q?: string;
   cursor?: string;
+  /** Newest first (default) or oldest first. */
+  sort?: "newest" | "oldest";
 };
 
 const like = (q: string) => "%" + q.replace(/[\\%_]/g, (c) => "\\" + c) + "%";
@@ -971,12 +973,13 @@ export async function listConversations(
   const gmailAccount = await visibleGmailAccount(workspaceId);
   if (p.channel === "gmail" && !gmailAccount)
     return { conversations: [], nextCursor: null };
+  const asc = p.sort === "oldest";
   let query = db()
     .from("inbox_conversations")
     .select(CONVERSATION_COLUMNS)
     .eq("workspace_id", workspaceId)
-    .order("last_message_at", { ascending: false })
-    .order("id", { ascending: false })
+    .order("last_message_at", { ascending: asc })
+    .order("id", { ascending: asc })
     .limit(CONVERSATION_PAGE + 1);
   if (p.channel) query = query.eq("provider", p.channel);
   if (p.channel === "gmail") query = query.eq("provider_account_id", gmailAccount!);
@@ -995,8 +998,9 @@ export async function listConversations(
     if (!at || isNaN(Date.parse(at)) || !/^[0-9a-f-]{36}$/.test(id || ""))
       throw new HttpError(400, "Ongeldige pagina.");
     const iso = new Date(at).toISOString();
+    const op = asc ? "gt" : "lt";
     conditions.push(
-      `or(last_message_at.lt."${iso}",and(last_message_at.eq."${iso}",id.lt.${id}))`,
+      `or(last_message_at.${op}."${iso}",and(last_message_at.eq."${iso}",id.${op}.${id}))`,
     );
   }
   if (conditions.length === 1) query = query.or(conditions[0].slice(3, -1));
@@ -1039,6 +1043,29 @@ export async function listConversations(
         ? last.last_message_at + "|" + last.id
         : null,
   };
+}
+
+// Conversations with unread messages per channel (for the channel rail).
+// Gmail counts only the mailbox that is linked right now.
+export async function unreadByChannel(workspaceId: string): Promise<Record<Channel, number>> {
+  const gmailAccount = await visibleGmailAccount(workspaceId);
+  const channels: Channel[] = ["gmail", "instagram", "messenger", "whatsapp"];
+  const counts = await Promise.all(
+    channels.map(async (channel) => {
+      if (channel === "gmail" && !gmailAccount) return 0;
+      let query = db()
+        .from("inbox_conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId)
+        .eq("provider", channel)
+        .gt("unread_count", 0);
+      if (channel === "gmail") query = query.eq("provider_account_id", gmailAccount!);
+      const { count, error } = await query;
+      if (error) throw error;
+      return count || 0;
+    }),
+  );
+  return Object.fromEntries(channels.map((c, i) => [c, counts[i]])) as Record<Channel, number>;
 }
 
 export async function unreadCount(workspaceId: string) {

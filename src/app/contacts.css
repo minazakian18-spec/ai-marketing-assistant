@@ -186,3 +186,240 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Newsletter: status column, consent choice, forms and consent dialogs */
+.contacts-status-cell small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.contacts-status {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.contacts-status.is-in {
+  background: #e8f5ee;
+  color: #1f6b3d;
+}
+.contacts-status.is-pending {
+  background: #fdf3e1;
+  color: #7a5412;
+}
+.contacts-status.is-out {
+  background: #f3f2f6;
+  color: #55516a;
+}
+.contacts-consent-check {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 400 !important;
+  line-height: 1.5;
+}
+.contacts-consent-check input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+}
+.nlf-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(20, 18, 30, 0.28);
+}
+.nlf {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 81;
+  display: flex;
+  flex-direction: column;
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(24, 18, 43, 0.04), 0 18px 48px rgba(24, 18, 43, 0.16);
+  transform: translate(-50%, -50%);
+}
+.nlf-narrow {
+  width: min(520px, calc(100vw - 32px));
+}
+.nlf header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 14px 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.nlf header > div {
+  flex: 1;
+  min-width: 0;
+}
+.nlf header h2 {
+  margin: 0 0 3px;
+  font-size: 16px;
+  color: var(--color-primary-dark);
+}
+.nlf header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+.nlf-close {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.nlf-close:hover {
+  background: #f3f2f6;
+}
+.nlf-body {
+  display: grid;
+  gap: 14px;
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+}
+.nlf-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nlf-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.nlf-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.nlf-state {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f3f2f6;
+  font-size: 11px;
+  font-weight: 600;
+  color: #55516a;
+}
+.nlf-state.is-on {
+  background: #e8f5ee;
+  color: #1f6b3d;
+}
+.nlf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.nlf-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+}
+.nlf-form {
+  display: grid;
+  gap: 4px;
+}
+.nlf-form .nlf-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.nlf-body > .button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.consent-log {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0 0 0 16px;
+  border-left: 2px solid #ece6fa;
+  list-style: none;
+}
+.consent-log li {
+  display: grid;
+  gap: 3px;
+  font-size: 13px;
+}
+.consent-log time,
+.consent-log small {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+.consent-log blockquote {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #faf9fd;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+.consent-erase {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.consent-erase > .button {
+  justify-self: start;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .nlf {
+    animation: nlf-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+@keyframes nlf-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px));
+  }
+}
+@media (max-width: 650px) {
+  .nlf,
+  .nlf-narrow {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 14px 14px 0 0;
+    transform: none;
+  }
+  @keyframes nlf-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+}

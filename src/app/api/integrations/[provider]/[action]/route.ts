@@ -1,5 +1,6 @@
 import { handleCalendarIntegration } from "@/lib/server/calendar-oauth";
 import { handleBusinessIntegration } from "@/lib/server/google-business-oauth";
+import { handleSearchConsoleIntegration } from "@/lib/server/search-console-oauth";
 import { oauthStateMatches } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -130,6 +131,8 @@ export async function POST(request: Request, { params }: Context) {
       return handleCalendarIntegration(request, route.action);
     if (route.provider === "google_business")
       return handleBusinessIntegration(request, route.action);
+    if (route.provider === "google_search_console")
+      return handleSearchConsoleIntegration(request, route.action);
     sameOrigin(request);
     if (!PROVIDERS.includes(route.provider))
       throw new HttpError(404, "Niet gevonden.");
@@ -382,6 +385,8 @@ export async function GET(request: Request, { params }: Context) {
       return handleCalendarIntegration(request, route.action);
     if (route.provider === "google_business")
       return handleBusinessIntegration(request, route.action);
+    if (route.provider === "google_search_console")
+      return handleSearchConsoleIntegration(request, route.action);
     if (!PROVIDERS.includes(route.provider))
       throw new HttpError(404, "Niet gevonden.");
     const provider = route.provider as Provider | "messenger" | "whatsapp",

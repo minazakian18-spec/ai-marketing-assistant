@@ -1,13 +1,12 @@
 "use client";
 import { useState, type ChangeEvent } from "react";
-import { Save, Camera } from "lucide-react";
+import { Save, Camera, Building2, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useWorkspace } from "@/components/workspace-provider";
 import { PageHeading } from "@/components/ui";
 export function AccountForm() {
   const { data, save } = useWorkspace();
   const [account, setAccount] = useState(data.account);
-  const [profile, setProfile] = useState(data.profile);
   const [message, setMessage] = useState("");
   const [photoError, setPhotoError] = useState("");
   const [loadingPhoto, setLoadingPhoto] = useState(false);
@@ -47,34 +46,17 @@ export function AccountForm() {
   return (
     <>
       <PageHeading
-        eyebrow="JOUW INSTELLINGEN"
-        title="Mijn account"
-        description="Beheer je persoonlijke gegevens en je bedrijfsgegevens."
+        eyebrow="Persoonlijk"
+        title="Account en profiel"
+        description="Je naam, foto en contactgegevens in Mavix."
       />
       <form
         onChange={() => setMessage("")}
         onSubmit={async (e) => {
           e.preventDefault();
           try { const response=await fetch("/api/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(account)});const result=await response.json();if(!response.ok)throw new Error(result.error); } catch(error) {setMessage(error instanceof Error?error.message:"Profiel opslaan mislukt.");return;}
-          if (
-            await save({
-              ...data,
-              account,
-              profile: {
-                ...data.profile,
-                name: profile.name,
-                industry: profile.industry,
-                website: profile.website,
-                phone: profile.phone,
-                address: profile.address,
-                postalCode: profile.postalCode,
-                city: profile.city,
-                country: profile.country,
-                vatNumber: profile.vatNumber,
-              },
-            })
-          )
-            setMessage("Je accountgegevens zijn opgeslagen.");
+          if (await save({ ...data, account }, "Je gegevens zijn opgeslagen"))
+            setMessage("Je gegevens zijn opgeslagen.");
         }}
       >
         <section className="panel account-panel">
@@ -147,50 +129,14 @@ export function AccountForm() {
             </div>
           </div>
         </section>
-        <section className="panel account-panel">
-          <div className="section-heading">
-            <div>
-              <h2>Bedrijfsgegevens</h2>
-              <p>
-                Bedrijfsnaam en branche zijn dezelfde gegevens als in{" "}
-                <Link className="text-link" href="/brand-hub">
-                  Brand Hub
-                </Link>
-                .
-              </p>
-            </div>
-          </div>
-          <div className="account-panel-body account-fields">
-            {(
-              [
-                ["name", "Bedrijfsnaam", "text"],
-                ["industry", "Branche", "text"],
-                ["website", "Website", "url"],
-                ["phone", "Bedrijfstelefoon", "tel"],
-                ["address", "Adres", "text"],
-                ["postalCode", "Postcode", "text"],
-                ["city", "Plaats", "text"],
-                ["country", "Land", "text"],
-                ["vatNumber", "BTW-nummer", "text"],
-              ] as const
-            ).map(([key, label, type]) => (
-              <label key={key}>
-                {label}
-                <input
-                  type={type}
-                  maxLength={300}
-                  placeholder={
-                    key === "website" ? "https://jouwbedrijf.nl" : undefined
-                  }
-                  value={profile[key]}
-                  onChange={(e) =>
-                    setProfile({ ...profile, [key]: e.target.value })
-                  }
-                />
-              </label>
-            ))}
-          </div>
-        </section>
+        <Link href="/account/bedrijf" className="panel account-panel st-crosslink">
+          <Building2 size={18} aria-hidden="true" />
+          <span>
+            <strong>Bedrijfsgegevens</strong>
+            <small>Bedrijfsnaam, adres en btw-nummer staan nu onder Bedrijfsinstellingen.</small>
+          </span>
+          <ArrowRight size={16} aria-hidden="true" />
+        </Link>
         <div className="account-save">
           <p role="status" className="success-message">
             {message}

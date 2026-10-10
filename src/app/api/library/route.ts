@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { workspace, failure, limited } from "@/lib/server/access";
 import { hasRole } from "@/lib/security";
-import { listLibrary } from "@/lib/server/library";
+import { LibrarySetupError, listLibrary } from "@/lib/server/library";
 
 // Albums, files (with short-lived preview URLs) and storage usage.
 export async function GET() {
@@ -12,6 +12,8 @@ export async function GET() {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch (e) {
+    // "setup": the page shows a friendly "being set up" state instead of an error.
+    if (e instanceof LibrarySetupError) return NextResponse.json({ error: e.message, setup: true }, { status: 503, headers: { "Cache-Control": "no-store" } });
     return failure(e);
   }
 }

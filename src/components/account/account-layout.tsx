@@ -3,31 +3,40 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
-import { accountLinks } from "./account-nav";
+import { accountGroups } from "./account-nav";
 import { useWorkspace } from "@/components/workspace-provider";
+
+// Settings shell: grouped navigation on the left (a scrollable row on
+// phones) and the selected settings page on the right.
 export function AccountLayout({ children }: { children: ReactNode }) {
   const path = usePathname();
   const { ready, logout } = useWorkspace();
   return (
-    <div className="account-settings">
-      <nav className="account-tabs" aria-label="Accountinstellingen">
-        {accountLinks.map(([href, label, Icon]) => (
-          <Link
-            key={href}
-            href={href}
-            aria-current={path === href ? "page" : undefined}
-          >
-            <Icon size={16} />
-            {label}
-          </Link>
+    <div className="account-settings st">
+      <nav className="st-nav" aria-label="Instellingen">
+        {accountGroups.map((g) => (
+          <div key={g.label} className="st-group">
+            <p className="st-group-label">{g.label}</p>
+            {g.links.map(([href, label, description, Icon]) => (
+              <Link key={href} href={href} className="st-link" aria-current={path === href ? "page" : undefined}>
+                <span className="st-link-icon" aria-hidden="true">
+                  <Icon size={16} />
+                </span>
+                <span className="st-link-text">
+                  <strong>{label}</strong>
+                  <small>{description}</small>
+                </span>
+              </Link>
+            ))}
+          </div>
         ))}
-      </nav>
-      {ready ? children : <p role="status">Account laden…</p>}
-      <div className="account-footer">
-        <button className="logout-button" onClick={logout} disabled={!ready}>
-          <LogOut size={17} />
+        <button type="button" className="st-logout" onClick={logout} disabled={!ready}>
+          <LogOut size={15} aria-hidden="true" />
           Uitloggen
         </button>
+      </nav>
+      <div className="st-content" key={path}>
+        {ready ? children : <p role="status">Instellingen laden…</p>}
       </div>
     </div>
   );

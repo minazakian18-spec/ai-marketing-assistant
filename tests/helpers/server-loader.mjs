@@ -46,11 +46,16 @@ export function memoryDb(tables) {
     let operation = "read",
       values,
       options,
-      returning = false;
+      returning = false,
+      countMode = false,
+      head = false;
     const predicates = [];
+    const sorters = [];
     const q = {
-      select() {
+      select(_columns, opts) {
         returning = true;
+        countMode = !!opts?.count;
+        head = !!opts?.head;
         return q;
       },
       eq(key, value) {
@@ -73,11 +78,21 @@ export function memoryDb(tables) {
         predicates.push((row) => row[key] > value);
         return q;
       },
+      lt(key, value) {
+        predicates.push((row) => row[key] < value);
+        return q;
+      },
+      lte(key, value) {
+        predicates.push((row) => row[key] <= value);
+        return q;
+      },
       is(key, value) {
         predicates.push((row) => row[key] === value);
         return q;
       },
-      order() {
+      order(key, opts) {
+        const dir = opts?.ascending === false ? -1 : 1;
+        sorters.push((a, b) => (a[key] < b[key] ? -dir : a[key] > b[key] ? dir : 0));
         return q;
       },
       limit() {
@@ -147,9 +162,18 @@ export function memoryDb(tables) {
         selected.forEach((row) => Object.assign(row, values));
       if (operation === "delete")
         tables[table] = rows.filter((row) => !selected.includes(row));
+      if (operation === "read" && sorters.length)
+        selected = [...selected].sort((a, b) => {
+          for (const s of sorters) {
+            const r = s(a, b);
+            if (r) return r;
+          }
+          return 0;
+        });
       return {
         data:
-          operation === "read" || returning ? structuredClone(selected) : null,
+          head ? null : operation === "read" || returning ? structuredClone(selected) : null,
+        ...(countMode ? { count: selected.length } : {}),
         error: null,
       };
     }

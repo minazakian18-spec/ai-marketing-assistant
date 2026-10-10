@@ -19,11 +19,14 @@ import {
   X,
   Files,
   Folder,
+  NotebookPen,
+  Clock,
 } from "lucide-react";
 import { PageHeading, IconButton, EmptyState } from "@/components/ui";
 import { Menu } from "@/components/menu";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
 import { FileTile, Thumb } from "@/components/library/file-tile";
+import { Drafts, workspaceDrafts } from "@/components/library/drafts";
 import { useWorkspace } from "@/components/workspace-provider";
 import { isBrowserDemo } from "@/lib/demo";
 import {
@@ -38,7 +41,7 @@ import {
 } from "@/lib/library/shared";
 import "../../library.css";
 
-type Section = { type: "all" } | { type: "kind"; kind: LibraryKind } | { type: "album"; id: string };
+type Section = { type: "all" } | { type: "kind"; kind: LibraryKind } | { type: "album"; id: string } | { type: "drafts" };
 type Sort = "newest" | "oldest" | "name" | "size";
 const KINDS: [LibraryKind, string, typeof ImagesIcon][] = [
   ["image", "Afbeeldingen", ImagesIcon],
@@ -58,7 +61,7 @@ const VIEW_KEY = "mavix.library.view";
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, init?.body && typeof init.body === "string" ? { ...init, headers: { "Content-Type": "application/json" } } : init);
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.error || "Er ging iets mis. Probeer het opnieuw.");
+  if (!r.ok) throw Object.assign(new Error(d.error || "Er ging iets mis. Probeer het opnieuw."), { setup: !!d.setup });
   return d as T;
 }
 
@@ -67,6 +70,7 @@ export default function LibraryPage() {
   const [demo, setDemo] = useState(false);
   const [lib, setLib] = useState<LibraryData | null>(null);
   const [loadError, setLoadError] = useState("");
+  const [setupPending, setSetupPending] = useState(false);
   const [message, setMessage] = useState("");
   const [section, setSection] = useState<Section>({ type: "all" });
   const [query, setQuery] = useState("");
@@ -87,7 +91,9 @@ export default function LibraryPage() {
     try {
       setLib(await api<LibraryData>("/api/library"));
       setLoadError("");
+      setSetupPending(false);
     } catch (e) {
+      setSetupPending(!!(e as { setup?: boolean }).setup);
       setLoadError(e instanceof Error ? e.message : "De bibliotheek kon niet worden geladen.");
     }
   }, []);
@@ -133,8 +139,9 @@ export default function LibraryPage() {
   }, [files, section, query, sort]);
 
   const currentAlbum = section.type === "album" ? albums.find((a) => a.id === section.id) : undefined;
+  const drafts = useMemo(() => workspaceDrafts(workspace), [workspace]);
   const title =
-    section.type === "all" ? "Alle bestanden" : section.type === "kind" ? KINDS.find((k) => k[0] === section.kind)![1] : currentAlbum?.name || "Album";
+    section.type === "all" ? "Alle bestanden" : section.type === "drafts" ? "Concepten" : section.type === "kind" ? KINDS.find((k) => k[0] === section.kind)![1] : currentAlbum?.name || "Album";
 
   /* ---------- actions ---------- */
   async function upload(list: FileList | File[] | null) {
@@ -254,14 +261,32 @@ export default function LibraryPage() {
         </section>
       ) : loadError ? (
         <section className="ui-card">
-          <EmptyState icon={<ImagesIcon size={18} />} title="Bibliotheek niet beschikbaar" action={<button className="button secondary" onClick={() => void load()}>Opnieuw proberen</button>}>
-            {loadError}
+          <EmptyState
+            icon={setupPending ? <Clock size={18} /> : <ImagesIcon size={18} />}
+            title={setupPending ? "De bibliotheek wordt nog ingericht" : "Bibliotheek even niet beschikbaar"}
+            action={
+              <button className="button secondary" onClick={() => void load()}>
+                Opnieuw proberen
+              </button>
+            }
+          >
+            {setupPending
+              ? "De opslag voor je bestanden is nog niet klaar. Je bestaande gegevens zijn veilig. Probeer het later opnieuw; blijft dit zo, neem dan contact op met je Mavix-beheerder."
+              : loadError}
           </EmptyState>
         </section>
       ) : !lib ? (
-        <p role="status" className="lb-muted">
-          Bibliotheek laden…
-        </p>
+        <div className="lb-skeleton" role="status" aria-label="Bibliotheek laden">
+          <div className="lb-skel lb-skel-bar" />
+          <div className="lb-skel-layout">
+            <div className="lb-skel lb-skel-nav" />
+            <div className="lb-skel-grid">
+              {Array.from({ length: 8 }, (_, i) => (
+                <div key={i} className="lb-skel lb-skel-tile" />
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           <section className="ui-card lb-storage" aria-label="Opslag">
@@ -300,6 +325,7 @@ export default function LibraryPage() {
                   setSection({ type: "kind", kind }),
                 ),
               )}
+              {navButton(section.type === "drafts", "Concepten", <NotebookPen size={16} />, drafts.length, () => setSection({ type: "drafts" }))}
               <div className="lb-nav-head">
                 <h2>Albums</h2>
                 {canEdit && (
@@ -409,7 +435,9 @@ export default function LibraryPage() {
                 </p>
               )}
 
-              {shown.length ? (
+              {section.type === "drafts" ? (
+                <Drafts drafts={drafts} query={query} />
+              ) : shown.length ? (
                 <ul className={layout === "grid" ? "lb-grid" : "lb-list"}>
                   {layout === "list" && (
                     <li className="lb-row lb-row-head" aria-hidden="true">

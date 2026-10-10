@@ -31,11 +31,13 @@ export function ImportWizard({
   const [step, setStep] = useState<"map" | "preview">("map");
   const [mapping, setMapping] = useState<Record<string, MavixField | "">>({});
   const [mappingError, setMappingError] = useState("");
+  const [consented, setConsented] = useState(false);
   useEffect(() => {
     if (open && sheet) {
       setMapping(guessMapping(sheet.headers));
       setStep("map");
       setMappingError("");
+      setConsented(false);
     }
   }, [open, sheet]);
   if (!sheet) return null;
@@ -65,7 +67,7 @@ export function ImportWizard({
           }
           setStep("preview");
         } else {
-          onImport(toImportedContacts(preview));
+          onImport(toImportedContacts(preview, consented));
           onClose();
         }
       }}
@@ -130,6 +132,13 @@ export function ImportWizard({
             Ongeldige e-mailadressen en contacten die al bestaan worden niet
             geïmporteerd.
           </p>
+          <label className="contacts-consent-check">
+            <input type="checkbox" checked={consented} onChange={(e) => setConsented(e.target.checked)} />
+            <span>
+              Deze mensen hebben toestemming gegeven voor e-mailmarketing (nieuwsbrief). Zonder vinkje krijgen ze de status
+              &ldquo;Niet bevestigd&rdquo; en ontvangen ze geen campagnes.
+            </span>
+          </label>
         </>
       )}
     </ConfirmDialog>

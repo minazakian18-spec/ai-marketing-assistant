@@ -18,6 +18,7 @@ import {
   RotateCcw,
   StickyNote,
   UserPlus,
+  Wand2,
   X,
 } from "lucide-react";
 import { Mavi } from "@/components/mavi";
@@ -52,6 +53,14 @@ export type SendPayload = {
   template?: { name: string; language: string; variables: string[] };
 };
 export type ConversationPatch = { status?: ConversationStatus; assignedUserId?: string | null; unread?: boolean; labels?: string[] };
+export type RewriteStyle = "professional" | "friendly" | "formal" | "shorter" | "longer";
+const REWRITE: [RewriteStyle, string][] = [
+  ["professional", "Professioneler"],
+  ["friendly", "Vriendelijker"],
+  ["formal", "Formeler (u)"],
+  ["shorter", "Korter"],
+  ["longer", "Uitgebreider"],
+];
 
 const STATUS_TEXT = { open: "Open", pending: "In afwachting", resolved: "Afgehandeld" } as const;
 const STATUS_ICON = {
@@ -109,6 +118,7 @@ export function Thread({
   detailsOpen = false,
   onUpdate,
   onSuggest,
+  onRewrite,
   templates,
   onLoadTemplates,
 }: {
@@ -126,6 +136,8 @@ export function Thread({
   detailsOpen?: boolean;
   onUpdate: (patch: ConversationPatch) => void;
   onSuggest: () => Promise<string | null>;
+  /** Rewrites the current draft (tone/length); the result is a draft again. */
+  onRewrite: (draft: string, style: RewriteStyle) => Promise<string | null>;
   templates: Template[] | null;
   onLoadTemplates: () => void;
 }) {
@@ -135,6 +147,8 @@ export function Thread({
   const [notice, setNotice] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const [suggested, setSuggested] = useState(false);
+  // The text before the last Mavi change, for "Ongedaan maken".
+  const [undo, setUndo] = useState<string | null>(null);
   const [template, setTemplate] = useState<Template | null>(null);
   const [vars, setVars] = useState<string[]>([]);
   const scroller = useRef<HTMLDivElement>(null);
@@ -147,6 +161,7 @@ export function Thread({
     setFiles([]);
     setNotice("");
     setSuggested(false);
+    setUndo(null);
     setTemplate(null);
   }, [c.id]);
 
@@ -189,6 +204,7 @@ export function Thread({
     onDraft("");
     setFiles([]);
     setSuggested(false);
+    setUndo(null);
   }
 
   function keyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -226,6 +242,7 @@ export function Thread({
     try {
       const text = await onSuggest();
       if (text) {
+        setUndo(draft);
         onDraft(text);
         setMode("reply");
         setSuggested(true);
@@ -233,6 +250,25 @@ export function Thread({
       }
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Mavi kon geen voorstel maken.");
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  async function rewrite(style: RewriteStyle) {
+    if (!draft.trim()) return;
+    setSuggesting(true);
+    setNotice("");
+    try {
+      const text = await onRewrite(draft, style);
+      if (text) {
+        setUndo(draft);
+        onDraft(text);
+        setSuggested(true);
+        window.setTimeout(() => input.current?.focus(), 0);
+      }
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Mavi kon de tekst niet aanpassen.");
     } finally {
       setSuggesting(false);
     }
@@ -375,7 +411,23 @@ export function Thread({
             Het 24-uursvenster van {caps.label} is gesloten. Je kunt weer antwoorden zodra de klant opnieuw een bericht stuurt.
           </p>
         )}
-        {suggested && !noteMode && <p className="ib-ai-note">Voorstel van Mavi — controleer en pas aan voor je verstuurt.</p>}
+        {suggested && !noteMode && (
+          <p className="ib-ai-note">
+            Voorstel van Mavi. Controleer en pas het aan; er wordt niets verstuurd tot jij op Versturen drukt.
+            {undo !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  onDraft(undo);
+                  setUndo(null);
+                  setSuggested(false);
+                }}
+              >
+                Ongedaan maken
+              </button>
+            )}
+          </p>
+        )}
         {notice && (
           <p className="ib-error" role="alert">
             {notice}
@@ -475,6 +527,22 @@ export function Thread({
                   <IconButton label="Antwoord laten voorstellen door Mavi" onClick={() => void suggest()} disabled={suggesting || blocked}>
                     <Mavi size={16} state={suggesting ? "thinking" : "idle"} />
                   </IconButton>
+                )}
+                {!noteMode && (
+                  <Menu
+                    label="Tekst aanpassen met Mavi"
+                    className="ib-rewrite-menu"
+                    trigger={<Wand2 size={16} />}
+                    align="start"
+                    items={[
+                      { type: "heading", label: draft.trim() ? "Mavi past je tekst aan" : "Schrijf eerst een tekst" },
+                      ...REWRITE.map(([style, label]) => ({
+                        label,
+                        disabled: !draft.trim() || suggesting || blocked,
+                        onSelect: () => void rewrite(style),
+                      })),
+                    ]}
+                  />
                 )}
                 <span className="ib-compose-hint">Enter om te versturen · Shift+Enter nieuwe regel</span>
               </div>

@@ -1,0 +1,119 @@
+:root {
+  --nl-bg: #f6f5fa;
+  --nl-card: #ffffff;
+  --nl-border: #e6e3ef;
+  --nl-text: #1d1830;
+  --nl-muted: #5d5872;
+  --nl-accent: #6d28d9;
+  --nl-accent-text: #ffffff;
+  --nl-error: #b42318;
+}
+.nl-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  background: var(--nl-bg);
+  color: var(--nl-text);
+}
+.nl-card {
+  width: min(440px, 100%);
+  padding: 28px 24px;
+  border: 1px solid var(--nl-border);
+  border-radius: 16px;
+  background: var(--nl-card);
+  box-shadow: 0 1px 2px rgba(24, 18, 43, 0.04), 0 12px 32px rgba(24, 18, 43, 0.06);
+}
+.nl-card h1 {
+  margin: 0 0 6px;
+  font-size: 21px;
+  line-height: 1.3;
+  color: #2e1065;
+}
+.nl-card p {
+  margin: 0 0 16px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--nl-muted);
+}
+.nl-form {
+  display: grid;
+  gap: 12px;
+}
+.nl-form label {
+  display: grid;
+  gap: 5px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.nl-form input[type="email"],
+.nl-form input[type="text"] {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d6d2e2;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--nl-text);
+  background: #fff;
+}
+.nl-form input:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+.nl-form .nl-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--nl-text);
+}
+.nl-consent input {
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--nl-accent);
+}
+.nl-consent a,
+.nl-card a {
+  color: var(--nl-accent);
+}
+.nl-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.nl-button {
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--nl-accent);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--nl-accent-text);
+  cursor: pointer;
+}
+.nl-button:hover {
+  filter: brightness(1.06);
+}
+.nl-button:focus-visible {
+  outline: 2px solid #2e1065;
+  outline-offset: 2px;
+}
+.nl-error {
+  color: var(--nl-error) !important;
+}
+.nl-foot {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-muted);
+}

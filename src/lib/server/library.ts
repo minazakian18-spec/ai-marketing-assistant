@@ -19,6 +19,22 @@ const BUCKET = "library";
 const db = () => adminClient();
 const UUID = /^[0-9a-f-]{36}$/;
 
+// The database or storage is not set up (migration 202610060001_library.sql
+// not applied). Users get a plain message; the server log names what is
+// missing so an administrator can fix it. Nothing is hidden or faked.
+export class LibrarySetupError extends HttpError {
+  constructor(public missing: string) {
+    super(503, "De bibliotheek wordt nog ingericht. Probeer het later opnieuw.");
+  }
+}
+const MISSING_TABLE = ["PGRST205", "42P01", "PGRST202", "42883"];
+function setupCheck(error: { code?: string; message?: string } | null, what: string) {
+  if (!error) return;
+  const missing = MISSING_TABLE.includes(error.code || "") || /bucket not found|nosuchbucket/i.test(error.message || "");
+  console.error(JSON.stringify({ event: missing ? "library_not_provisioned" : "library_db_error", missing: what, code: error.code || "storage" }));
+  throw missing ? new LibrarySetupError(what) : new HttpError(503, "De bibliotheek is tijdelijk niet beschikbaar. Probeer het later opnieuw.");
+}
+
 // Optional storage limit per workspace. Without it Mavix shows usage only
 // and does not invent a quota.
 export function quotaBytes(): number | null {
@@ -33,12 +49,12 @@ async function ensureSystemAlbums(workspaceId: string) {
       SYSTEM_ALBUMS.map((a) => ({ workspace_id: workspaceId, system_key: a.key, name: a.name })),
       { onConflict: "workspace_id,system_key", ignoreDuplicates: true },
     );
-  if (error) throw new HttpError(503, "De bibliotheek is nog niet ingericht. Voer de database-migratie uit.");
+  setupCheck(error, "table library_albums");
 }
 
 async function usage(workspaceId: string) {
   const { data, error } = await db().rpc("library_usage", { p_workspace: workspaceId });
-  if (error) throw error;
+  setupCheck(error, "function library_usage");
   return Number(data) || 0;
 }
 
@@ -54,11 +70,12 @@ export async function listLibrary(workspaceId: string, canEdit: boolean): Promis
       .limit(2000),
     usage(workspaceId),
   ]);
-  if (aErr || fErr) throw aErr || fErr;
+  setupCheck(aErr || fErr, "table library_files");
   const paths = (files || []).map((f) => f.storage_path as string);
   const signed = new Map<string, string>();
   for (let i = 0; i < paths.length; i += 500) {
-    const { data } = await db().storage.from(BUCKET).createSignedUrls(paths.slice(i, i + 500), 3600);
+    const { data, error } = await db().storage.from(BUCKET).createSignedUrls(paths.slice(i, i + 500), 3600);
+    setupCheck(error && /bucket/i.test(error.message) ? error : null, "storage bucket library");
     for (const s of data || []) if (s.path && s.signedUrl) signed.set(s.path, s.signedUrl);
   }
   const counts = new Map<string, number>();
@@ -122,6 +139,7 @@ export async function uploadFiles(
     const ext = (f.name.match(/\.([a-z0-9]{1,8})$/i)?.[1] || "bin").toLowerCase();
     const path = `${ctx.workspaceId}/${randomUUID()}.${ext}`;
     const { error: upErr } = await db().storage.from(BUCKET).upload(path, f, { contentType: f.type, upsert: false });
+    if (upErr && /bucket/i.test(upErr.message)) setupCheck(upErr, "storage bucket library");
     if (upErr) throw new HttpError(502, "Uploaden is niet gelukt. Probeer het opnieuw.");
     const kind = options.kind && options.kind !== "other" ? options.kind : LIBRARY_TYPES[f.type];
     const { data, error } = await db()

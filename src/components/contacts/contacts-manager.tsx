@@ -11,12 +11,17 @@ import {
   Trash2,
   Mail,
   Users,
+  ShieldCheck,
+  FileInput,
 } from "lucide-react";
 import { usePresence } from "@/components/use-presence";
 import { useWorkspace } from "@/components/workspace-provider";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
 import { ContactFormDialog } from "./contact-form-dialog";
 import { ImportWizard } from "./import-wizard";
+import { NewsletterForms } from "./newsletter-forms";
+import { ConsentDialog } from "./consent-dialog";
+import { isNewsletterContact, NEWSLETTER_GROUP } from "@/lib/newsletter";
 import { contactName, distinctGroups, segmentForGroup } from "@/lib/contact-data";
 import { parseContactFile, type ParsedSheet } from "@/lib/contact-import";
 import type { Contact } from "@/lib/types";
@@ -26,11 +31,13 @@ function ContactRowMenu({
   onEdit,
   onGroup,
   onDelete,
+  onConsent,
 }: {
   contact: Contact;
   onEdit: () => void;
   onGroup: () => void;
   onDelete: () => void;
+  onConsent?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const present = usePresence(open);
@@ -89,6 +96,18 @@ function ContactRowMenu({
           >
             <Tags size={15} /> Voeg toe aan groep
           </button>
+          {onConsent && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onConsent();
+              }}
+            >
+              <ShieldCheck size={15} /> Toestemming bekijken
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -107,6 +126,8 @@ function ContactRowMenu({
 }
 
 type Filter = "all" | "recent" | string;
+const STATUS_CLASS: Record<Contact["status"], string> = { Ingeschreven: "is-in", "Niet bevestigd": "is-pending", Uitgeschreven: "is-out" };
+const NEWSLETTER_FILTER = "__newsletter";
 
 export function ContactsManager() {
   const { data, save } = useWorkspace();
@@ -128,8 +149,11 @@ export function ContactsManager() {
   >(null);
   const [groupDraft, setGroupDraft] = useState("");
   const [message, setMessage] = useState("");
+  const [formsOpen, setFormsOpen] = useState(false);
+  const [consentFor, setConsentFor] = useState<Contact | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const groups = useMemo(() => distinctGroups(contacts), [contacts]);
+  const groups = useMemo(() => distinctGroups(contacts).filter((g) => g !== NEWSLETTER_GROUP), [contacts]);
+  const newsletterCount = useMemo(() => contacts.filter(isNewsletterContact).length, [contacts]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -137,6 +161,8 @@ export function ContactsManager() {
       if (filter === "recent") {
         const days = (Date.now() - new Date(c.createdAt).getTime()) / 86400000;
         if (days > 30) return false;
+      } else if (filter === NEWSLETTER_FILTER) {
+        if (!isNewsletterContact(c)) return false;
       } else if (filter !== "all" && c.group !== filter) return false;
       if (!term) return true;
       return (
@@ -246,6 +272,10 @@ export function ContactsManager() {
           {contacts.length} contact{contacts.length === 1 ? "" : "en"}
         </span>
         <div className="contacts-header-actions">
+          <button type="button" className="button secondary" onClick={() => setFormsOpen(true)}>
+            <FileInput size={16} />
+            Aanmeldformulieren
+          </button>
           <input
             ref={fileInput}
             type="file"
@@ -275,8 +305,9 @@ export function ContactsManager() {
           <Users size={28} />
           <h2>Bouw je publiek op</h2>
           <p>
-            Voeg e-mailadressen van klanten handmatig toe of importeer ze via
-            Excel om aan de slag te gaan met e-mail.
+            Voeg e-mailadressen van klanten handmatig toe, importeer ze via
+            Excel, of zet een aanmeldformulier op je website: nieuwe
+            nieuwsbriefabonnees verschijnen dan vanzelf hier.
           </p>
           <div className="contacts-header-actions">
             <button
@@ -326,6 +357,16 @@ export function ContactsManager() {
               >
                 Recent
               </button>
+              {newsletterCount > 0 && (
+                <button
+                  type="button"
+                  className="lib-filter-pill"
+                  aria-pressed={filter === NEWSLETTER_FILTER}
+                  onClick={() => setFilter(NEWSLETTER_FILTER)}
+                >
+                  Nieuwsbriefabonnees ({newsletterCount})
+                </button>
+              )}
               {groups.map((g) => (
                 <button
                   key={g}
@@ -403,6 +444,7 @@ export function ContactsManager() {
                   <th scope="col">E-mail</th>
                   <th scope="col">Bedrijf</th>
                   <th scope="col">Tag / groep</th>
+                  <th scope="col">Nieuwsbrief</th>
                   <th scope="col">Datum toegevoegd</th>
                   <th scope="col">
                     <span className="sr-only">Acties</span>
@@ -433,6 +475,17 @@ export function ContactsManager() {
                         "—"
                       )}
                     </td>
+                    <td className="contacts-status-cell">
+                      <span className={"contacts-status " + STATUS_CLASS[c.status]}>{c.status}</span>
+                      {c.newsletter && (
+                        <small>
+                          via formulier
+                          {c.newsletter.subscribedAt &&
+                            " · " +
+                              new Date(c.newsletter.subscribedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })}
+                        </small>
+                      )}
+                    </td>
                     <td>
                       {new Date(c.createdAt).toLocaleDateString("nl-NL", {
                         day: "numeric",
@@ -452,13 +505,14 @@ export function ContactsManager() {
                           setGroupPromptFor(c);
                         }}
                         onDelete={() => setDeleteTarget(c)}
+                        onConsent={c.newsletter ? () => setConsentFor(c) : undefined}
                       />
                     </td>
                   </tr>
                 ))}
                 {!filtered.length && (
                   <tr>
-                    <td colSpan={7} className="field-note">
+                    <td colSpan={8} className="field-note">
                       Geen contacten gevonden voor dit filter.
                     </td>
                   </tr>
@@ -481,6 +535,22 @@ export function ContactsManager() {
         }}
         onSave={upsertContact}
       />
+      {formsOpen && <NewsletterForms business={data.profile.name} canEdit onClose={() => setFormsOpen(false)} />}
+      {consentFor && (
+        <ConsentDialog
+          contact={consentFor}
+          canEdit
+          onClose={() => setConsentFor(null)}
+          onErased={() => {
+            const gone = consentFor;
+            setConsentFor(null);
+            void persistContacts(
+              contacts.filter((c) => c.id !== gone.id),
+              "De gegevens van " + gone.email + " zijn gewist.",
+            );
+          }}
+        />
+      )}
       <ImportWizard
         open={importOpen}
         sheet={importSheet}

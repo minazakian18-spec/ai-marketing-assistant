@@ -2,13 +2,21 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { workspace, failure, limited, sameOrigin, HttpError } from "@/lib/server/access";
 import { conversationForAi } from "@/lib/server/inbox";
-import { generateInboxReply, summarizeConversation } from "@/lib/server/ai";
+import { generateInboxReply, rewriteInboxReply, summarizeConversation } from "@/lib/server/ai";
 
 type Context = { params: Promise<{ id: string }> };
-const input = z.object({ action: z.enum(["reply", "summary"]), instruction: z.string().trim().max(500).optional() });
+const input = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("reply"), instruction: z.string().trim().max(500).optional() }),
+  z.object({ action: z.literal("summary") }),
+  z.object({
+    action: z.literal("rewrite"),
+    draft: z.string().trim().min(1).max(4000),
+    style: z.enum(["professional", "friendly", "formal", "shorter", "longer"]),
+  }),
+]);
 
-// "Mavi antwoord voorstellen" / summary. Returns a draft only; it is never
-// sent automatically.
+// "Mavi antwoord voorstellen", rewriting a draft (tone/length) and summaries.
+// Returns a draft only; it is never sent automatically.
 export async function POST(request: Request, { params }: Context) {
   try {
     sameOrigin(request);
@@ -21,7 +29,9 @@ export async function POST(request: Request, { params }: Context) {
     const text =
       body.action === "reply"
         ? await generateInboxReply(conversation, body.instruction)
-        : await summarizeConversation(conversation);
+        : body.action === "rewrite"
+          ? await rewriteInboxReply(conversation, body.draft, body.style)
+          : await summarizeConversation(conversation);
     return NextResponse.json({ text }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
     if (e instanceof z.ZodError) return failure(new HttpError(400, "Ongeldige aanvraag."));

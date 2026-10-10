@@ -17,6 +17,7 @@ import type { Workspace } from "@/lib/types";
 const Context = createContext<{
   data: Workspace;
   ready: boolean;
+  draftScope: string;
   save: (data: Workspace, message?: string) => Promise<boolean>;
   signedOut: boolean;
   logout: () => void;
@@ -25,6 +26,7 @@ const Context = createContext<{
 }>({
   data: emptyWorkspace,
   ready: false,
+  draftScope: "",
   save: async () => false,
   signedOut: false,
   logout: () => {},
@@ -47,6 +49,7 @@ export function WorkspaceProvider({
   const [ready, setReady] = useState(false),
     [error, setError] = useState(""),
     [toast, setToast] = useState("");
+  const [draftScope, setDraftScope] = useState("");
   const version = useRef(0),
     busy = useRef(false),
     role = useRef("MEMBER");
@@ -54,6 +57,7 @@ export function WorkspaceProvider({
   syncContacts(data.contacts);
   useEffect(() => {
     if (demo) {
+      setDraftScope("demo");
       try {
         const local = readWorkspace();
         setData(local);
@@ -76,6 +80,7 @@ export function WorkspaceProvider({
         if (!r.ok) throw new Error(result.error || "Laden mislukt.");
         if (active) {
           setData(result.data);
+          setDraftScope(result.draftScope);
           version.current = result.version;
           role.current = result.role;
           setReady(true);
@@ -129,6 +134,7 @@ export function WorkspaceProvider({
       value={{
         data,
         ready,
+        draftScope,
         save,
         signedOut: false,
         logout: () => {

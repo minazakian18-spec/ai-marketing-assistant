@@ -62,7 +62,7 @@ function respond(question: string, data: Workspace): AgentReply {
   if (/inbox|bericht|whatsapp|klantvraag/.test(q))
     return { text: "Klantgesprekken uit al je kanalen staan in de Inbox.", action: { href: "/inbox", label: "Open de Inbox" } };
   if (/seo|zoekmachine|vindbaar/.test(q))
-    return { text: "De SEO-werkruimte is in voorbereiding. Daar komt straks de analyse van je website.", action: { href: "/seo", label: "Open SEO" } };
+    return { text: "In SEO Intelligence analyseer je hoe vindbaar je website is, met concrete verbeterpunten en een snelheidsmeting van Google.", action: { href: "/seo", label: "Open SEO Intelligence" } };
   if (/advert|ads|google ads/.test(q))
     return { text: "Advertenties werken straks via een Google Ads-koppeling.", action: { href: "/ads", label: "Open Advertenties" } };
   if (/insta|post|social|reel|story|caption/.test(q))

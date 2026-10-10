@@ -4,6 +4,7 @@ import { ListFilter, Search, X } from "lucide-react";
 import { Menu, type MenuItem } from "@/components/menu";
 import { BrandIcon } from "@/components/brand-icon";
 import { capabilities, type Channel, type ConversationView } from "@/lib/inbox/shared";
+import { CHANNEL_NAME, type SortOrder } from "./channel-rail";
 import { initials, listTime } from "./format";
 
 export type StatusFilter = "open" | "unread" | "mine" | "resolved";
@@ -28,7 +29,6 @@ export function ContactAvatar({ name, channel, size = 38 }: { name: string; chan
 
 export function ConversationList({
   conversations,
-  channels,
   selectedId,
   channel,
   status,
@@ -36,8 +36,10 @@ export function ConversationList({
   loading,
   hasMore,
   unread,
+  sort,
   onChannel,
   onStatus,
+  onSort,
   onQuery,
   onSelect,
   onMore,
@@ -45,7 +47,6 @@ export function ConversationList({
   extraMore,
 }: {
   conversations: ConversationView[];
-  channels: Channel[];
   selectedId: string | null;
   channel: Channel | "";
   status: StatusFilter;
@@ -53,8 +54,10 @@ export function ConversationList({
   loading: boolean;
   hasMore: boolean;
   unread: number;
+  sort: SortOrder;
   onChannel: (c: Channel | "") => void;
   onStatus: (s: StatusFilter) => void;
+  onSort: (s: SortOrder) => void;
   onQuery: (q: string) => void;
   onSelect: (id: string) => void;
   onMore: () => void;
@@ -64,19 +67,21 @@ export function ConversationList({
   extraMore?: { label: string; busy: boolean; onClick: () => void } | null;
 }) {
   const filtered = channel !== "" || status !== "open";
+  // Channels and folders live in the channel rail; on phones this menu offers
+  // the folders and the sort order.
   const items: MenuItem[] = [
-    { type: "heading", label: "Kanaal" },
-    { label: "Alle kanalen", checked: channel === "", onSelect: () => onChannel("") },
-    ...channels.map((c) => ({ label: capabilities[c].label, checked: channel === c, onSelect: () => onChannel(c) })),
-    { type: "separator" },
-    { type: "heading", label: "Status" },
+    { type: "heading", label: "Map" },
     ...(Object.keys(STATUS_LABEL) as StatusFilter[]).map((s) => ({ label: STATUS_LABEL[s], checked: status === s, onSelect: () => onStatus(s) })),
+    { type: "separator" },
+    { type: "heading", label: "Sorteren" },
+    { label: "Nieuwste eerst", checked: sort === "newest", onSelect: () => onSort("newest") },
+    { label: "Oudste eerst", checked: sort === "oldest", onSelect: () => onSort("oldest") },
   ];
   return (
     <aside className="ib-list" aria-label="Gesprekken">
       <div className="ib-list-head">
         <div className="ib-list-title">
-          <h2>Gesprekken</h2>
+          <h2>{channel ? CHANNEL_NAME[channel] : "Alle berichten"}</h2>
           {unread > 0 && <span className="ib-count">{unread} ongelezen</span>}
         </div>
         <div className="ib-search-row">
@@ -85,7 +90,7 @@ export function ConversationList({
             <span className="sr-only">Zoek in gesprekken</span>
             <input type="search" placeholder="Zoeken" value={query} maxLength={100} onChange={(e) => onQuery(e.target.value)} />
           </label>
-          <Menu label="Filteren" className={filtered ? "is-active" : ""} trigger={<ListFilter size={16} />} items={items} />
+          <Menu label="Map en sortering" className={"ib-filter-menu" + (status !== "open" || sort !== "newest" ? " is-active" : "")} trigger={<ListFilter size={16} />} items={items} />
         </div>
         {filtered && (
           <div className="ib-active-filters">
@@ -105,7 +110,7 @@ export function ConversationList({
           </div>
         )}
       </div>
-      <ul className="ib-items">
+      <ul className="ib-items" key={channel + "|" + status + "|" + sort}>
         {conversations.map((c) => (
           <li key={c.id}>
             <button

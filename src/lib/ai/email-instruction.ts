@@ -44,7 +44,8 @@ export function buildEmailInstruction(input: {
     offer: input.offer?.trim() || "",
     tone: input.tone?.trim() || brand.toneOfVoice,
     length: input.length || "gemiddeld",
-    cta: input.cta?.trim() || "",
+    // The CTA typed for this e-mail wins; otherwise the Brand Hub default.
+    cta: input.cta?.trim() || brand.ctas[0] || "",
     userInstruction: input.prompt,
     useWebsite: input.useWebsite,
   };
