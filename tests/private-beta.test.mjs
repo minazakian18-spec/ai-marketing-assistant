@@ -191,3 +191,56 @@ test("registration can be closed for the private beta", async () => {
     delete process.env.MAVIX_SIGNUP;
   }
 });
+
+test("content generation uses the stored Brand Hub profile, never the browser's, and is metered", async () => {
+  const tables = {
+    workspace_members: [{ user_id: "u1", workspace_id: "w1", role: "OWNER", created_at: "1" }],
+    workspaces: [{ id: "w1", deleted_at: null }],
+    business_profiles: [{ workspace_id: "w1", data: { profile: { name: "Telepizza", description: "Pizza", productList: [] } } }],
+    ai_usage: [],
+  };
+  const db = memoryDb(tables);
+  db.auth = { getUser: async () => ({ data: { user: { id: "u1" } }, error: null }) };
+  let received;
+  const load = serverLoader({
+    [path.resolve("src/lib/server/supabase.ts")]: { adminClient: () => db, authClient: async () => db, appUrl: () => origin },
+    "next/headers": { cookies: async () => ({ get: () => undefined }) },
+    "@/lib/server/ai": {
+      generateInstagramText: async (brief, profile) => {
+        received = { brief, profile };
+        const usage = load("src/lib/server/ai-usage.ts");
+        usage.recordTokens("claude-opus-5-5", 800, 200);
+        return { caption: "Echte caption", hashtags: "#pizza" };
+      },
+    },
+  });
+  const key = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = "test-key-not-real";
+  try {
+    const route = load("src/app/api/generate/instagram/route.ts");
+    const res = await route.POST(
+      new Request(origin + "/api/generate/instagram", {
+        method: "POST",
+        headers: { origin, "Content-Type": "application/json", "Idempotency-Key": "abcdef123456" },
+        body: JSON.stringify({ prompt: "Pizza van de maand", type: "Post", profile: { name: "Vervalst bedrijf" }, photos: [], variant: 0 }),
+      }),
+    );
+    assert.equal(res.status, 200);
+    const post = await res.json();
+    assert.equal(post.caption, "Echte caption");
+    assert.equal(post.status, "draft");
+    assert.equal(received.profile.name, "Telepizza");
+    assert.equal(tables.ai_usage.length, 1);
+    assert.deepEqual([tables.ai_usage[0].feature, tables.ai_usage[0].status, tables.ai_usage[0].input_tokens, tables.ai_usage[0].request_key], ["content_instagram", "succeeded", 800, "content_instagram:abcdef123456"]);
+  } finally {
+    if (key) process.env.ANTHROPIC_API_KEY = key;
+    else delete process.env.ANTHROPIC_API_KEY;
+  }
+});
+
+test("members cannot generate content (only owners and admins can save drafts)", async () => {
+  const { load } = setup({ workspace_members: [{ user_id: "u1", workspace_id: "w1", role: "MEMBER", created_at: "1" }], workspaces: [{ id: "w1", deleted_at: null }] });
+  const route = load("src/app/api/generate/edit/route.ts");
+  const res = await route.POST(new Request(origin + "/api/generate/edit", { method: "POST", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify({ action: "shorter", text: "Een tekst om in te korten.", channel: "instagram" }) }));
+  assert.equal(res.status, 403);
+});

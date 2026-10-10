@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Building2, MailPlus, UserCheck } from "lucide-react";
-import { PageHeading, Badge } from "@/components/ui";
+import { PageHeading } from "@/components/ui";
 
 type Space = { workspace_id: string; role: string; workspaces: { name: string } };
 const ROLE: Record<string, string> = { OWNER: "Eigenaar", ADMIN: "Beheerder", MEMBER: "Lid" };
@@ -137,7 +137,7 @@ export default function TeamPage() {
             </label>
           </div>
           <div className="st-row-end">
-            <Badge tone="neutral">Besloten beta: uitgenodigde collega&apos;s komen in deze werkruimte</Badge>
+            <small className="field-note">Uitgenodigde collega&apos;s krijgen toegang tot deze werkruimte.</small>
             <button disabled={busy || !email} className="button primary">
               Uitnodigen
             </button>

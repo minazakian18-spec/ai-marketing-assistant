@@ -556,3 +556,23 @@ button:focus-visible > .cs-chip, .cs-chip:focus-visible { outline: none; box-sha
   .st-switch-track, .st-switch-track::after { transition: none; }
 }
 .st-row-end { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+/* Guard against sub-pixel grid overflow causing a horizontal page scrollbar
+   (clip, not hidden: keeps position: sticky working). */
+.app-shell .main-shell { overflow-x: clip; }
+.app-shell .main-shell > main { min-width: 0; }
+
+/* Content Studio hub */
+.studio-drafts .dash-block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+
+/* Dashboard: single-column stacks must not grow with their content on
+   narrow screens (the planning card was clipped on phones). */
+.dash-stack { grid-template-columns: minmax(0, 1fr); }
+.dash-stack > *, .dash-columns > * { min-width: 0; }
+@media (max-width: 900px) { .dash-columns { grid-template-columns: minmax(0, 1fr); } }
+
+/* Contacts: header actions wrap on narrow screens instead of overflowing. */
+@media (max-width: 720px) {
+  .contacts-header-actions { flex-wrap: wrap; flex-shrink: 1; min-width: 0; width: 100%; }
+  .contacts-header-actions .button { flex: 1 1 auto; justify-content: center; }
+}
