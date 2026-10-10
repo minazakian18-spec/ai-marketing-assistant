@@ -4,9 +4,18 @@
 -- until a platform administrator approves them.
 
 -- 1. Workspace access status (private beta) and optional AI quota.
-alter table public.workspaces add column if not exists access_status text not null default 'pending';
 alter table public.workspaces add column if not exists access_changed_at timestamptz;
 alter table public.workspaces add column if not exists ai_monthly_token_limit integer;
+-- access_status is added once. Only on that first run every workspace that
+-- already exists is approved, so the owner keeps access. Running the script
+-- again never approves later (pending) sign-ups.
+do $$ begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'workspaces' and column_name = 'access_status') then
+    alter table public.workspaces add column access_status text not null default 'pending';
+    update public.workspaces set access_status = 'approved', access_changed_at = now();
+  end if;
+end $$;
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'workspaces_access_status_check') then
     alter table public.workspaces add constraint workspaces_access_status_check check (access_status in ('pending','approved','suspended'));
@@ -15,8 +24,6 @@ do $$ begin
     alter table public.workspaces add constraint workspaces_ai_limit_check check (ai_monthly_token_limit is null or ai_monthly_token_limit >= 0);
   end if;
 end $$;
--- Grandfather every workspace that exists when this migration runs.
-update public.workspaces set access_status = 'approved', access_changed_at = now() where access_status = 'pending' and created_at < now();
 
 -- Members can read their workspace row (existing policy); nobody can change
 -- access_status from the browser: there is no update policy on workspaces.
