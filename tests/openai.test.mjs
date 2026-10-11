@@ -134,7 +134,8 @@ test("cost safeguard: the global monthly budget stops every workspace before the
     const usage = load("src/lib/server/ai-usage.ts");
     await assert.rejects(usage.metered({ workspaceId: "w1", user: { id: "u1" } }, "agent", async () => "x"), (e) => e.status === 503 && /budget/.test(e.message));
     assert.equal(calls.length, 0);
-    assert.equal(tables.ai_usage.length, 1, "no ledger row for a refused request");
+    const refused = tables.ai_usage.find((r) => r.workspace_id === "w1");
+    assert.deepEqual([refused.status, refused.model, refused.cost_micro_usd], ["failed", "refused", 0], "refused request is logged at zero cost");
   }));
 
 test("conservative defaults: short output limits and modest quotas", () => {
@@ -204,4 +205,85 @@ test("Mavix Agent: logged-out, pending-beta and cross-site requests are refused 
     const csrf = setup({});
     assert.equal((await csrf.load("src/app/api/agent/route.ts").POST(agentRequest({ text: "Hoi" }, { origin: "https://evil.example" }))).status, 403);
     assert.equal(pending.calls.length + loggedOut.calls.length + csrf.calls.length, 0);
+  }));
+
+test("cost safeguard: simultaneous requests cannot spend past the global budget together", (t) =>
+  withEnv({ OPENAI_API_KEY: FAKE_KEY, AI_GLOBAL_MONTHLY_BUDGET_USD: "0.05", AI_DAILY_REQUESTS_PER_USER: "1000" }, async () => {
+    quiet(t);
+    const users = Array.from({ length: 12 }, (_, i) => "user" + i);
+    const tables = {
+      workspace_members: users.map((u) => ({ user_id: u, workspace_id: "w1", role: "OWNER", created_at: "1" })),
+      workspaces: [{ id: "w1", deleted_at: null, access_status: "approved" }],
+      ai_usage: [],
+    };
+    const { load } = setup(tables);
+    const usage = load("src/lib/server/ai-usage.ts");
+    const reservation = usage.reservationMicroUsd("agent");
+    let calls = 0;
+    const results = await Promise.allSettled(
+      users.map((u) =>
+        usage.metered({ workspaceId: "w1", user: { id: u } }, "agent", async () => {
+          calls++;
+          await new Promise((r) => setTimeout(r, 20));
+          usage.recordTokens("gpt-5.4-mini", 8000, usage.OUTPUT_LIMIT.agent);
+          return "ok";
+        }),
+      ),
+    );
+    const passed = results.filter((r) => r.status === "fulfilled").length;
+    assert.equal(passed, calls, "only admitted requests reached the model");
+    assert.ok(passed * reservation <= 50_000, `admitted ${passed} x ${reservation} must stay within 0.05 USD`);
+    assert.ok(passed < users.length, "the budget refused some of the burst");
+    const spent = tables.ai_usage.reduce((s, r) => s + r.cost_micro_usd, 0);
+    assert.ok(spent <= 50_000, "recorded spend " + spent + " within budget");
+    assert.ok(tables.ai_usage.every((r) => r.status !== "pending"), "no reservation left behind");
+  }));
+
+test("cost safeguard: the reservation covers the worst case of the configured models", () =>
+  withEnv({ OPENAI_MODEL: undefined, OPENAI_ADVANCED_MODEL: undefined }, async () => {
+    const usage = setup({}).load("src/lib/server/ai-usage.ts");
+    // priciest configured model is gpt-5.4-mini: 0.75 in / 4.50 out per 1M
+    assert.equal(usage.reservationMicroUsd("content_email"), Math.round(8000 * 0.75 + 1800 * 4.5));
+    assert.ok(usage.costMicroUsd("gpt-5.4-mini", 8000, 1800) <= usage.reservationMicroUsd("content_email"));
+  }));
+
+test("cost safeguard: oversized input is refused before any API call; long conversations are trimmed to recent messages", (t) =>
+  withEnv({ OPENAI_API_KEY: FAKE_KEY }, async () => {
+    quiet(t);
+    const { load, calls } = setup({});
+    const openai = load("src/lib/server/openai.ts");
+    await assert.rejects(openai.aiText("x", [{ role: "user", content: [{ type: "text", text: "a".repeat(30000) }] }]), (e) => e.status === 413);
+    assert.equal(calls.length, 0);
+    const ai = load("src/lib/server/ai.ts");
+    const messages = Array.from({ length: 30 }, (_, i) => ({ from: i % 2 ? "business" : "customer", text: "bericht " + i + " " + "x".repeat(1900), attachments: [], at: "2026-10-10T10:00:00Z" }));
+    await ai.generateInboxReply({ channel: "gmail", subject: "Vraag", customerName: "Sanne", messages, profile: {} });
+    const sent = JSON.stringify(calls[0].input);
+    assert.ok(sent.length < 8000 * 3, "request within the input cap");
+    assert.match(sent, /bericht 29 /, "newest message kept");
+    assert.ok(!sent.includes("bericht 0 "), "oldest messages dropped");
+  }));
+
+test("reasoning tokens are part of output_tokens and are charged as output", (t) =>
+  withEnv({ OPENAI_API_KEY: FAKE_KEY }, async () => {
+    quiet(t);
+    const tables = {};
+    const { load, setReply } = setup(tables);
+    setReply(async () => ({ status: "completed", output_text: "Klaar.", usage: { input_tokens: 400, output_tokens: 300, output_tokens_details: { reasoning_tokens: 250 } } }));
+    const usage = load("src/lib/server/ai-usage.ts");
+    await usage.metered({ workspaceId: "w1", user: { id: "u1" } }, "brand_improve", () => load("src/lib/server/ai.ts").improveBrandText("description", "Wij bakken pizza's in Utrecht.", {}));
+    const row = tables.ai_usage[0];
+    assert.equal(row.output_tokens, 300);
+    assert.equal(row.cost_micro_usd, Math.round(400 * 0.2 + 300 * 1.2));
+  }));
+
+test("incomplete responses (output limit hit while reasoning) are still recorded and charged", (t) =>
+  withEnv({ OPENAI_API_KEY: FAKE_KEY }, async () => {
+    quiet(t);
+    const tables = {};
+    const { load, setReply } = setup(tables);
+    setReply(async () => ({ status: "incomplete", output_text: "", usage: { input_tokens: 500, output_tokens: 600, output_tokens_details: { reasoning_tokens: 600 } } }));
+    const usage = load("src/lib/server/ai-usage.ts");
+    await assert.rejects(usage.metered({ workspaceId: "w1", user: { id: "u1" } }, "brand_improve", () => load("src/lib/server/ai.ts").improveBrandText("description", "Wij bakken pizza's in Utrecht.", {})));
+    const row = tables.ai_usage[0];
+    assert.deepEqual([row.status, row.output_tokens, row.cost_micro_usd], ["failed", 600, Math.round(500 * 0.2 + 600 * 1.2)]);
   }));

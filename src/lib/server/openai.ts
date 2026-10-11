@@ -1,7 +1,8 @@
 import "server-only";
 import OpenAI from "openai";
 import { HttpError } from "./access";
-import { currentOutputLimit, recordTokens } from "./ai-usage";
+import { currentOutputLimit, recordTokens, DEFAULT_MODEL, DEFAULT_ADVANCED_MODEL, MAX_INPUT_TOKENS } from "./ai-usage";
+export { DEFAULT_MODEL, DEFAULT_ADVANCED_MODEL };
 
 // Central OpenAI configuration for every Mavix AI feature (Responses API,
 // official SDK). The key is read only on the server (OPENAI_API_KEY) and is
@@ -13,8 +14,6 @@ import { currentOutputLimit, recordTokens } from "./ai-usage";
 // Reasoning effort stays low/none: these are short writing tasks, and
 // reasoning tokens are billed as output.
 
-export const DEFAULT_MODEL = "gpt-5.6-luna";
-export const DEFAULT_ADVANCED_MODEL = "gpt-5.4-mini";
 export type AiTier = "standard" | "advanced";
 export type AiMessage = { role: "user"; content: { type: "text"; text: string }[] };
 
@@ -48,6 +47,10 @@ const toInput = (messages: AiMessage[]) =>
 /** One text generation. Records tokens for the current metered request. */
 export async function aiText(instructions: string, messages: AiMessage[], tier: AiTier = "standard"): Promise<string> {
   const model = modelFor(tier);
+  // Hard input cap (about 3 characters per token, conservative for Dutch):
+  // a request can never cost more than the budget reservation assumed.
+  const chars = instructions.length + messages.reduce((s, m) => s + m.content.reduce((t, c) => t + c.text.length, 0), 0);
+  if (chars > MAX_INPUT_TOKENS * 3) throw new HttpError(413, "Deze opdracht is te lang voor Mavi. Maak hem korter.");
   try {
     const response = await openai().responses.create({
       model,
@@ -62,7 +65,8 @@ export async function aiText(instructions: string, messages: AiMessage[], tier: 
     const text = (response.output_text || "").trim();
     if (response.status === "incomplete" && !text) throw new HttpError(502, "Mavi kreeg geen volledig antwoord. Probeer een kortere opdracht.");
     if (!text) throw new HttpError(502, "Mavi gaf geen voorstel terug. Probeer het opnieuw.");
-    console.info(JSON.stringify({ event: "ai_generated", model, input: usage?.input_tokens || 0, output: usage?.output_tokens || 0 }));
+    // output_tokens already includes reasoning tokens (billed as output).
+    console.info(JSON.stringify({ event: "ai_generated", model, input: usage?.input_tokens || 0, output: usage?.output_tokens || 0, reasoning: usage?.output_tokens_details?.reasoning_tokens || 0 }));
     return text;
   } catch (e) {
     throw aiError(e);

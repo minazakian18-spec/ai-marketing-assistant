@@ -79,6 +79,19 @@ Rules:
 - Write in Dutch. At most 4 short bullet lines starting with "- ": what the customer wants, relevant details, what has been answered, and the open next step.
 - Use only what is in the conversation. Output only the bullets.`;
 
+// Newest messages first until ~10,000 characters: keeps every request within
+// the input size the cost reservation assumes (MAX_INPUT_TOKENS).
+function recentMessages(messages: AiConversation["messages"]) {
+  const kept: AiConversation["messages"] = [];
+  let size = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    size += messages[i].text.length + 80;
+    if (size > 10_000 && kept.length) break;
+    kept.unshift(messages[i]);
+  }
+  return kept;
+}
+
 function payload(c: AiConversation, task: string): AiMessage[] {
   return [
     {
@@ -93,7 +106,7 @@ function payload(c: AiConversation, task: string): AiMessage[] {
               channel: capabilities[c.channel].label,
               subject: c.subject || undefined,
               customer_name: c.customerName,
-              messages: c.messages.map((m) => ({
+              messages: recentMessages(c.messages).map((m) => ({
                 from: m.from,
                 at: m.at,
                 text: m.text,

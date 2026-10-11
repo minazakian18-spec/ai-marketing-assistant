@@ -95,6 +95,27 @@ export function costMicroUsd(model: string, input: number, output: number) {
 };
 const notReady = (e: { code?: string } | null) => !!e && ["42P01", "PGRST205", "42703"].includes(e.code || "");
 
+// Models (defaults here so both the client and the budget use the same ones).
+export const DEFAULT_MODEL = "gpt-5.6-luna";
+export const DEFAULT_ADVANCED_MODEL = "gpt-5.4-mini";
+export const configuredModels = () => [
+  (process.env.OPENAI_MODEL || "").trim() || DEFAULT_MODEL,
+  (process.env.OPENAI_ADVANCED_MODEL || "").trim() || DEFAULT_ADVANCED_MODEL,
+];
+// Longest input a request can carry (inputs are length-validated on every
+// route: about 6,000 characters of text plus the Brand Hub context).
+export const MAX_INPUT_TOKENS = 8000;
+// A pending reservation older than this is a crashed request; it stops
+// counting so it cannot block the budget forever.
+const PENDING_TTL_MS = 15 * 60_000;
+// Unknown model without a configured price: assume an expensive one.
+const FALLBACK_PRICE = { input: 5, output: 30 };
+export function reservationMicroUsd(feature: AiFeature) {
+  const prices = configuredModels().map((m) => priceFor(m) || FALLBACK_PRICE);
+  const input = Math.max(...prices.map((p) => p.input)),
+    output = Math.max(...prices.map((p) => p.output));
+  return Math.round(MAX_INPUT_TOKENS * input + OUTPUT_LIMIT[feature] * output);
+}
 export async function usageSummary(workspaceId: string) {
   const db = adminClient();
   const { data, error } = await db
@@ -143,46 +164,65 @@ export async function metered<T>(
   const db = adminClient();
   const l = limits();
   const day = new Date(Date.now() - 86_400_000).toISOString();
-  const [{ data: ws, error: wsError }, month, today, running, global] = await Promise.all([
-    db.from("workspaces").select("ai_monthly_token_limit").eq("id", auth.workspaceId).maybeSingle(),
-    db.from("ai_usage").select("input_tokens,output_tokens").eq("workspace_id", auth.workspaceId).gte("created_at", monthStart()).limit(20000),
-    db.from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", auth.user.id).gte("created_at", day),
-    db
-      .from("ai_usage")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", auth.user.id)
-      .eq("status", "pending")
-      .gte("created_at", new Date(Date.now() - 120_000).toISOString()),
-    // All workspaces together: the shared provider credit.
-    db.from("ai_usage").select("cost_micro_usd").gte("created_at", monthStart()).limit(100000),
-  ]);
-  const err = wsError || month.error || today.error || running.error || global.error;
-  if (err) {
+  const fail = (err: { code?: string }) => {
     // Fail closed: without the ledger there is no cost control.
     console.error(JSON.stringify({ event: notReady(err) ? "ai_usage_not_provisioned" : "ai_usage_failed", code: err.code || "error" }));
-    throw new HttpError(503, "AI is tijdelijk niet beschikbaar. Probeer het later opnieuw.");
-  }
+    return new HttpError(503, "AI is tijdelijk niet beschikbaar. Probeer het later opnieuw.");
+  };
+  const [{ data: ws, error: wsError }, month, today] = await Promise.all([
+    db.from("workspaces").select("ai_monthly_token_limit").eq("id", auth.workspaceId).maybeSingle(),
+    db.from("ai_usage").select("input_tokens,output_tokens").eq("workspace_id", auth.workspaceId).gte("created_at", monthStart()).limit(20000),
+    db.from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", auth.user.id).neq("model", "refused").gte("created_at", day),
+  ]);
+  const err = wsError || month.error || today.error;
+  if (err) throw fail(err);
   const limit = (ws?.ai_monthly_token_limit as number | null) ?? l.monthlyTokens;
   const used = (month.data || []).reduce((s, r) => s + (r.input_tokens as number) + (r.output_tokens as number), 0);
-  const spent = (global.data || []).reduce((s, r) => s + Number(r.cost_micro_usd || 0), 0);
-  if (spent >= l.globalMonthlyMicroUsd) {
-    console.error(JSON.stringify({ event: "ai_global_budget_reached" }));
-    throw new HttpError(503, "Het AI-budget van Mavix voor deze maand is bereikt. Er is niets gegenereerd.");
-  }
   if (used >= limit) throw new HttpError(429, "Het AI-tegoed van deze maand is op. Neem contact op met Mavix om het te verhogen.");
   if ((today.count || 0) >= l.dailyRequestsPerUser) throw new HttpError(429, "Je hebt vandaag het maximale aantal AI-verzoeken gebruikt. Morgen kun je verder.");
-  if ((running.count || 0) >= l.concurrentPerUser) throw new HttpError(429, "Mavi is nog bezig met je vorige verzoek. Even geduld.");
 
+  // 1. Reserve first: the row carries the worst-case cost of this request
+  //    (longest allowed input, full output limit, priciest configured model).
   const key = requestKey && /^[\w-]{8,100}$/.test(requestKey) ? feature + ":" + requestKey : null;
+  const reserved = reservationMicroUsd(feature);
+  const startedAt = new Date().toISOString();
   const { data: row, error: insertError } = await db
     .from("ai_usage")
-    .insert({ workspace_id: auth.workspaceId, user_id: auth.user.id, feature, model: "pending", status: "pending", request_key: key })
+    .insert({ workspace_id: auth.workspaceId, user_id: auth.user.id, feature, model: "reserved", status: "pending", request_key: key, cost_micro_usd: reserved, created_at: startedAt })
     .select("id")
     .single();
   if (insertError) {
     if (insertError.code === "23505") throw new HttpError(409, "Dit verzoek is al verwerkt of wordt nog verwerkt.");
-    throw new HttpError(503, "AI is tijdelijk niet beschikbaar. Probeer het later opnieuw.");
+    throw fail(insertError);
   }
+  const settle = (values: Record<string, unknown>) => db.from("ai_usage").update({ ...values, finished_at: new Date().toISOString() }).eq("id", row.id);
+
+  // 2. Then check, counting every reservation that exists now (including
+  //    concurrent ones). Whichever request checks last sees all earlier
+  //    reservations, so simultaneous requests can never spend past the
+  //    budget together; at worst they are all refused.
+  const recent = new Date(Date.now() - PENDING_TTL_MS).toISOString();
+  const [settled, pending, running] = await Promise.all([
+    db.from("ai_usage").select("cost_micro_usd").in("status", ["succeeded", "failed"]).gte("created_at", monthStart()).limit(100000),
+    db.from("ai_usage").select("cost_micro_usd").eq("status", "pending").gte("created_at", recent).limit(10000),
+    db.from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", auth.user.id).eq("status", "pending").gte("created_at", recent),
+  ]);
+  const checkError = settled.error || pending.error || running.error;
+  const sum = (rows: { cost_micro_usd: unknown }[] | null) => (rows || []).reduce((s, r) => s + Number(r.cost_micro_usd || 0), 0);
+  const refusal = checkError
+    ? fail(checkError)
+    : sum(settled.data) + sum(pending.data) > l.globalMonthlyMicroUsd
+      ? new HttpError(503, "Het AI-budget van Mavix voor deze maand is bereikt. Er is niets gegenereerd.")
+      : (running.count || 0) > l.concurrentPerUser
+        ? new HttpError(429, "Mavi is nog bezig met je vorige verzoek. Even geduld.")
+        : null;
+  if (refusal) {
+    if (refusal.status === 503 && !checkError) console.error(JSON.stringify({ event: "ai_global_budget_reached" }));
+    await settle({ status: "failed", model: "refused", cost_micro_usd: 0 });
+    throw refusal;
+  }
+
+  // 3. Run, then replace the reservation by the real tokens and cost.
   const store: Store = { feature, maxTokens: OUTPUT_LIMIT[feature], usage: null };
   let ok = false;
   try {
@@ -191,17 +231,13 @@ export async function metered<T>(
     return result;
   } finally {
     const u = store.usage;
-    const { error } = await db
-      .from("ai_usage")
-      .update({
-        status: ok ? "succeeded" : "failed",
-        model: u?.model || "none",
-        input_tokens: u?.input || 0,
-        output_tokens: u?.output || 0,
-        cost_micro_usd: costMicroUsd(u?.model || "", u?.input || 0, u?.output || 0),
-        finished_at: new Date().toISOString(),
-      })
-      .eq("id", row.id);
+    const { error } = await settle({
+      status: ok ? "succeeded" : "failed",
+      model: u?.model || "none",
+      input_tokens: u?.input || 0,
+      output_tokens: u?.output || 0,
+      cost_micro_usd: costMicroUsd(u?.model || "", u?.input || 0, u?.output || 0),
+    });
     if (error) console.error(JSON.stringify({ event: "ai_usage_update_failed", code: error.code || "error" }));
   }
 }
