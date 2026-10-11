@@ -36,18 +36,28 @@ Daarna is `/beheer` voor jou beschikbaar. Beheerrechten staan alleen in de datab
 - `MAVIX_SIGNUP=closed` in Hostinger zet registreren helemaal uit.
 - Uitgenodigde teamleden komen in de goedgekeurde werkruimte terecht, ook al krijgen ze zelf een (pending) werkruimte.
 
-## 4. AI
+## 4. AI (OpenAI)
 
-- Provider: Claude via de officiële Anthropic SDK, alleen op de server (`ANTHROPIC_API_KEY` in Hostinger).
-- Werkt nu echt: Content Studio (Instagram en e-mail genereren, herschrijven, korter/langer, toon, duidelijker, sterkere CTA, 3 alternatieven), Inbox-antwoorden en -verfijningen, samenvattingen, reviewantwoorden, Brand Hub-voorbeeld/verbetering, SEO-teksten, Research.
-- Elke AI-aanroep gaat langs `metered()` (`src/lib/server/ai-usage.ts`): beta-goedkeuring, maandtegoed per werkruimte, daglimiet per gebruiker, maximaal 2 gelijktijdige verzoeken per gebruiker, idempotency-key tegen dubbel klikken, outputlimiet per functie en een registratie van tokens (nooit prompts of antwoorden).
-- Kosten worden alleen getoond als `AI_PRICE_INPUT_PER_MTOK` en `AI_PRICE_OUTPUT_PER_MTOK` zijn ingesteld met de prijzen uit je Anthropic-account.
-- Zonder `ANTHROPIC_API_KEY` wordt niets gegenereerd en ziet de gebruiker een eerlijke melding.
+- Provider: OpenAI via de officiële `openai` SDK en de Responses API, alleen op de server (`src/lib/server/openai.ts`). Sleutel: `OPENAI_API_KEY` in Hostinger; nooit `NEXT_PUBLIC_`, nooit gelogd of naar de browser gestuurd.
+- Modellen (te wijzigen met `OPENAI_MODEL` / `OPENAI_ADVANCED_MODEL`):
+  - `gpt-5.6-luna` (standaard: Instagram, tekst bewerken, Brand Hub, SEO, reviews, samenvattingen, Research-samenvatting) — $0,20 / $1,20 per 1M tokens in/uit.
+  - `gpt-5.4-mini` (geavanceerd: e-mailcampagnes, Inbox-antwoorden, Mavix Agent) — $0,75 / $4,50 per 1M tokens.
+  - Redeneren staat op `none` (standaard) of `low` (geavanceerd); redeneertokens worden als output betaald.
+- Werkt via OpenAI: Content Studio (genereren, herschrijven, korter/langer, toon, duidelijker, sterkere CTA, 3 alternatieven), Inbox-antwoorden, -verfijningen en samenvattingen, reviewantwoorden, Brand Hub-voorbeeld/verbetering, SEO-teksten, Research en de Mavix Agent.
+- Elke aanroep gaat langs `metered()` (`src/lib/server/ai-usage.ts`): beta-goedkeuring, werkruimte-autorisatie, rate limit, maandtegoed per werkruimte (standaard 300.000 tokens), daglimiet per gebruiker (standaard 40), max. 2 gelijktijdige verzoeken, idempotency-key, korte outputlimiet per functie, en een **globaal maandbudget** voor alle werkruimtes samen (`AI_GLOBAL_MONTHLY_BUDGET_USD`, standaard $8 van de $10 tegoed). Tokens en geschatte kosten (OpenAI-prijs van het gebruikte model) worden per verzoek vastgelegd, nooit prompts of antwoorden.
+- Maximaal 1 herhaalpoging bij netwerkfouten; geen AI bij het laden van pagina's of op de achtergrond (alleen Research maakt na een door de gebruiker gestart onderzoek één samenvatting).
+- Tegoed op bij OpenAI → gebruikers zien "Het AI-tegoed van Mavix is op"; er wordt niets gegenereerd.
+- Zonder `OPENAI_API_KEY` wordt niets gegenereerd en ziet de gebruiker een eerlijke melding; de Agent valt dan terug op navigatiehulp zonder AI.
 
+### Lokaal testen met een eigen ontwikkelsleutel
+
+1. platform.openai.com → project **Mavix** (of een apart project "Mavix dev") → API keys → *Create new secret key*, met een eigen naam zoals `mavix-local`.
+2. Zet in `C:\Documents\AIMI\.env.local` (staat in `.gitignore`, wordt nooit gecommit): `OPENAI_API_KEY=<je ontwikkelsleutel>` en eventueel `AI_GLOBAL_MONTHLY_BUDGET_USD=1`.
+3. Herstart `npm run dev`. Plak de sleutel nooit in een chat.
 ## 5. Opslaan
 
 Alle bedrijfsgegevens staan op de server (`business_profiles.data`, met versiecontrole tegen overschrijven vanaf een ander apparaat). Content Studio slaat bewerkingen automatisch op na 1,5 seconde; de status (Niet opgeslagen / Opslaan… / Opgeslagen / Opslaan mislukt) toont pas "Opgeslagen" na bevestiging van de server. Bij een conflict verschijnt "Nieuwste versie laden" in plaats van stil overschrijven.
 
 ## 6. Omgevingsvariabelen (Hostinger)
 
-Nieuw (optioneel): `MAVIX_SIGNUP`, `AI_MONTHLY_TOKEN_LIMIT`, `AI_DAILY_REQUESTS_PER_USER`, `AI_PRICE_INPUT_PER_MTOK`, `AI_PRICE_OUTPUT_PER_MTOK`. Zie `.env.example`.
+Nieuw: `OPENAI_API_KEY` (vereist voor AI). Optioneel: `OPENAI_MODEL`, `OPENAI_ADVANCED_MODEL`, `AI_GLOBAL_MONTHLY_BUDGET_USD`, `MAVIX_SIGNUP`, `AI_MONTHLY_TOKEN_LIMIT`, `AI_DAILY_REQUESTS_PER_USER`, `AI_PRICE_INPUT_PER_MTOK`, `AI_PRICE_OUTPUT_PER_MTOK`. Zie `.env.example`.

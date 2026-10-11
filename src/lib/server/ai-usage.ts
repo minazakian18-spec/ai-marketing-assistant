@@ -8,8 +8,10 @@ import { HttpError } from "./access";
 // -> tokens recorded. Prompts and outputs are never stored, only counts.
 //
 // Costs: Mavix only multiplies tokens by prices you configure
-// (AI_PRICE_INPUT_PER_MTOK / AI_PRICE_OUTPUT_PER_MTOK, USD per million
-// tokens). Without them the cost stays 0 and the admin view shows tokens.
+// Costs: tokens x the OpenAI price of the model that answered (PRICES).
+// For a model not in the table, AI_PRICE_INPUT/OUTPUT_PER_MTOK is used.
+// A global monthly budget (AI_GLOBAL_MONTHLY_BUDGET_USD, default 8 of the
+// 10 USD prepaid credit) stops all AI before the provider credit runs out.
 
 export type AiFeature =
   | "inbox_reply"
@@ -22,23 +24,36 @@ export type AiFeature =
   | "brand_improve"
   | "seo_suggest"
   | "review_reply"
-  | "research";
+  | "research"
+  | "agent";
 
 // Output cap per feature (tokens); short drafts never need the model maximum.
+// Output cap per feature (tokens, including reasoning tokens). Deliberately
+// short: drafts never need more, and output tokens cost the most.
 export const OUTPUT_LIMIT: Record<AiFeature, number> = {
-  inbox_reply: 2000,
-  inbox_rewrite: 2000,
-  inbox_summary: 1200,
-  content_instagram: 3000,
-  content_email: 6000,
-  content_edit: 4000,
-  brand_preview: 2000,
-  brand_improve: 1500,
-  seo_suggest: 1500,
-  review_reply: 1500,
-  research: 2500,
+  inbox_reply: 900,
+  inbox_rewrite: 900,
+  inbox_summary: 500,
+  content_instagram: 1000,
+  content_email: 1800,
+  content_edit: 1400,
+  brand_preview: 700,
+  brand_improve: 600,
+  seo_suggest: 700,
+  review_reply: 600,
+  research: 900,
+  agent: 900,
 };
 
+// OpenAI standard prices, USD per 1M tokens (pricing page, October 2026).
+export const PRICES: Record<string, { input: number; output: number }> = {
+  "gpt-5.6-luna": { input: 0.2, output: 1.2 },
+  "gpt-5.6-terra": { input: 2, output: 12 },
+  "gpt-5.4-mini": { input: 0.75, output: 4.5 },
+  "gpt-5.4-nano": { input: 0.2, output: 1.25 },
+  "gpt-5-mini": { input: 0.25, output: 2 },
+  "gpt-5-nano": { input: 0.05, output: 0.4 },
+};
 type Store = { feature: AiFeature; maxTokens: number; usage: { input: number; output: number; model: string } | null };
 const als = new AsyncLocalStorage<Store>();
 
@@ -59,16 +74,22 @@ const num = (v: string | undefined, d: number) => {
   return Number.isFinite(n) && n >= 0 ? n : d;
 };
 export const limits = () => ({
-  monthlyTokens: num(process.env.AI_MONTHLY_TOKEN_LIMIT, 2_000_000),
-  dailyRequestsPerUser: num(process.env.AI_DAILY_REQUESTS_PER_USER, 150),
+  monthlyTokens: num(process.env.AI_MONTHLY_TOKEN_LIMIT, 300_000),
+  dailyRequestsPerUser: num(process.env.AI_DAILY_REQUESTS_PER_USER, 40),
+  globalMonthlyMicroUsd: Math.round(num(process.env.AI_GLOBAL_MONTHLY_BUDGET_USD, 8) * 1_000_000),
   concurrentPerUser: 2,
 });
-export function costMicroUsd(input: number, output: number) {
-  const pin = num(process.env.AI_PRICE_INPUT_PER_MTOK, 0),
-    pout = num(process.env.AI_PRICE_OUTPUT_PER_MTOK, 0);
-  return Math.round(input * pin + output * pout); // per-MTok price * tokens = micro-USD
+export function priceFor(model: string) {
+  const known = PRICES[model] || PRICES[Object.keys(PRICES).find((k) => model.startsWith(k + "-")) || ""];
+  if (known) return known;
+  const input = num(process.env.AI_PRICE_INPUT_PER_MTOK, 0),
+    output = num(process.env.AI_PRICE_OUTPUT_PER_MTOK, 0);
+  return input || output ? { input, output } : null;
 }
-const monthStart = () => {
+export function costMicroUsd(model: string, input: number, output: number) {
+  const p = priceFor(model);
+  return p ? Math.round(input * p.input + output * p.output) : 0; // per-MTok price * tokens = micro-USD
+}const monthStart = () => {
   const d = new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
 };
@@ -102,7 +123,7 @@ export async function usageSummary(workspaceId: string) {
     failed: rows.filter((r) => r.status === "failed").length,
     tokens,
     costMicroUsd: rows.reduce((s, r) => s + Number(r.cost_micro_usd || 0), 0),
-    pricesConfigured: !!process.env.AI_PRICE_INPUT_PER_MTOK && !!process.env.AI_PRICE_OUTPUT_PER_MTOK,
+    pricesConfigured: true,
     limit: (ws?.ai_monthly_token_limit as number | null) ?? limits().monthlyTokens,
     byFeature,
   };
@@ -122,7 +143,7 @@ export async function metered<T>(
   const db = adminClient();
   const l = limits();
   const day = new Date(Date.now() - 86_400_000).toISOString();
-  const [{ data: ws, error: wsError }, month, today, running] = await Promise.all([
+  const [{ data: ws, error: wsError }, month, today, running, global] = await Promise.all([
     db.from("workspaces").select("ai_monthly_token_limit").eq("id", auth.workspaceId).maybeSingle(),
     db.from("ai_usage").select("input_tokens,output_tokens").eq("workspace_id", auth.workspaceId).gte("created_at", monthStart()).limit(20000),
     db.from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", auth.user.id).gte("created_at", day),
@@ -132,8 +153,10 @@ export async function metered<T>(
       .eq("user_id", auth.user.id)
       .eq("status", "pending")
       .gte("created_at", new Date(Date.now() - 120_000).toISOString()),
+    // All workspaces together: the shared provider credit.
+    db.from("ai_usage").select("cost_micro_usd").gte("created_at", monthStart()).limit(100000),
   ]);
-  const err = wsError || month.error || today.error || running.error;
+  const err = wsError || month.error || today.error || running.error || global.error;
   if (err) {
     // Fail closed: without the ledger there is no cost control.
     console.error(JSON.stringify({ event: notReady(err) ? "ai_usage_not_provisioned" : "ai_usage_failed", code: err.code || "error" }));
@@ -141,6 +164,11 @@ export async function metered<T>(
   }
   const limit = (ws?.ai_monthly_token_limit as number | null) ?? l.monthlyTokens;
   const used = (month.data || []).reduce((s, r) => s + (r.input_tokens as number) + (r.output_tokens as number), 0);
+  const spent = (global.data || []).reduce((s, r) => s + Number(r.cost_micro_usd || 0), 0);
+  if (spent >= l.globalMonthlyMicroUsd) {
+    console.error(JSON.stringify({ event: "ai_global_budget_reached" }));
+    throw new HttpError(503, "Het AI-budget van Mavix voor deze maand is bereikt. Er is niets gegenereerd.");
+  }
   if (used >= limit) throw new HttpError(429, "Het AI-tegoed van deze maand is op. Neem contact op met Mavix om het te verhogen.");
   if ((today.count || 0) >= l.dailyRequestsPerUser) throw new HttpError(429, "Je hebt vandaag het maximale aantal AI-verzoeken gebruikt. Morgen kun je verder.");
   if ((running.count || 0) >= l.concurrentPerUser) throw new HttpError(429, "Mavi is nog bezig met je vorige verzoek. Even geduld.");
@@ -170,7 +198,7 @@ export async function metered<T>(
         model: u?.model || "none",
         input_tokens: u?.input || 0,
         output_tokens: u?.output || 0,
-        cost_micro_usd: costMicroUsd(u?.input || 0, u?.output || 0),
+        cost_micro_usd: costMicroUsd(u?.model || "", u?.input || 0, u?.output || 0),
         finished_at: new Date().toISOString(),
       })
       .eq("id", row.id);

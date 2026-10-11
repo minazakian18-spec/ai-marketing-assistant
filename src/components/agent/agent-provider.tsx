@@ -32,6 +32,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const previews = useRef<string[]>([]);
   const dataRef = useRef(data);
+  const messagesRef = useRef<AgentMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
@@ -44,9 +48,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       const info = attachments.map((a) => ({ name: a.file.name, kind: a.kind, preview: a.preview }));
       setMessages((m) => [...m, { id: id(), role: "user", text: q, attachments: info }]);
       setState("thinking");
-      runAgent({ text: q, attachments: info, page: pathname }, dataRef.current)
+      runAgent({ text: q, attachments: info, page: pathname }, dataRef.current, messagesRef.current)
         .then((reply) => setMessages((m) => [...m, { id: id(), role: "agent", ...reply }]))
-        .catch(() => setMessages((m) => [...m, { id: id(), role: "agent", text: "Er ging iets mis. Probeer het opnieuw." }]))
+        .catch((e) => setMessages((m) => [...m, { id: id(), role: "agent", text: e instanceof Error ? e.message : "Er ging iets mis. Probeer het opnieuw." }]))
         .finally(() => setState("done"));
     },
     [pathname],

@@ -11,6 +11,7 @@ import { analyze } from "../research/rules";
 import { buildReport, nextEligibleAt, researchPeriod } from "../research/report";
 import { businessKindOf, contentFacts, emailFacts, profileFacts, reviewFacts, websiteFacts } from "../research/extract";
 import type { GoogleProfileData, InboxData, ResearchInput, ResearchReport, ReviewData, SourceInfo, StageId, WebsiteData } from "../research/types";
+import { aiConfigured } from "./openai";
 
 // Research pipeline: collect (real sources only) -> analyze (rules) ->
 // report (+ optional AI wording) -> persist. One run per workspace per
@@ -227,7 +228,7 @@ export async function runResearch(workspaceId: string, id: string, userId?: stri
     const findings = analyze(input);
     const period = researchPeriod();
     let report = buildReport(input, findings, period);
-    const ai = process.env.ANTHROPIC_API_KEY && userId ? await metered({ workspaceId, user: { id: userId } }, "research", () => researchSummary(report)).catch(() => null) : null;
+    const ai = aiConfigured() && userId ? await metered({ workspaceId, user: { id: userId } }, "research", () => researchSummary(report)).catch(() => null) : null;
     if (ai) report = { ...report, summary: ai, summarySource: "ai" };
 
     const { error } = await db()

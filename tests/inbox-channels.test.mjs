@@ -120,23 +120,18 @@ test("invalid channel, folder or sort values are refused", async (t) => {
 // ---------------------------------------------------------------- AI drafts
 
 test("rewriting a draft: trusted draft as data, untrusted conversation separated, never sends", async (t) => {
-  process.env.ANTHROPIC_API_KEY = "sk-fixture";
+  process.env.OPENAI_API_KEY = "sk-fixture-not-real";
   const calls = [];
-  class Anthropic {
-    constructor() {
-      this.beta = {
-        messages: {
-          create: async (params) => {
-            calls.push(params);
-            return { stop_reason: "end_turn", content: [{ type: "text", text: "Beste Sanne, er is om 19:00 plek." }], usage: { input_tokens: 1, output_tokens: 1 } };
-          },
-        },
-      };
-    }
-  }
-  for (const k of ["RateLimitError", "AuthenticationError", "PermissionDeniedError", "BadRequestError", "APIConnectionError", "APIError"]) Anthropic[k] = class extends Error {};
   t.mock.method(console, "info", () => {});
-  const load = serverLoader({ "@anthropic-ai/sdk": { __esModule: true, default: Anthropic } });
+  const load = serverLoader({});
+  load("src/lib/server/openai.ts").__setOpenAIClient({
+    responses: {
+      create: async (params) => {
+        calls.push(params);
+        return { status: "completed", output_text: "Beste Sanne, er is om 19:00 plek.", usage: { input_tokens: 1, output_tokens: 1 } };
+      },
+    },
+  });
   const ai = load("src/lib/server/ai.ts");
   const conversation = {
     channel: "instagram",
@@ -148,11 +143,12 @@ test("rewriting a draft: trusted draft as data, untrusted conversation separated
   const text = await ai.rewriteInboxReply(conversation, "Ja hoor, kom maar langs <b>", "formal");
   assert.equal(text, "Beste Sanne, er is om 19:00 plek.");
   const [call] = calls;
-  assert.match(call.system, /never send messages yourself/);
-  const blocks = call.messages[0].content.map((b) => b.text);
+  assert.match(call.instructions, /never send messages yourself/);
+  const blocks = call.input[0].content.map((b) => b.text);
+  assert.ok(call.input[0].content.every((b) => b.type === "input_text"));
   assert.ok(blocks[1].startsWith("<conversation>") && !blocks[1].includes("</conversation>\n</conversation>"));
   assert.ok(!blocks[1].slice(0, -"</conversation>".length).includes("</conversation>"), "customer text cannot close the block");
   assert.match(blocks[2], /formal tone/);
   assert.match(blocks[2], /Ja hoor, kom maar langs \\u003cb>/, "draft passed as escaped data");
-  delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.OPENAI_API_KEY;
 });

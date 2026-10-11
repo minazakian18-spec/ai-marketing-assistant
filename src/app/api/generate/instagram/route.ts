@@ -7,8 +7,9 @@ import { metered } from "@/lib/server/ai-usage";
 import { storedProfile } from "@/lib/server/stored-profile";
 import { buildInstagramInstruction, goalLabel, isInstagramGoal } from "@/lib/ai/instagram-instruction";
 import type { Profile } from "@/lib/types";
+import { aiConfigured } from "@/lib/server/openai";
 
-// Frontend -> Mavix backend -> Claude (server-side key). The Brand Hub
+// Frontend -> Mavix backend -> OpenAI (server-side key). The Brand Hub
 // profile is read from the database, never trusted from the browser. Images
 // are the owner's own uploads; Mavix does not generate pictures. The local
 // mock generator only runs in development with ENABLE_DEMO_AI=true and no key.
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     if (!body?.prompt?.trim() || body.prompt.length > 2000) throw new HttpError(400, "Beschrijf in een paar woorden wat je wilt maken.");
     const profile = await storedProfile(auth.workspaceId);
     const req = { ...body, profile: profile as unknown as Profile, photos: Array.isArray(body.photos) ? body.photos.slice(0, 10) : [], variant: Number(body.variant) || 0 };
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!aiConfigured()) {
       if (process.env.ENABLE_DEMO_AI === "true" && process.env.NODE_ENV !== "production") return NextResponse.json(await generateContent(req));
       throw new HttpError(503, "AI-generatie is nog niet geconfigureerd. Er is geen content gegenereerd.");
     }

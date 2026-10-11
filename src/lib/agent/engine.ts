@@ -1,14 +1,11 @@
-// Mavix Agent engine: turns a user request into a reply. This is the single
-// place to connect a real AI model later. Today it answers from the
-// workspace's own data and routes to the right part of Mavix; it never
-// claims to have done work it cannot do.
-//
-// To connect real AI: replace `runAgent` with a call to a server route
-// (e.g. POST /api/agent) that uses src/lib/server/ai.ts (Claude via the
-// Anthropic SDK, key stays server-side). Keep the same AgentRequest /
-// AgentReply shapes so the provider and every UI surface keep working.
+// Mavix Agent engine: turns a user request into a reply. With an account it
+// asks POST /api/agent (OpenAI on the server, business context read there).
+// In test mode, or when AI is not configured, it answers from the workspace's
+// own data and routes to the right part of Mavix (no AI); it never claims to
+// have done work it cannot do.
 import { readiness } from "../instagram-model";
 import type { Workspace } from "../types";
+import { isBrowserDemo } from "../demo";
 
 export type AgentAction = { href: string; label: string };
 export type AgentAttachmentInfo = { name: string; kind: "image" | "file"; preview?: string };
@@ -74,19 +71,31 @@ function respond(question: string, data: Workspace): AgentReply {
   };
 }
 
-export async function runAgent(request: AgentRequest, data: Workspace): Promise<AgentReply> {
-  await new Promise((r) => setTimeout(r, 500));
-  // Mavi cannot read files until an AI model is connected; say so instead
-  // of pretending to have analysed them.
+function localReply(request: AgentRequest, data: Workspace): AgentReply {
+  // Files cannot be read yet; say so instead of pretending to have analysed them.
   const note = request.attachments.length
     ? `Ik heb ${request.attachments.length === 1 ? "je bijlage" : request.attachments.length + " bijlagen"} ontvangen (${request.attachments
         .map((a) => a.name)
-        .join(", ")}). Bestanden lezen kan ik nog niet: Mavix Agent is nog niet met een AI-model verbonden.`
+        .join(", ")}). Bestanden lezen kan Mavi nog niet.`
     : "";
   const reply = request.text ? respond(request.text, data) : { text: "" };
   return { ...reply, text: [note, reply.text].filter(Boolean).join(" ") };
 }
 
+export async function runAgent(request: AgentRequest, data: Workspace, history: AgentMessage[] = []): Promise<AgentReply> {
+  if (isBrowserDemo() || !request.text) return localReply(request, data);
+  const response = await fetch("/api/agent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID(), "X-Mavix-Page": request.page || "" },
+    body: JSON.stringify({ text: request.text, history: history.filter((m) => m.text).map((m) => ({ role: m.role, text: m.text })).slice(-8) }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || "Mavi kon geen antwoord geven. Probeer het opnieuw.");
+  if (!body.configured) return localReply(request, data);
+  const reply: AgentReply = { text: body.text, action: body.action };
+  if (request.attachments.length) reply.text = "Bestanden lezen kan Mavi nog niet; ik heb alleen je vraag gelezen. " + reply.text;
+  return reply;
+}
 // Business-aware shortcuts from the workspace's real state.
 export function agentShortcuts(data: Workspace): { label: string; prompt: string }[] {
   const out: { label: string; prompt: string }[] = [];

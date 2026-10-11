@@ -4,6 +4,7 @@ import { workspace, sameOrigin, limited, failure, HttpError } from "@/lib/server
 import { CONTENT_EDITS, editContent, type ContentEdit } from "@/lib/server/ai";
 import { metered } from "@/lib/server/ai-usage";
 import { storedProfile } from "@/lib/server/stored-profile";
+import { aiConfigured } from "@/lib/server/openai";
 
 const input = z.object({
   action: z.enum(Object.keys(CONTENT_EDITS) as [ContentEdit, ...ContentEdit[]]),
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     await limited("ai:" + auth.user.id, 10);
     await limited("ai-ws:" + auth.workspaceId, 60);
     const body = input.parse(await request.json());
-    if (!process.env.ANTHROPIC_API_KEY) throw new HttpError(503, "AI-bewerken is nog niet geconfigureerd. Je tekst is niet gewijzigd.");
+    if (!aiConfigured()) throw new HttpError(503, "AI-bewerken is nog niet geconfigureerd. Je tekst is niet gewijzigd.");
     const profile = await storedProfile(auth.workspaceId);
     const results = await metered(auth, "content_edit", () => editContent(body.action, body.text, body.channel, profile), request.headers.get("idempotency-key"));
     return NextResponse.json({ results }, { headers: { "Cache-Control": "private, no-store" } });

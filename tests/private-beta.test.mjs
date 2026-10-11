@@ -89,7 +89,7 @@ test("AI metering: tokens are recorded per request, without prompt or output", a
   const usage = load("src/lib/server/ai-usage.ts");
   const out = await usage.metered({ workspaceId: "w1", user: { id: "u1" } }, "inbox_reply", async () => {
     assert.equal(usage.currentOutputLimit(), usage.OUTPUT_LIMIT.inbox_reply);
-    usage.recordTokens("claude-opus-5-5", 1200, 300);
+    usage.recordTokens("gpt-5.4-mini", 1200, 300);
     return "draft text";
   });
   assert.equal(out, "draft text");
@@ -97,7 +97,7 @@ test("AI metering: tokens are recorded per request, without prompt or output", a
   const row = tables.ai_usage[0];
   assert.deepEqual(
     { status: row.status, model: row.model, input: row.input_tokens, output: row.output_tokens, feature: row.feature, user: row.user_id },
-    { status: "succeeded", model: "claude-opus-5-5", input: 1200, output: 300, feature: "inbox_reply", user: "u1" },
+    { status: "succeeded", model: "gpt-5.4-mini", input: 1200, output: 300, feature: "inbox_reply", user: "u1" },
   );
   assert.ok(!JSON.stringify(row).includes("draft text"));
 });
@@ -135,19 +135,21 @@ test("AI metering: monthly quota, daily cap and concurrent requests are enforced
   }
 });
 
-test("AI metering: cost uses only configured prices", async () => {
+test("AI metering: cost uses the OpenAI price of the model that answered", async () => {
   const usage = setup({}).load("src/lib/server/ai-usage.ts");
-  assert.equal(usage.costMicroUsd(1_000_000, 1_000_000), 0);
+  assert.equal(usage.costMicroUsd("gpt-5.6-luna", 1_000_000, 1_000_000), 200_000 + 1_200_000);
+  assert.equal(usage.costMicroUsd("gpt-5.4-mini", 1_000_000, 100_000), 750_000 + 450_000);
+  assert.equal(usage.costMicroUsd("gpt-5.4-mini-2026-03-17", 1_000_000, 0), 750_000, "dated snapshot uses its base price");
+  assert.equal(usage.costMicroUsd("unknown-model", 1_000_000, 1_000_000), 0);
   process.env.AI_PRICE_INPUT_PER_MTOK = "3";
   process.env.AI_PRICE_OUTPUT_PER_MTOK = "15";
   try {
-    assert.equal(usage.costMicroUsd(1_000_000, 100_000), 3_000_000 + 1_500_000);
+    assert.equal(usage.costMicroUsd("unknown-model", 1_000_000, 100_000), 3_000_000 + 1_500_000);
   } finally {
     delete process.env.AI_PRICE_INPUT_PER_MTOK;
     delete process.env.AI_PRICE_OUTPUT_PER_MTOK;
   }
 });
-
 test("content generation: without an AI key nothing is generated in production", async () => {
   const tables = {
     workspace_members: [{ user_id: "u1", workspace_id: "w1", role: "OWNER", created_at: "1" }],
@@ -156,8 +158,8 @@ test("content generation: without an AI key nothing is generated in production",
     ai_usage: [],
   };
   const { load } = setup(tables);
-  const key = process.env.ANTHROPIC_API_KEY;
-  delete process.env.ANTHROPIC_API_KEY;
+  const key = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
   try {
     for (const kind of ["instagram", "email"]) {
       const route = load(`src/app/api/generate/${kind}/route.ts`);
@@ -167,7 +169,7 @@ test("content generation: without an AI key nothing is generated in production",
     }
     assert.equal(tables.ai_usage.length, 0);
   } finally {
-    if (key) process.env.ANTHROPIC_API_KEY = key;
+    if (key) process.env.OPENAI_API_KEY = key;
   }
 });
 
@@ -209,13 +211,13 @@ test("content generation uses the stored Brand Hub profile, never the browser's,
       generateInstagramText: async (brief, profile) => {
         received = { brief, profile };
         const usage = load("src/lib/server/ai-usage.ts");
-        usage.recordTokens("claude-opus-5-5", 800, 200);
+        usage.recordTokens("gpt-5.6-luna", 800, 200);
         return { caption: "Echte caption", hashtags: "#pizza" };
       },
     },
   });
-  const key = process.env.ANTHROPIC_API_KEY;
-  process.env.ANTHROPIC_API_KEY = "test-key-not-real";
+  const key = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key-not-real";
   try {
     const route = load("src/app/api/generate/instagram/route.ts");
     const res = await route.POST(
@@ -233,8 +235,8 @@ test("content generation uses the stored Brand Hub profile, never the browser's,
     assert.equal(tables.ai_usage.length, 1);
     assert.deepEqual([tables.ai_usage[0].feature, tables.ai_usage[0].status, tables.ai_usage[0].input_tokens, tables.ai_usage[0].request_key], ["content_instagram", "succeeded", 800, "content_instagram:abcdef123456"]);
   } finally {
-    if (key) process.env.ANTHROPIC_API_KEY = key;
-    else delete process.env.ANTHROPIC_API_KEY;
+    if (key) process.env.OPENAI_API_KEY = key;
+    else delete process.env.OPENAI_API_KEY;
   }
 });
 
