@@ -15,7 +15,7 @@
    One short, soft light travels along the rounded border at a constant speed
    (offset-path follows the real perimeter, so it never speeds up around
    corners the way a rotating conic gradient does). It is only visible inside
-   a 1px band on top of the neutral border (.mx-ring), plus a faint 4px glow
+   a 2px band on top of the neutral border (.mx-ring), plus a faint 4px glow
    outside the edge (.mx-halo). Component: components/glow-frame.tsx. */
 .composer {
   isolation: isolate;
@@ -61,10 +61,10 @@
     linear-gradient(#000 0 0) content-box exclude,
     linear-gradient(#000 0 0);
 }
-/* Exactly the 1px border line. */
+/* A 2px band over the border line. */
 .mx-ring {
   inset: 0;
-  padding: 1px;
+  padding: 2px;
   opacity: var(--mx-ring-opacity);
   transition: opacity var(--dur-panel) ease;
 }
@@ -80,20 +80,17 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 110px;
+  width: 120px;
   height: 18px;
-  offset-path: inset(0.5px round calc(var(--mx-radius) + 0.5px));
+  offset-path: inset(1px round calc(var(--mx-radius)));
   offset-anchor: center;
   offset-rotate: auto;
   background: radial-gradient(closest-side, var(--mx-core), var(--mx-soft) 50%, transparent);
-  /* Segment 0 leads; the others trail at 3% of the lap each and fade out. */
-  opacity: calc(1 - var(--i, 0) * 0.17);
   animation: mx-travel var(--mx-speed) linear infinite;
-  animation-delay: calc(var(--mx-speed) * (4 - var(--i, 0)) * -0.03);
   will-change: offset-distance;
 }
 .mx-halo .mx-light {
-  width: 90px;
+  width: 96px;
   height: 14px;
   offset-path: inset(4.5px round calc(var(--mx-radius) + 1px));
   filter: blur(3px);
