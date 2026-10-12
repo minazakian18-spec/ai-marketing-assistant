@@ -80,17 +80,20 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 120px;
+  width: 110px;
   height: 18px;
   offset-path: inset(0.5px round calc(var(--mx-radius) + 0.5px));
   offset-anchor: center;
   offset-rotate: auto;
   background: radial-gradient(closest-side, var(--mx-core), var(--mx-soft) 50%, transparent);
+  /* Segment 0 leads; the others trail at 3% of the lap each and fade out. */
+  opacity: calc(1 - var(--i, 0) * 0.17);
   animation: mx-travel var(--mx-speed) linear infinite;
+  animation-delay: calc(var(--mx-speed) * (4 - var(--i, 0)) * -0.03);
   will-change: offset-distance;
 }
 .mx-halo .mx-light {
-  width: 96px;
+  width: 90px;
   height: 14px;
   offset-path: inset(4.5px round calc(var(--mx-radius) + 1px));
   filter: blur(3px);
