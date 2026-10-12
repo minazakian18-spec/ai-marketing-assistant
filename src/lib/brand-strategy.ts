@@ -64,7 +64,7 @@ export const PERSONALITY = ["Betrouwbaar", "Gastvrij", "Creatief", "Eerlijk", "A
 export const DESIGN_STYLES = ["Minimalistisch", "Warm en huiselijk", "Modern", "Klassiek", "Speels", "Luxe", "Natuurlijk", "Industrieel", "Kleurrijk"];
 export const TYPOGRAPHY: { id: string; label: string; stack: string }[] = [
   { id: "modern", label: "Modern schreefloos", stack: "var(--font-inter), system-ui, sans-serif" },
-  { id: "geometrisch", label: "Geometrisch", stack: "var(--font-lexend), system-ui, sans-serif" },
+  { id: "geometrisch", label: "Geometrisch", stack: "'Avenir Next', Futura, 'Century Gothic', system-ui, sans-serif" },
   { id: "klassiek", label: "Klassiek met schreef", stack: "Georgia, 'Times New Roman', serif" },
   { id: "elegant", label: "Elegant", stack: "'Didot', 'Bodoni 72', Georgia, serif" },
   { id: "afgerond", label: "Afgerond en vriendelijk", stack: "ui-rounded, 'SF Pro Rounded', 'Nunito', system-ui, sans-serif" },

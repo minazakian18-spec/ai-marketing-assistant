@@ -31,7 +31,7 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-primary);
@@ -48,7 +48,7 @@
 }
 .mkt-h1 {
   font-size: clamp(40px, 6.6vw, 86px);
-  font-weight: 750;
+  font-weight: 700;
   line-height: 1.04;
   letter-spacing: -0.035em;
   margin: 18px 0 20px;
@@ -62,7 +62,7 @@
 }
 .mkt-h2 {
   font-size: clamp(26px, 3.4vw, 40px);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.15;
   margin: 0 0 14px;
 }
@@ -805,7 +805,7 @@
   gap: 8px;
   align-items: center;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-primary);
   background: var(--color-bg-soft-purple);
   padding: 6px 12px;
@@ -874,7 +874,7 @@
   gap: 42px;
   flex-wrap: wrap;
   opacity: 0.55;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-text-muted);
   letter-spacing: -0.01em;
 }
@@ -888,7 +888,7 @@
 .mkt-trust-stat strong {
   display: block;
   font-size: 28px;
-  font-weight: 750;
+  font-weight: 700;
   color: var(--color-primary-dark);
 }
 .mkt-trust-stat span {
@@ -952,7 +952,7 @@
   background: var(--color-bg-soft-purple);
   color: var(--color-primary-dark);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   display: grid;
   place-items: center;
 }
@@ -1179,7 +1179,7 @@
 }
 .mkt-save-badge {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: #15803d;
   background: #ecfdf3;
   padding: 3px 9px;
@@ -1212,7 +1212,7 @@
   background: var(--gradient-primary);
   color: #fff;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 5px 12px;
   border-radius: 999px;
 }
@@ -1233,7 +1233,7 @@
 }
 .mkt-price-amount strong {
   font-size: 38px;
-  font-weight: 750;
+  font-weight: 700;
   font-family: var(--font-display);
 }
 .mkt-price-amount span {
@@ -1352,7 +1352,7 @@
   display: grid;
   place-items: center;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .mkt-testimonial-person strong {
   display: block;
@@ -1479,7 +1479,7 @@
 .mkt-pricing-promo h2 {
   color: #fff;
   font-size: clamp(26px, 3.4vw, 42px);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin: 16px 0 12px;
 }
@@ -1521,14 +1521,14 @@
 }
 .mkt-trending-badge {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-primary);
 }
 .mkt-trending-card h3 {
   font-size: 19px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-text);
   font-family: var(--font-display, var(--font-sans));
 }
@@ -1623,7 +1623,7 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-primary-dark);
   margin-bottom: 6px;
 }
@@ -1658,7 +1658,7 @@
   background: var(--color-bg-soft-purple);
   color: var(--color-primary-dark);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 10px;
 }
 .mkt-step-icon {
@@ -1668,7 +1668,7 @@
 }
 .mkt-step h3 {
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   margin: 0 0 6px;
   color: var(--color-text);
 }
@@ -1722,7 +1722,7 @@
 .mkt-footer-col h2 {
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-muted);

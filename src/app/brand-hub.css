@@ -702,7 +702,7 @@
   overflow: hidden;
   border-radius: 50%;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   box-shadow: 0 0 0 1px var(--app-border);
 }
 .bh-avatar img {
@@ -728,7 +728,7 @@
 .bh-post-image span {
   padding: 0 16px;
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
 }
@@ -751,7 +751,7 @@
   height: 44px;
   padding: 0 14px;
   color: #fff;
-  font-weight: 700;
+  font-weight: 600;
 }
 .bh-mail-bar img {
   max-height: 28px;

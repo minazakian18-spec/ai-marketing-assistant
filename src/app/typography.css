@@ -1,0 +1,93 @@
+/* Mavix typography system (loaded after globals.css on every page).
+   One typeface (Inter, optical sizing on), four weights, one scale. Modules
+   use these tokens instead of their own sizes and weights.
+
+   Weights:  400 body · 500 labels/UI · 600 headings and emphasis · 700 only
+             for numbers and the wordmark. Never 800/900.
+   Colour:   page titles in brand dark purple; everything else near-black;
+             muted grey only for genuinely secondary text (AA on white). */
+
+:root {
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* App scale (desktop). Phones step the two largest sizes down. */
+  --fs-display: 30px; /* dashboard greeting, agent welcome */
+  --fs-page: 28px; /* page titles */
+  --fs-section: 20px; /* section titles */
+  --fs-card: 16px; /* card and panel titles */
+  --fs-body: 14px;
+  --fs-ui: 14px; /* buttons, inputs, navigation */
+  --fs-small: 13px; /* helper text, meta */
+  --fs-micro: 12px; /* badges, eyebrows */
+
+  --lh-tight: 1.2;
+  --lh-snug: 1.35;
+  --lh-body: 1.55;
+
+  --tracking-display: -0.024em;
+  --tracking-heading: -0.014em;
+  --tracking-ui: -0.003em;
+  --tracking-caps: 0.06em;
+
+  --text-heading: #2a0f5c; /* brand dark purple, 13:1 on white */
+  --text-strong: #121118;
+  --text-body: #26252e;
+  --text-secondary: #4b4a55; /* 8.6:1 */
+  --text-muted: #63626d; /* 6:1, secondary only */
+}
+@media (max-width: 640px) {
+  :root {
+    --fs-display: 25px;
+    --fs-page: 24px;
+    --fs-section: 18px;
+  }
+}
+
+html {
+  font-optical-sizing: auto;
+  font-synthesis-weight: none;
+}
+body {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-body);
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  text-wrap: balance;
+}
+h1 {
+  letter-spacing: var(--tracking-display);
+}
+h2,
+h3 {
+  letter-spacing: var(--tracking-heading);
+}
+p,
+li {
+  text-wrap: pretty;
+}
+button,
+input,
+select,
+textarea,
+label {
+  letter-spacing: var(--tracking-ui);
+}
+strong,
+b {
+  font-weight: var(--fw-semibold);
+}
+.tabular,
+time,
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
+}

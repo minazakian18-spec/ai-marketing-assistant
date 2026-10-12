@@ -27,7 +27,7 @@
 }
 .cal-period-label {
   font-size: 16px;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--color-primary-dark);
   min-width: 150px;
   text-transform: capitalize;
@@ -102,7 +102,7 @@
   background: #fff;
   padding: 10px 12px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-text-muted);
   text-align: center;
 }
@@ -129,7 +129,7 @@
 }
 .cal-month-cell.is-today .cal-month-daynum {
   color: var(--color-primary-dark);
-  font-weight: 700;
+  font-weight: 600;
 }
 .cal-month-cell-head {
   display: flex;
@@ -183,7 +183,7 @@
   align-items: baseline;
   font-size: 11px;
   color: var(--color-text-muted);
-  font-weight: 700;
+  font-weight: 600;
 }
 .cal-week-items {
   display: flex;
@@ -349,7 +349,7 @@
 }
 .cal-list-group-label {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-text-secondary);
   margin-bottom: 8px;
   text-transform: capitalize;
@@ -567,7 +567,7 @@
 .cal-create .ui-menu-list { min-width: 0; width: 100%; }
 .cal-create .ui-menu-list [role="menuitem"] { white-space: normal; text-align: left; }
 .cal-sidebar-close, .cal-sidebar-open { display: none; }
-.cal-group h2 { margin: 0 0 6px; padding: 0 6px; font-size: 12.5px; font-weight: 650; color: var(--app-text); }
+.cal-group h2 { margin: 0 0 6px; padding: 0 6px; font-size: 12.5px; font-weight: 600; color: var(--app-text); }
 .cal-checks { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
 .cal-checks label { display: flex; align-items: center; gap: 10px; padding: 5px 6px; border-radius: 6px; font-size: 13px; color: var(--app-text-2); cursor: pointer; }
 .cal-checks label:hover { background: var(--app-hover); }
@@ -620,7 +620,7 @@
 .plan-head { display: grid; gap: 1px; margin: 0; padding: 6px 8px 8px; border-bottom: 1px solid var(--app-border); }
 .plan-head strong { font-size: 13.5px; }
 .plan-head span { font-size: 12px; color: var(--app-muted); }
-.plan-group { margin: 6px 0 2px; padding: 4px 8px 0; border-top: 1px solid var(--app-border); font-size: 11px; font-weight: 650; letter-spacing: 0.03em; text-transform: uppercase; color: var(--app-muted); }
+.plan-group { margin: 6px 0 2px; padding: 4px 8px 0; border-top: 1px solid var(--app-border); font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--app-muted); }
 .plan-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 7px; background: none; font-size: 13.5px; text-align: left; color: var(--app-text); cursor: pointer; }
 .plan-item:hover:not(:disabled), .plan-item:focus-visible { background: var(--app-hover); outline: none; }
 .plan-item svg { flex-shrink: 0; color: var(--app-text-2); }
@@ -724,7 +724,7 @@
 
 /* Agenda */
 .ag { display: flex; flex-direction: column; gap: 14px; }
-.ag-day h3 { margin: 0 0 6px; font-size: 13px; font-weight: 650; text-transform: capitalize; color: var(--app-text, #15141a); }
+.ag-day h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; text-transform: capitalize; color: var(--app-text, #15141a); }
 .ag-day ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--app-border, #e6e6eb); border-radius: 10px; background: #fff; overflow: hidden; }
 .ag-day li + li { border-top: 1px solid var(--app-border, #e6e6eb); }
 .ag-day button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 14px; border: 0; background: none; text-align: left; font-size: 14px; cursor: pointer; color: var(--app-text, #15141a); }

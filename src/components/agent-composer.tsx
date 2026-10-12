@@ -52,6 +52,16 @@ export function AgentComposer({
   const [webSearch, setWebSearch] = useState(false);
   const [deepResearch, setDeepResearch] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  // The travelling border light only runs while the composer is on screen.
+  const [inView, setInView] = useState(true);
+  useEffect(() => {
+    const el = formRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { rootMargin: "80px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const filePicker = useRef<HTMLInputElement>(null);
   const imagePicker = useRef<HTMLInputElement>(null);
   const latest = useRef<AgentAttachment[]>([]);
@@ -118,7 +128,10 @@ export function AgentComposer({
 
   return (
     <form
+      ref={formRef}
       className={"composer composer-" + size + (dragging ? " is-dragging" : "")}
+      data-busy={busy || undefined}
+      data-paused={!inView || undefined}
       onSubmit={submit}
       onDragOver={(e) => drag(e, true)}
       onDragEnter={(e) => drag(e, true)}

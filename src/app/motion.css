@@ -1,0 +1,234 @@
+/* Mavix motion layer (loaded last in the app layout).
+   Timings: 150ms for small interactions, 220ms for panels, 8s for the one
+   long decorative loop (the AI input light). Only opacity, transform and a
+   single custom angle are animated; never layout. All motion stops under
+   prefers-reduced-motion, and every component looks finished without it. */
+
+:root {
+  --dur-fast: 150ms;
+  --dur-panel: 220ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --focus-ring: 0 0 0 2px #fff, 0 0 0 4px rgba(109, 40, 217, 0.55);
+}
+
+/* ================= AI input: travelling light =================
+   A registered angle drives a conic gradient. ::before draws it only in a
+   1.5px ring (mask: border-box minus padding-box), so the light follows the
+   real border radius and never crosses text or controls. ::after is the same
+   light, blurred, behind the opaque input: only the glow outside the edge
+   shows. Without @property support the light simply stands still. */
+@property --mx-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.composer {
+  isolation: isolate;
+  --mx-ring: 1.5px;
+  --mx-light: rgba(124, 58, 237, 0.95);
+  --mx-light-soft: rgba(167, 139, 250, 0.55);
+  --mx-glow-opacity: 0.32;
+  --mx-speed: 8s;
+}
+.composer-large {
+  --mx-radius: 16px;
+}
+.composer-compact {
+  --mx-radius: 12px;
+}
+.composer::before,
+.composer::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--mx-angle),
+    transparent 0deg,
+    transparent 250deg,
+    var(--mx-light-soft) 300deg,
+    var(--mx-light) 335deg,
+    var(--mx-light-soft) 350deg,
+    transparent 360deg
+  );
+  animation: mx-orbit var(--mx-speed) linear infinite;
+}
+.composer::before,
+.composer::after {
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+.composer::before {
+  z-index: 1;
+  padding: var(--mx-ring);
+}
+/* Glow: an 8px band outside the edge only (mask applies after the blur). */
+.composer::after {
+  z-index: 0;
+  inset: -9px;
+  padding: 8px;
+  border-radius: calc(var(--mx-radius, 14px) + 8px);
+  filter: blur(5px);
+  opacity: var(--mx-glow-opacity);
+  transition: opacity var(--dur-panel) ease;
+}
+/* The input surface stays clean and readable above the glow. */
+.composer > * {
+  position: relative;
+  z-index: 2;
+}
+.composer .composer-drop {
+  position: absolute;
+  z-index: 3;
+}
+.composer:focus-within {
+  --mx-light: rgba(109, 40, 217, 1);
+  --mx-glow-opacity: 0.5;
+}
+/* Real request in progress: a little faster and a second, fainter light. */
+.composer[data-busy] {
+  --mx-speed: 3.6s;
+  --mx-glow-opacity: 0.55;
+}
+.composer[data-busy]::before {
+  background: conic-gradient(
+    from var(--mx-angle),
+    transparent 0deg,
+    var(--mx-light-soft) 40deg,
+    var(--mx-light) 70deg,
+    transparent 110deg,
+    transparent 180deg,
+    var(--mx-light-soft) 220deg,
+    var(--mx-light) 250deg,
+    transparent 290deg
+  );
+}
+.composer[data-paused]::before,
+.composer[data-paused]::after {
+  animation-play-state: paused;
+}
+.composer.is-dragging::before,
+.composer.is-dragging::after {
+  opacity: 0;
+}
+@keyframes mx-orbit {
+  to {
+    --mx-angle: 360deg;
+  }
+}
+/* The dashboard composer is the primary action: a calm, slightly raised card. */
+.agent-surface .composer {
+  border-color: #ddd5f3;
+  box-shadow:
+    0 1px 2px rgba(24, 18, 43, 0.05),
+    0 12px 32px -12px rgba(76, 29, 149, 0.18);
+}
+.agent-surface .composer:focus-within {
+  border-color: #cbbdf2;
+  box-shadow:
+    0 1px 2px rgba(24, 18, 43, 0.05),
+    0 14px 36px -12px rgba(76, 29, 149, 0.24);
+}
+
+/* ================= Mavix logo motion =================
+   Idle float (globals.css: 4.6s, a few px), hover: slight scale and a glow
+   that follows the logo's own shape (drop-shadow), never a rotation. The
+   thinking state only runs while a real request is in progress. */
+.mavi-avatar:hover {
+  transform: none;
+}
+.mavi-avatar .mavi,
+.mavix-brand .mavix-mark {
+  transition:
+    transform var(--dur-panel) var(--ease-out),
+    filter var(--dur-panel) ease;
+}
+.mavi-avatar:hover .mavi,
+.mavix-brand:hover .mavix-mark {
+  transform: scale(1.045);
+  filter: drop-shadow(0 0 6px rgba(124, 58, 237, 0.35));
+}
+/* Sidebar and header wordmark: a barely visible breath. */
+.mavix-brand .mavix-mark {
+  animation: mx-breathe 6s ease-in-out infinite;
+  transform-origin: 50% 60%;
+}
+@keyframes mx-breathe {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -1.5px;
+  }
+}
+
+/* ================= Interaction polish ================= */
+/* One focus ring everywhere, keyboard only. */
+.app-shell :is(a, button, [role="button"], [role="tab"], [role="menuitem"], summary, select, input[type="checkbox"], input[type="radio"]):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.app-shell .button {
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out);
+}
+.app-shell .button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.app-shell .button:active:not(:disabled) {
+  transform: translateY(0);
+}
+.app-shell .button[aria-busy="true"] {
+  cursor: progress;
+}
+/* Cards that are links lift a little; static cards do not move. */
+.app-shell a:is(.ui-card, .studio-option, .dash-action, .st-channel, .lb-draft) {
+  transition:
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out);
+}
+.app-shell a:is(.ui-card, .studio-option, .dash-action):hover {
+  transform: translateY(-1px);
+}
+.app-shell :disabled {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer::before,
+  .composer::after,
+  .mavix-brand .mavix-mark {
+    animation: none;
+  }
+  /* Static, elegant fallback: a soft accent arc in the top-left corner. */
+  .composer::before {
+    background: conic-gradient(from 300deg, transparent 0deg, rgba(124, 58, 237, 0.55) 40deg, transparent 100deg);
+  }
+  .composer::after {
+    opacity: 0;
+  }
+  .mavi-avatar .mavi,
+  .mavix-brand .mavix-mark,
+  .app-shell .button,
+  .app-shell a:is(.ui-card, .studio-option, .dash-action, .st-channel, .lb-draft) {
+    transition: none;
+  }
+  .mavi-avatar:hover .mavi,
+  .mavix-brand:hover .mavix-mark,
+  .app-shell .button:hover:not(:disabled),
+  .app-shell a:is(.ui-card, .studio-option, .dash-action):hover {
+    transform: none;
+  }
+}

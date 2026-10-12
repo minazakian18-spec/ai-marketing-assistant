@@ -225,11 +225,7 @@ export function WorkspaceProvider({
             </>
           ) : (
             <>
-              <span className="ws-boot-mark" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </span>
+              <MaviAvatar size={48} state="thinking" />
               <p>Je werkruimte wordt geladen…</p>
             </>
           )}
