@@ -1,7 +1,7 @@
 /* Mavix motion layer (loaded last in the app layout).
-   Timings: 150ms for small interactions, 220ms for panels, 8s for the one
-   long decorative loop (the AI input light). Only opacity, transform and a
-   single custom angle are animated; never layout. All motion stops under
+   Timings: 150ms for small interactions, 220ms for panels, 12s for the one
+   long decorative loop (the AI input light). Only opacity, transform and
+   offset-distance are animated; never layout. All motion stops under
    prefers-reduced-motion, and every component looks finished without it. */
 
 :root {
@@ -12,23 +12,20 @@
 }
 
 /* ================= AI input: travelling light =================
-   A registered angle drives a conic gradient. ::before draws it only in a
-   1.5px ring (mask: border-box minus padding-box), so the light follows the
-   real border radius and never crosses text or controls. ::after is the same
-   light, blurred, behind the opaque input: only the glow outside the edge
-   shows. Without @property support the light simply stands still. */
-@property --mx-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
+   One short, soft light travels along the rounded border at a constant speed
+   (offset-path follows the real perimeter, so it never speeds up around
+   corners the way a rotating conic gradient does). It is only visible inside
+   a 1px band on top of the neutral border (.mx-ring), plus a faint 4px glow
+   outside the edge (.mx-halo). Component: components/glow-frame.tsx. */
 .composer {
   isolation: isolate;
-  --mx-ring: 1.5px;
-  --mx-light: rgba(124, 58, 237, 0.95);
-  --mx-light-soft: rgba(167, 139, 250, 0.55);
-  --mx-glow-opacity: 0.32;
-  --mx-speed: 8s;
+  --mx-radius: 12px;
+  --mx-speed: 12s;
+  --mx-core: rgba(124, 58, 237, 0.9);
+  --mx-soft: rgba(196, 181, 253, 0.55);
+  --mx-ring-opacity: 0.7;
+  --mx-halo-opacity: 0.22;
+  border-color: #e4e1ec;
 }
 .composer-large {
   --mx-radius: 16px;
@@ -36,26 +33,26 @@
 .composer-compact {
   --mx-radius: 12px;
 }
-.composer::before,
-.composer::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  pointer-events: none;
-  background: conic-gradient(
-    from var(--mx-angle),
-    transparent 0deg,
-    transparent 250deg,
-    var(--mx-light-soft) 300deg,
-    var(--mx-light) 335deg,
-    var(--mx-light-soft) 350deg,
-    transparent 360deg
-  );
-  animation: mx-orbit var(--mx-speed) linear infinite;
+.composer > * {
+  position: relative;
+  z-index: 2;
 }
-.composer::before,
-.composer::after {
+.composer > .mx-frame {
+  position: absolute;
+  z-index: 1;
+  inset: -1px;
+  border-radius: calc(var(--mx-radius) + 1px);
+  pointer-events: none;
+}
+.composer .composer-drop {
+  position: absolute;
+  z-index: 3;
+}
+.mx-ring,
+.mx-halo {
+  position: absolute;
+  border-radius: inherit;
+  overflow: hidden;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -64,78 +61,83 @@
     linear-gradient(#000 0 0) content-box exclude,
     linear-gradient(#000 0 0);
 }
-.composer::before {
-  z-index: 1;
-  padding: var(--mx-ring);
-}
-/* Glow: an 8px band outside the edge only (mask applies after the blur). */
-.composer::after {
-  z-index: 0;
-  inset: -9px;
-  padding: 8px;
-  border-radius: calc(var(--mx-radius, 14px) + 8px);
-  filter: blur(5px);
-  opacity: var(--mx-glow-opacity);
+/* Exactly the 1px border line. */
+.mx-ring {
+  inset: 0;
+  padding: 1px;
+  opacity: var(--mx-ring-opacity);
   transition: opacity var(--dur-panel) ease;
 }
-/* The input surface stays clean and readable above the glow. */
-.composer > * {
-  position: relative;
-  z-index: 2;
+/* A faint band just outside the border; nothing inside the input. */
+.mx-halo {
+  inset: -4px;
+  padding: 4px;
+  border-radius: calc(var(--mx-radius) + 5px);
+  opacity: var(--mx-halo-opacity);
+  transition: opacity var(--dur-panel) ease;
 }
-.composer .composer-drop {
+.mx-light {
   position: absolute;
-  z-index: 3;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: 18px;
+  offset-path: inset(0.5px round calc(var(--mx-radius) + 0.5px));
+  offset-anchor: center;
+  offset-rotate: auto;
+  background: radial-gradient(closest-side, var(--mx-core), var(--mx-soft) 50%, transparent);
+  animation: mx-travel var(--mx-speed) linear infinite;
+  will-change: offset-distance;
+}
+.mx-halo .mx-light {
+  width: 96px;
+  height: 14px;
+  offset-path: inset(4.5px round calc(var(--mx-radius) + 1px));
+  filter: blur(3px);
+}
+@keyframes mx-travel {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
 }
 .composer:focus-within {
-  --mx-light: rgba(109, 40, 217, 1);
-  --mx-glow-opacity: 0.5;
+  border-color: #d9d3ea;
+  --mx-ring-opacity: 1;
+  --mx-halo-opacity: 0.34;
 }
-/* Real request in progress: a little faster and a second, fainter light. */
+/* A real request is running: same single light, a little quicker. */
 .composer[data-busy] {
-  --mx-speed: 3.6s;
-  --mx-glow-opacity: 0.55;
+  --mx-speed: 7s;
+  --mx-ring-opacity: 1;
 }
-.composer[data-busy]::before {
-  background: conic-gradient(
-    from var(--mx-angle),
-    transparent 0deg,
-    var(--mx-light-soft) 40deg,
-    var(--mx-light) 70deg,
-    transparent 110deg,
-    transparent 180deg,
-    var(--mx-light-soft) 220deg,
-    var(--mx-light) 250deg,
-    transparent 290deg
-  );
-}
-.composer[data-paused]::before,
-.composer[data-paused]::after {
+.composer[data-paused] .mx-light {
   animation-play-state: paused;
 }
-.composer.is-dragging::before,
-.composer.is-dragging::after {
+.composer.is-dragging .mx-frame {
   opacity: 0;
 }
-@keyframes mx-orbit {
-  to {
-    --mx-angle: 360deg;
+/* Browsers without offset-path shapes keep the clean neutral border. */
+@supports not (offset-path: inset(0 round 1px)) {
+  .composer > .mx-frame {
+    display: none;
   }
 }
 /* The dashboard composer is the primary action: a calm, slightly raised card. */
 .agent-surface .composer {
-  border-color: #ddd5f3;
+  border-color: #e4e1ec;
   box-shadow:
-    0 1px 2px rgba(24, 18, 43, 0.05),
-    0 12px 32px -12px rgba(76, 29, 149, 0.18);
+    0 1px 2px rgba(24, 18, 43, 0.04),
+    0 10px 28px -14px rgba(76, 29, 149, 0.16);
 }
 .agent-surface .composer:focus-within {
-  border-color: #cbbdf2;
+  border-color: #d9d3ea;
   box-shadow:
-    0 1px 2px rgba(24, 18, 43, 0.05),
-    0 14px 36px -12px rgba(76, 29, 149, 0.24);
+    0 1px 2px rgba(24, 18, 43, 0.04),
+    0 12px 30px -14px rgba(76, 29, 149, 0.2);
 }
-
 /* ================= Mavix logo motion =================
    Idle float (globals.css: 4.6s, a few px), hover: slight scale and a glow
    that follows the logo's own shape (drop-shadow), never a rotation. The
@@ -207,17 +209,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .composer::before,
-  .composer::after,
+  .mx-light,
   .mavix-brand .mavix-mark {
     animation: none;
   }
-  /* Static, elegant fallback: a soft accent arc in the top-left corner. */
-  .composer::before {
-    background: conic-gradient(from 300deg, transparent 0deg, rgba(124, 58, 237, 0.55) 40deg, transparent 100deg);
+  /* Static, elegant fallback: one soft highlight resting on the top edge. */
+  .mx-light {
+    offset-distance: 6%;
   }
-  .composer::after {
-    opacity: 0;
+  .mx-halo {
+    display: none;
   }
   .mavi-avatar .mavi,
   .mavix-brand .mavix-mark,

@@ -4,6 +4,7 @@ import { ArrowUp, FileText, Globe, ImagePlus, Paperclip, Telescope, X } from "lu
 import { IconButton } from "@/components/ui";
 import type { AgentAttachment } from "@/lib/agent-handoff";
 import { RotatingPrompt } from "@/components/rotating-prompt";
+import { GlowFrame } from "@/components/glow-frame";
 
 const MAX_FILES = 5;
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -150,6 +151,7 @@ export function AgentComposer({
         if (attachments) add(e.dataTransfer.files);
       }}
     >
+      <GlowFrame />
       {files.length > 0 && (
         <ul className="composer-files" aria-label="Bijlagen">
           {files.map((f) => (

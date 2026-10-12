@@ -1,244 +1,103 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  ArrowUpRight,
-  CheckCheck,
-  CalendarDays,
-  Eye,
-  Orbit,
-  Instagram,
-  Mail,
-  Plug,
-} from "lucide-react";
-import { PageHeading } from "@/components/ui";
+import { useEffect, useState } from "react";
+import { ChartNoAxesColumn, Plug } from "lucide-react";
 import { ResearchSection } from "@/components/research/research-section";
-import "../../research.css";
-import { Mavi } from "@/components/mavi";
 import { useWorkspace } from "@/components/workspace-provider";
-import { ConfirmDialog } from "@/components/account/confirm-dialog";
-import { NewContentMenu } from "@/components/dashboard/new-content-menu";
-import {
-  Attention,
-  Upcoming,
-  RecentContent,
-  ItemStatus,
-} from "@/components/dashboard/content-sections";
-import {
-  localDashboardItems,
-  emailDashboardItems,
-  thisWeek,
-  comingWeek,
-  shortDate,
-  type DashboardItem,
-} from "@/lib/dashboard-data";
-import "../../dashboard.css";
-import {
-  defaultInstagram,
-  autopilotLabel,
-  readiness,
-} from "@/lib/instagram-model";
+import { isBrowserDemo } from "@/lib/demo";
+import "../../research.css";
+import "../../insights.css";
 
-const channelCards = [
-  {
-    key: "instagram",
-    title: "Instagram",
-    Icon: Instagram,
-    text: "Bereik, engagement en volgersgroei verschijnen hier zodra Instagram gekoppeld is.",
-  },
-  {
-    key: "email",
-    title: "E-mail",
-    Icon: Mail,
-    text: "Open rate en click rate verschijnen hier zodra campagnes via een gekoppeld account verstuurd worden.",
-  },
-];
+// Inzichten: how marketing performs and what Mavix can discover. No approval
+// queue, planning or automation status here: those live on the Dashboard,
+// Calendar and in the channel modules.
+//
+// Performance numbers are only shown when a connected integration really
+// delivers them. Today no channel exposes reach or engagement to Mavix yet,
+// so the section says so once, depending on what is connected.
+
+const LABEL: Record<string, string> = {
+  instagram: "Instagram",
+  messenger: "Facebook Messenger",
+  gmail: "Gmail",
+  whatsapp: "WhatsApp",
+  google_business: "Google Bedrijfsprofiel",
+  google_search_console: "Google Search Console",
+  google_calendar: "Google Agenda",
+};
+// Channels whose statistics Mavix will read once supported (marketing results).
+const ANALYTICS = ["instagram", "google_business", "google_search_console"];
+
+type Conn = { provider: string; status: string };
 
 export default function Insights() {
-  const { data, ready, save } = useWorkspace();
-  const [selected, setSelected] = useState<DashboardItem | null>(null);
-  const [message, setMessage] = useState("");
-  const router = useRouter();
+  const { ready } = useWorkspace();
+  const [connections, setConnections] = useState<Conn[] | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (isBrowserDemo()) {
+      setConnections([]);
+      return;
+    }
+    let active = true;
+    fetch("/api/integrations", { cache: "no-store" })
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error();
+        if (active) setConnections(body.connections || []);
+      })
+      .catch(() => active && setError(true));
+    return () => {
+      active = false;
+    };
+  }, []);
+
   if (!ready) return <p role="status">Inzichten laden…</p>;
-  const now = new Date();
-  const local = [
-    ...localDashboardItems(data.posts),
-    ...emailDashboardItems(data.email?.campaigns || []),
-  ].sort((a, b) => b.date.localeCompare(a.date));
-  const attention = local.filter((p) =>
-    ["review", "blocked", "failed"].includes(p.status),
-  );
-  const brand = readiness(data.profile);
-  if (brand.score < 100)
-    attention.push({
-      id: "brand-readiness",
-      title: "Vul je Brand Hub aan",
-      channel: "Instagram",
-      kind: "Brand Hub",
-      status: "brand",
-      date: now.toISOString(),
-      body:
-        "Ontbreekt: " +
-        brand.checks
-          .filter((c) => !c.done)
-          .map((c) => c.label)
-          .join(", "),
-      href: "/brand-hub",
-      variant: 0,
-      local: true,
-    });
-  const planned = local.filter((p) => p.status === "scheduled");
-  const upcoming = comingWeek(planned, now);
-  const week = thisWeek(local, now);
-  const kpis = [
-    {
-      label: "Wacht op goedkeuring",
-      value: String(attention.filter((i) => i.status === "review").length),
-      sub: "Klaar voor jouw blik",
-      Icon: CheckCheck,
-    },
-    {
-      label: "Gepland deze week",
-      value: String(thisWeek(planned, now).length),
-      sub: "In je kalender",
-      Icon: CalendarDays,
-    },
-    {
-      label: "Automatisering",
-      value: autopilotLabel(data.instagram || defaultInstagram),
-      sub: "Social",
-      Icon: Orbit,
-    },
-    {
-      label: "Bereik deze maand",
-      value: "—",
-      sub: "Koppel Instagram om bereik te zien",
-      Icon: Eye,
-    },
-  ];
+  const connected = (connections || []).filter((c) => c.status === "connected" && ANALYTICS.includes(c.provider)).map((c) => LABEL[c.provider] || c.provider);
+
   return (
-    <div className="command-dashboard">
-      <PageHeading
-        eyebrow="Groei"
-        title="Inzichten"
-        description="Je planning, openstaande acties en resultaten per kanaal."
-        action={<NewContentMenu />}
-      />
-      <ResearchSection />
-      <section className="command-kpis" aria-label="Marketingoverzicht">
-        {kpis.map(({ label, value, sub, Icon }) => (
-          <article className="command-kpi" key={label}>
-            <div>
-              <span>{label}</span>
-              <Icon size={17} />
-            </div>
-            <strong key={value} className="metric-value-enter">
-              {value}
-            </strong>
-            <p>{sub}</p>
-          </article>
-        ))}
-      </section>
-      <div className="command-priority">
-        <Attention items={attention} onView={setSelected} />
-        <section className="panel ws-next-step">
-          <div className="ws-next-step-head">
-            <Mavi size={20} />
-            <h2>Volgende stap</h2>
+    <div className="ins">
+      <header className="ins-head">
+        <h1>Inzichten</h1>
+        <p>Ontdek hoe je marketing presteert en waar je kunt groeien.</p>
+      </header>
+
+      <section className="ins-section" aria-labelledby="ins-performance">
+        <h2 id="ins-performance">Marketingresultaten</h2>
+        {connections === null && !error ? (
+          <div className="ins-skeleton" aria-busy="true" aria-label="Laden">
+            <span />
+            <span />
           </div>
-          <p>
-            {week.some((p) => p.kind.includes("Reel"))
-              ? "Je Reel-planning staat klaar. Wissel productcontent af met een kijkje achter de schermen."
-              : "Je hebt deze week nog geen Reel gepland. Een korte product-Reel is een goede aanvulling."}
+        ) : error ? (
+          <p className="ins-error" role="alert">
+            Je koppelingen konden niet worden geladen. Probeer het later opnieuw.
           </p>
-          <p>
-            {week.some((p) => p.channel === "E-mail")
-              ? "Je e-mailplanning staat klaar. Houd je onderwerpregel kort en kies één duidelijke CTA."
-              : "Plan ook een nieuwsbrief voor je ingeschreven contacten, met één duidelijke CTA."}
-          </p>
-          <Link className="button primary" href="/calendar">
-            Naar de kalender
-            <ArrowUpRight size={16} />
-          </Link>
-        </section>
-      </div>
-      <p role="status" className="dashboard-message">
-        {message}
-      </p>
-      <div className="channel-performance">
-        {channelCards.map(({ key, title, Icon, text }) => (
-          <section className="panel ws-connect" key={key}>
-            <span className="ws-connect-icon">
-              <Icon size={18} />
+        ) : (
+          <div className="ins-empty">
+            <span className="ins-empty-icon" aria-hidden="true">
+              <ChartNoAxesColumn size={18} />
             </span>
             <div>
-              <h2>{title}</h2>
-              <p>{text}</p>
+              <strong>Nog geen marketinggegevens beschikbaar</strong>
+              <p>
+                {connected.length
+                  ? `${connected.join(" en ")} ${connected.length === 1 ? "is" : "zijn"} gekoppeld, maar Mavix leest bereik en interacties nog niet uit. Zodra dat kan, zie je hier je resultaten en trends.`
+                  : "Koppel een kanaal om je resultaten en trends te bekijken."}
+              </p>
             </div>
-            <Link className="button secondary" href="/account/integraties">
-              <Plug size={15} />
-              Integraties
-            </Link>
-          </section>
-        ))}
-      </div>
-      <div className="command-bottom">
-        <Upcoming items={upcoming} onView={setSelected} />
-        <RecentContent items={local} onView={setSelected} />
-      </div>
-      <ConfirmDialog
-        open={selected !== null}
-        title={selected?.title || "Content bekijken"}
-        onClose={() => setSelected(null)}
-        confirmLabel={
-          selected?.status === "brand"
-            ? "Verbeter Brand Hub"
-            : selected?.channel === "E-mail"
-              ? "Open E-mail"
-              : "Open Social"
-        }
-        onConfirm={() => {
-          if (selected) router.push(selected.href);
-          setSelected(null);
-        }}
-      >
-        {selected && (
-          <div className="dashboard-detail">
-            <p>
-              {selected.kind} · {shortDate(selected.date)}
-            </p>
-            <ItemStatus status={selected.status} />
-            <p className="detail-body">{selected.body}</p>
-            {selected.channel === "Instagram" &&
-              selected.status === "review" && (
-                <button
-                  className="button primary"
-                  onClick={async () => {
-                    if (
-                      await save({
-                        ...data,
-                        posts: data.posts.map((p) =>
-                          p.id === selected.id
-                            ? { ...p, status: "approved" }
-                            : p,
-                        ),
-                      })
-                    ) {
-                      setSelected(null);
-                      setMessage(
-                        "Je concept is goedgekeurd en klaar om in te plannen.",
-                      );
-                    }
-                  }}
-                >
-                  <CheckCheck size={16} />
-                  Goedkeuren
-                </button>
-              )}
+            {!connected.length && (
+              <Link href="/account/integraties" className="button secondary">
+                <Plug size={15} />
+                Integraties bekijken
+              </Link>
+            )}
           </div>
         )}
-      </ConfirmDialog>
+      </section>
+
+      <ResearchSection />
     </div>
   );
 }

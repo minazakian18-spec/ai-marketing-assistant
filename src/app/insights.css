@@ -1,0 +1,149 @@
+/* Inzichten: header, one performance section, AI research. Calm, aligned,
+   minimal elevation (tokens: typography.css / design-system.css). */
+.ins {
+  display: grid;
+  gap: 28px;
+  max-width: 980px;
+}
+.app-shell .main-shell .ins-head h1 {
+  margin: 0;
+  font-size: var(--fs-page);
+  letter-spacing: var(--tracking-display);
+  color: var(--text-strong);
+}
+.ins-head p {
+  margin: 6px 0 0;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+.ins-section {
+  display: grid;
+  gap: 12px;
+}
+.app-shell .main-shell .ins-section h2 {
+  margin: 0;
+  font-size: var(--fs-card);
+  color: var(--text-strong);
+}
+.ins-empty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+.ins-empty > div {
+  flex: 1;
+  min-width: 0;
+}
+.ins-empty strong {
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+.ins-empty p {
+  margin: 3px 0 0;
+  font-size: var(--fs-small);
+  color: var(--text-secondary);
+}
+.ins-empty-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #f3f2f7;
+  color: var(--text-muted);
+}
+.ins-empty .button {
+  flex: none;
+  height: 36px;
+}
+.ins-error {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--ds-radius);
+  background: var(--ds-danger-soft);
+  font-size: var(--fs-small);
+  color: var(--ds-danger);
+}
+.ins-skeleton {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+}
+.ins-skeleton span {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #ebe9f1, #f5f4f8, #ebe9f1);
+  background-size: 200% 100%;
+  animation: ds-shimmer 1.4s ease-in-out infinite;
+}
+.ins-skeleton span + span {
+  width: 60%;
+}
+
+/* AI research, compact on this page. */
+.ins .rs {
+  gap: 14px;
+  margin: 0;
+  padding: 18px 20px;
+  border-color: var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: none;
+}
+.ins .rs-intro {
+  align-items: center;
+  gap: 14px;
+}
+.ins .rs-intro > div {
+  flex: 1;
+  min-width: 0;
+}
+.app-shell .main-shell .ins .rs-intro h2 {
+  font-size: var(--fs-card);
+  color: var(--text-strong);
+}
+.ins .rs-intro p {
+  margin: 3px 0 0;
+  font-size: var(--fs-small);
+  color: var(--text-secondary);
+}
+.app-shell .main-shell .ins .rs-start {
+  flex: none;
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: var(--fs-ui);
+}
+.ins .rs-cta {
+  padding-left: 46px;
+}
+.ins .rs > .rs-note {
+  padding-left: 46px;
+}
+
+@media (max-width: 640px) {
+  .ins-empty,
+  .ins .rs-intro {
+    flex-wrap: wrap;
+  }
+  .ins-empty .button,
+  .app-shell .main-shell .ins .rs-start {
+    width: 100%;
+    justify-content: center;
+  }
+  .ins .rs-cta,
+  .ins .rs > .rs-note {
+    padding-left: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ins-skeleton span {
+    animation: none;
+  }
+}

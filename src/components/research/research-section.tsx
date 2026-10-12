@@ -37,7 +37,7 @@ export function ResearchSection() {
   const [demoReport, setDemoReport] = useState<ResearchReport | null>(null);
 
   const kind = businessKindOf(data.profile.industry || "", data.profile.description || "");
-  const label = kind === "restaurant" ? "Onderzoek mijn restaurant" : "Onderzoek mijn bedrijf";
+  const label = "Onderzoek starten";
 
   const load = useCallback(async () => {
     try {
@@ -111,20 +111,24 @@ export function ResearchSection() {
   const period = state?.period || researchPeriod();
   const next = state?.nextEligibleAt || nextEligibleAt(period);
   const earlier = (state?.history || []).filter((h) => h.id !== completed?.id);
+  // Not running and nothing to show yet: the start button sits in the header.
+  const idle = demo ? !demoReport : !!state && !running && !shown;
 
   return (
     <section className="rs" aria-labelledby="rs-title">
       <div className="rs-intro">
-        <MaviAvatar size={44} state={running ? "thinking" : "idle"} />
+        <MaviAvatar size={32} state={running ? "thinking" : "idle"} live={false} />
         <div>
-          <p className="rs-eyebrow">AI-onderzoek</p>
-          <h2 id="rs-title">{label}</h2>
-          <p>
-            Mavix onderzoekt alles wat over {kind === "restaurant" ? "je restaurant" : "je bedrijf"} beschikbaar is en vertelt je in gewone taal wat goed gaat, wat beter kan en waar je deze maand mee moet beginnen.
-          </p>
+          <h2 id="rs-title">AI-bedrijfsonderzoek</h2>
+          <p>Ontdek kansen, trends en verbeterpunten voor {kind === "restaurant" ? "jouw restaurant" : "jouw bedrijf"}. Eén keer per maand, in gewone taal.</p>
         </div>
+        {idle && (
+          <button type="button" className="button primary rs-start" onClick={() => void start()} disabled={starting || (!demo && !state?.canRun)}>
+            {current?.status === "failed" ? <RotateCcw size={15} /> : null}
+            {starting ? "Starten…" : current?.status === "failed" ? "Opnieuw proberen" : label}
+          </button>
+        )}
       </div>
-
       {error && (
         <p className="rs-error" role="alert">
           {error}
@@ -138,12 +142,7 @@ export function ResearchSection() {
             <ResearchReportView report={demoReport} onAsk={async (q) => answerFromReport(q, demoReport)} />
           </>
         ) : (
-          <div className="rs-cta">
-            <button type="button" className="button primary rs-start" onClick={() => void start()}>
-              {label}
-            </button>
-            <p>Testmodus: je ziet een voorbeeld op basis van je voorbeeldprofiel. Er wordt niets opgeslagen.</p>
-          </div>
+          <p className="rs-note">Testmodus: je krijgt een voorbeeld op basis van je voorbeeldprofiel, zonder AI. Er wordt niets opgeslagen.</p>
         )
       ) : !state ? (
         !error && <p className="rs-note">Laden…</p>
@@ -202,11 +201,7 @@ export function ResearchSection() {
               {current.error || "Het vorige onderzoek kon niet worden afgerond."} Je kunt het opnieuw proberen; dit telt niet als nieuw onderzoek.
             </p>
           )}
-          <button type="button" className="button primary rs-start" onClick={() => void start()} disabled={starting || !state.canRun}>
-            {current?.status === "failed" ? <RotateCcw size={16} /> : null}
-            {starting ? "Starten…" : current?.status === "failed" ? "Opnieuw proberen" : label}
-          </button>
-          <p>Eén keer per maand. Je rapport blijft bewaard en kun je altijd teruglezen.</p>
+          <p>Mavix bekijkt je Brand Hub, content en e-mail, en je Google-profiel en website als die gekoppeld zijn. Je rapport blijft bewaard.</p>
           {earlier.length > 0 && (
             <p className="rs-note">
               Eerder onderzoek:{" "}
