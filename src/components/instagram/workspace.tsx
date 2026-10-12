@@ -270,6 +270,8 @@ function Workspace() {
               fromCalendar={planning.fromCalendar}
               returnDate={planning.returnDate}
               focusPreview={search.get("view") === "preview"}
+              initialBrief={search.get("brief")?.slice(0, 2000) || ""}
+              start={search.get("start") === "ai" ? "ai" : search.get("start") === "manual" ? "manual" : undefined}
               profile={data.profile}
               onPersist={persist}
             />

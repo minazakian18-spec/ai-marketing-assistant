@@ -20,6 +20,7 @@ export type AiFeature =
   | "content_instagram"
   | "content_email"
   | "content_edit"
+  | "content_copy"
   | "brand_preview"
   | "brand_improve"
   | "seo_suggest"
@@ -37,6 +38,7 @@ export const OUTPUT_LIMIT: Record<AiFeature, number> = {
   content_instagram: 1000,
   content_email: 1800,
   content_edit: 1400,
+  content_copy: 1200,
   brand_preview: 700,
   brand_improve: 600,
   seo_suggest: 700,

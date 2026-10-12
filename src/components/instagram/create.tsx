@@ -20,6 +20,8 @@ import {
   Bookmark,
   X,
   CalendarClock,
+  Images,
+  Plug,
 } from "lucide-react";
 import { GenerationSkeleton, previewMock } from "@/components/generation-skeleton";
 import { Mavi } from "@/components/mavi";
@@ -33,6 +35,7 @@ import { readImages } from "@/lib/local-images";
 import { instagramGoals, type InstagramGoal } from "@/lib/ai/instagram-instruction";
 import { PostVisual } from "./shared";
 import { PlanningNotice } from "@/components/calendar/planning-notice";
+import { LibraryPicker } from "@/components/library/library-picker";
 
 // Content Studio for Instagram: controls (left), the editor (centre, the main
 // workspace) and a realistic post preview (right). Generation, rewrites and
@@ -63,6 +66,8 @@ export function CreateStudio({
   fromCalendar = false,
   returnDate,
   focusPreview = false,
+  initialBrief = "",
+  start,
   onPersist,
 }: {
   profile: Profile;
@@ -72,13 +77,18 @@ export function CreateStudio({
   fromCalendar?: boolean;
   returnDate?: string;
   focusPreview?: boolean;
+  /** One-line brief from the "Nieuwe content maken" flow. */
+  initialBrief?: string;
+  /** "ai" generates right away, "manual" opens an empty editor. */
+  start?: "ai" | "manual";
   onPersist: (post: Post) => Promise<boolean>;
 }) {
   const { saveState } = useWorkspace();
   const known = FORMATS.some((f) => f.id === initialType);
   const [type, setType] = useState<ContentType>(editPost?.contentType || (known ? (initialType as ContentType) : "Post"));
   const [notice, setNotice] = useState(initialType && UPCOMING[initialType] ? UPCOMING[initialType] : "");
-  const [prompt, setPrompt] = useState(editPost?.prompt || "");
+  const [prompt, setPrompt] = useState(editPost?.prompt || initialBrief);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [photos, setPhotos] = useState<string[]>(editPost?.media || []);
   const [product, setProduct] = useState("");
   const [goal, setGoal] = useState<InstagramGoal>("merkbekendheid");
@@ -95,6 +105,7 @@ export function CreateStudio({
   const [status, setStatus] = useState<SaveStatus>(editPost ? "saved" : "idle");
   const [history, setHistory] = useState<{ caption: string; hashtags: string }[]>([]);
   const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [altMode, setAltMode] = useState<"full" | "opening">("full");
   const [view, setView] = useState<"edit" | "preview">(focusPreview && editPost ? "preview" : "edit");
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
@@ -105,7 +116,7 @@ export function CreateStudio({
         .split("\n")
         .map((p) => p.trim())
         .filter(Boolean);
-  const dirty = !!post && (caption !== post.caption || hashtags !== post.hashtags || date !== (post.date || ""));
+  const dirty = !!post && (caption !== post.caption || hashtags !== post.hashtags || date !== (post.date || "") || photos.join("|") !== (post.media || []).join("|"));
 
   // Persist the current editor state. Status only turns "saved" after the
   // server confirmed it (onPersist resolves true).
@@ -120,14 +131,14 @@ export function CreateStudio({
         setError("Kies een tijdstip in de toekomst of maak de datum leeg.");
         return false;
       }
-      const next: Post = { ...post, caption, hashtags, date, status: nextStatus || post.status, failureReason: undefined };
+      const next: Post = { ...post, caption, hashtags, date, media: photos, status: nextStatus || post.status, failureReason: undefined, updatedAt: new Date().toISOString() };
       setStatus("saving");
       const ok = await onPersist(next);
       setStatus(ok ? "saved" : "error");
       if (ok) setPost(next);
       return ok;
     },
-    [post, caption, hashtags, date, onPersist],
+    [post, caption, hashtags, date, photos, onPersist],
   );
 
   // Debounced autosave of edits (never while another save runs).
@@ -138,7 +149,7 @@ export function CreateStudio({
       if (saveState !== "saving") void persist();
     }, AUTOSAVE_MS);
     return () => window.clearTimeout(timer.current);
-  }, [dirty, busy, caption, hashtags, date, persist, saveState]);
+  }, [dirty, busy, caption, hashtags, date, photos, persist, saveState]);
   const shownStatus: SaveStatus = dirty && status !== "saving" ? "dirty" : status;
   // Warn before leaving with unsaved edits.
   useEffect(() => {
@@ -193,6 +204,7 @@ export function CreateStudio({
         remember();
       }
       if (date) next.date = date;
+      next.updatedAt = new Date().toISOString();
       setStatus("saving");
       if (await onPersist(next)) {
         setPost(next);
@@ -211,15 +223,46 @@ export function CreateStudio({
     }
   }
 
+  // Start without AI: an empty concept that is saved as soon as there is a caption.
+  function startManual() {
+    setError("");
+    const now = new Date().toISOString();
+    setPost({ id: crypto.randomUUID(), prompt: prompt.trim(), caption: "", hashtags: "", status: "draft", date: date || "", createdAt: now, updatedAt: now, variant: 0, contentType: type, source: "manual", media: photos });
+    setStatus("idle");
+    setMessage("Schrijf je caption. Mavix slaat je concept automatisch op.");
+    window.setTimeout(() => document.getElementById("ig-caption")?.focus(), 50);
+  }
+
+  // Coming from "Nieuwe content maken": start the chosen way once.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || editPost || !start) return;
+    started.current = true;
+    // Drop brief/start from the URL so a reload never creates a second concept.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("brief");
+    url.searchParams.delete("start");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search);
+    if (start === "manual") startManual();
+    else if (prompt.trim()) void generate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
+
   async function edit(action: ContentEditAction) {
     if (!caption.trim()) return;
     setError("");
     setMessage("");
     setBusy("edit");
     try {
-      const results = await editContentText(action, caption, "instagram");
-      if (action === "alternatives") setAlternatives(results);
-      else if (results[0]) {
+      const results = await editContentText(action, action === "hashtags" ? caption + "\n" + hashtags : caption, "instagram");
+      if (action === "alternatives" || action === "headline") {
+        setAltMode(action === "headline" ? "opening" : "full");
+        setAlternatives(results);
+      } else if (action === "hashtags" && results[0]) {
+        remember();
+        setHashtags(results[0].replace(/\s+/g, " ").trim());
+        setMessage("Hashtags voorgesteld. Pas ze gerust aan.");
+      } else if (results[0]) {
         remember();
         setCaption(results[0]);
         setMessage("Mavix AI heeft je tekst aangepast. Controleer het resultaat.");
@@ -286,6 +329,13 @@ export function CreateStudio({
           )}
         </div>
 
+        <p className="cs-publish-note">
+          <Plug size={14} aria-hidden="true" />
+          <span>
+            Publiceren naar Instagram vanuit Mavix is nog niet beschikbaar. Ingeplande posts verschijnen in je <Link href="/calendar">kalender</Link>; plaats ze zelf, bijvoorbeeld met Kopiëren.{" "}
+            <Link href="/account/integraties">Integraties bekijken</Link>
+          </span>
+        </p>
         <div className="cs-grid" data-view={view}>
           <aside className="cs-controls" aria-label="Instellingen">
             <fieldset className="cs-field">
@@ -382,6 +432,10 @@ export function CreateStudio({
                     }}
                   />
                 </label>
+                <button type="button" className="cs-upload cs-upload-library" disabled={!!busy || photos.length >= 4} onClick={() => setPickerOpen(true)}>
+                  <Images size={16} aria-hidden="true" />
+                  Kies uit Bibliotheek
+                </button>
                 {photos.length > 0 && (
                   <div className="cs-photos">
                     {photos.map((photo, i) => (
@@ -424,6 +478,12 @@ export function CreateStudio({
               />
               <div className="cs-brief-bar">
                 <small>Mavix AI gebruikt je Brand Hub: toon, doelgroep en producten.</small>
+                {!post && (
+                  <button type="button" className="button secondary" disabled={!!busy} onClick={startManual}>
+                    <PenLine size={15} />
+                    Zelf schrijven
+                  </button>
+                )}
                 <button className="button primary" aria-busy={generating} disabled={!!busy || !prompt.trim()}>
                   {generating ? <Mavi size={16} state="thinking" tone="brand" live /> : post ? <RefreshCw size={15} /> : <Wand2 size={15} />}
                   {generating ? "Bezig…" : post ? "Opnieuw genereren" : "Genereren"}
@@ -471,14 +531,14 @@ export function CreateStudio({
                 <textarea id="ig-caption" className="cs-caption" rows={10} maxLength={4000} value={caption} onChange={(e) => setCaption(e.target.value)} />
                 {alternatives.length > 0 && (
                   <div className="cs-alternatives">
-                    <p>Kies een alternatief om je caption te vervangen:</p>
+                    <p>{altMode === "opening" ? "Kies een nieuwe openingszin (de rest van je caption blijft staan):" : "Kies een alternatief om je caption te vervangen:"}</p>
                     {alternatives.map((alt, i) => (
                       <button
                         key={i}
                         type="button"
                         onClick={() => {
                           remember();
-                          setCaption(alt);
+                          setCaption(altMode === "opening" ? [alt.split("\n")[0], ...caption.split("\n").slice(1)].join("\n") : alt);
                           setAlternatives([]);
                         }}
                       >
@@ -492,9 +552,14 @@ export function CreateStudio({
                 )}
                 {type !== "Content Ideas" && (
                   <>
-                    <label className="cs-label" htmlFor="ig-hashtags">
-                      Hashtags
-                    </label>
+                    <div className="cs-label-row">
+                      <label className="cs-label" htmlFor="ig-hashtags">
+                        Hashtags
+                      </label>
+                      <button type="button" className="cs-chip cs-chip-small" disabled={!!busy || !caption.trim()} onClick={() => void edit("hashtags")}>
+                        Hashtags voorstellen
+                      </button>
+                    </div>
                     <textarea id="ig-hashtags" rows={2} maxLength={1000} value={hashtags} onChange={(e) => setHashtags(e.target.value)} />
                   </>
                 )}
@@ -561,6 +626,7 @@ export function CreateStudio({
           </p>
         )}
       </div>
+      <LibraryPicker open={pickerOpen} max={Math.max(1, 4 - photos.length)} onClose={() => setPickerOpen(false)} onPick={(imgs) => setPhotos([...photos, ...imgs].slice(0, 4))} />
     </>
   );
 }

@@ -9,7 +9,7 @@ import { aiConfigured } from "@/lib/server/openai";
 const input = z.object({
   action: z.enum(Object.keys(CONTENT_EDITS) as [ContentEdit, ...ContentEdit[]]),
   text: z.string().trim().min(5).max(6000),
-  channel: z.enum(["instagram", "email"]),
+  channel: z.enum(["instagram", "email", "copy"]),
 });
 
 // Content Studio quick actions (rewrite, shorter, longer, tone, clarity, CTA,

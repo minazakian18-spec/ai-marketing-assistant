@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Mail, Newspaper, Tag, Reply, HeartHandshake, RefreshCw, Wand2, Monitor, Smartphone, Save, Check, CalendarClock, Copy, Undo2, Eye, PenLine, ChevronDown } from "lucide-react";
+import { Send, Mail, Newspaper, Tag, Reply, HeartHandshake, RefreshCw, Wand2, Monitor, Smartphone, Save, Check, CalendarClock, Copy, Undo2, Eye, PenLine, ChevronDown } from "lucide-react";
 import { GenerationSkeleton, previewMock } from "@/components/generation-skeleton";
 import { Mavi } from "@/components/mavi";
 import { Menu } from "@/components/menu";
@@ -41,6 +41,8 @@ export function EmailCreate({
   fromCalendar = false,
   returnDate,
   initialPreview = false,
+  initialBrief = "",
+  start,
   onSave,
 }: {
   profile: Profile;
@@ -50,10 +52,12 @@ export function EmailCreate({
   fromCalendar?: boolean;
   returnDate?: string;
   initialPreview?: boolean;
+  initialBrief?: string;
+  start?: "ai" | "manual";
   onSave: (c: EmailCampaign) => Promise<boolean>;
 }) {
   const { saveState } = useWorkspace();
-  const [prompt, setPrompt] = useState(initial?.prompt || "");
+  const [prompt, setPrompt] = useState(initial?.prompt || initialBrief);
   const [kind, setKind] = useState<EmailKind>(KINDS.some((k) => k.id === initial?.kind) ? initial!.kind : "Create Campaign");
   const [audience, setAudience] = useState(initial?.audience || initialAudience || "Nieuwsbriefabonnees");
   const [product, setProduct] = useState("");
@@ -74,6 +78,7 @@ export function EmailCreate({
   const [error, setError] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [altMode, setAltMode] = useState<"body" | "subject">("body");
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
 
@@ -97,6 +102,7 @@ export function EmailCreate({
         status: nextStatus || (dirty ? "draft" : saved.status),
         date: nextStatus === "approved" ? "" : draft.date,
         reason: "",
+        updatedAt: new Date().toISOString(),
       };
       const problem = nextStatus && nextStatus !== "draft" ? campaignError(next, nextStatus === "scheduled") : "";
       if (problem) {
@@ -178,6 +184,56 @@ export function EmailCreate({
     }
   }
 
+  // Start without AI: an empty campaign concept, saved right away as a draft.
+  async function startManual() {
+    setError("");
+    const now = new Date().toISOString();
+    const blank: EmailCampaign = {
+      id: crypto.randomUUID(),
+      title: prompt.trim().slice(0, 120) || "Nieuwe e-mail",
+      kind,
+      prompt: prompt.trim(),
+      subject: "",
+      preview: "",
+      sender: profile.name || "Ons team",
+      audience,
+      body: "",
+      cta: "",
+      ctaUrl: profile.website || "",
+      hero: "",
+      footer: [profile.name || "Jouw bedrijfsnaam", profile.address, profile.postalCode, profile.city].filter(Boolean).join(" · "),
+      status: "draft",
+      date: initialDate || "",
+      createdAt: now,
+      updatedAt: now,
+      source: "manual",
+      variant: 0,
+      reason: "",
+    };
+    setStatus("saving");
+    if (await onSave(blank)) {
+      setSaved(blank);
+      setDraft(editable(blank));
+      setStatus("saved");
+      setMessage("Schrijf je onderwerp en inhoud. Mavix slaat automatisch op.");
+      window.setTimeout(() => document.getElementById("em-subject")?.focus(), 50);
+    } else setStatus("error");
+  }
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || initial || !start) return;
+    started.current = true;
+    // Drop brief/start from the URL so a reload never creates a second concept.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("brief");
+    url.searchParams.delete("start");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search);
+    if (start === "manual") void startManual();
+    else if (prompt.trim()) void generate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
+
   async function edit(action: ContentEditAction) {
     if (!draft?.body.trim()) return;
     setError("");
@@ -185,7 +241,10 @@ export function EmailCreate({
     setBusy("edit");
     try {
       const results = await editContentText(action, draft.body, "email");
-      if (action === "alternatives") setAlternatives(results);
+      if (action === "alternatives" || action === "headline") {
+        setAltMode(action === "headline" ? "subject" : "body");
+        setAlternatives(results);
+      }
       else if (results[0]) {
         setHistory((h) => [...h.slice(-9), draft.body]);
         set({ body: results[0] });
@@ -259,6 +318,10 @@ export function EmailCreate({
           )}
         </div>
 
+        <p className="cs-publish-note">
+          <Send size={14} aria-hidden="true" />
+          <span>Mavix verstuurt nog geen campagnes. Een ingeplande e-mail staat in je <Link href="/calendar">kalender</Link> als planning; versturen doe je zelf in je e-mailprogramma.</span>
+        </p>
         <div className="cs-grid" data-view={view}>
           <aside className="cs-controls" aria-label="Instellingen">
             <fieldset className="cs-field">
@@ -378,6 +441,12 @@ export function EmailCreate({
               />
               <div className="cs-brief-bar">
                 <small>Mavix AI gebruikt je Brand Hub en verzint geen prijzen of acties.</small>
+                {!saved && (
+                  <button type="button" className="button secondary" disabled={!!busy} onClick={() => void startManual()}>
+                    <PenLine size={15} />
+                    Zelf schrijven
+                  </button>
+                )}
                 <button className="button primary" aria-busy={generating} disabled={!!busy || !prompt.trim()}>
                   {generating ? <Mavi size={16} state="thinking" tone="brand" live /> : saved ? <RefreshCw size={15} /> : <Wand2 size={15} />}
                   {generating ? "Bezig…" : saved ? "Opnieuw genereren" : "Genereren"}
@@ -432,14 +501,17 @@ export function EmailCreate({
                 <textarea id="em-body" className="cs-caption" rows={14} maxLength={10000} value={draft.body} onChange={(e) => set({ body: e.target.value })} />
                 {alternatives.length > 0 && (
                   <div className="cs-alternatives">
-                    <p>Kies een alternatief om de inhoud te vervangen:</p>
+                    <p>{altMode === "subject" ? "Kies een nieuwe onderwerpregel:" : "Kies een alternatief om de inhoud te vervangen:"}</p>
                     {alternatives.map((alt, i) => (
                       <button
                         key={i}
                         type="button"
                         onClick={() => {
-                          setHistory((h) => [...h.slice(-9), draft.body]);
-                          set({ body: alt });
+                          if (altMode === "subject") set({ subject: alt.split("\n")[0].replace(/^#+\s*/, "").slice(0, 120) });
+                          else {
+                            setHistory((h) => [...h.slice(-9), draft.body]);
+                            set({ body: alt });
+                          }
                           setAlternatives([]);
                         }}
                       >

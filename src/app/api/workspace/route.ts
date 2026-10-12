@@ -5,6 +5,7 @@ import {applyContactUnsubscribes,contactConsentGuard,syncNewsletterContacts} fro
 import type {Contact} from '@/lib/types';
 import {brandProfileSchema,brandAssetsValid} from '@/lib/server/brand-validation';
 import {z} from 'zod';
+import {copyValid} from '@/lib/studio';
 // Newsletter signups are merged into the stored contacts when the workspace is
 // loaded (syncNewsletterContacts); saves keep unsubscribes and suppressions in
 // step with the Contacts module.
@@ -12,6 +13,8 @@ export async function GET(){try{const {db,user,workspaceId,role}=await workspace
 export async function PUT(request:Request){try{sameOrigin(request);const {db,workspaceId,user}=await workspace(['OWNER','ADMIN']);await limited('save:'+user.id,60);const text=await request.text();if(text.length>5_000_000)throw new HttpError(413,'Deze werkruimte is te groot.');const {data,version}=z.object({version:z.number().int().nonnegative(),data:z.object({profile:z.object({name:z.string().max(160)}).passthrough(),posts:z.array(z.object({id:z.string(),status:z.enum(['draft','approved','scheduled','rejected','blocked','failed','published'])}).passthrough()).max(10000)}).passthrough()}).parse(JSON.parse(text));const {data:previous,error:previousError}=await db.from('business_profiles').select('data').eq('workspace_id',workspaceId).single();if(previousError)throw previousError;const oldPosts=previous.data?.posts||[];if(data.posts.some(p=>p.status==='published'&&!oldPosts.some((old:{id:string;status:string})=>old.id===p.id&&old.status==='published')))throw new HttpError(409,'Publiceren vereist een echte provideractie. Er is niets gepubliceerd.');
  // Brand Hub: structured fields and images (PNG/JPEG/WebP data URLs only, size-limited).
  const profile=brandProfileSchema.parse(data.profile);
+ // Content Studio marketing copy: own records in the same workspace blob.
+ if(data.copies!==undefined&&(!Array.isArray(data.copies)||data.copies.length>1000||!data.copies.every(copyValid)))throw new HttpError(400,'Ongeldige marketingteksten.');
  if(!brandAssetsValid(profile,previous.data?.profile||{}))throw new HttpError(400,'Ongeldige afbeelding. Gebruik een PNG-, JPG- of WebP-bestand binnen de uploadlimiet.');
  const before=(Array.isArray(previous.data?.contacts)?previous.data.contacts:[]) as Contact[],after=(Array.isArray(data.contacts)?data.contacts:[]) as Contact[];
  // Refuse re-subscribing suppressed addresses; record new unsubscribes first.

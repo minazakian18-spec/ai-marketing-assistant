@@ -441,11 +441,16 @@ export const CONTENT_EDITS = {
   clearer: "Improve clarity and readability: simpler sentences, clear structure, same facts.",
   cta: "Keep the text but make the call to action stronger and more concrete (use calls_to_action from the business context when suitable).",
   alternatives: "Write 3 alternative versions, separated by a line with only ---.",
+  hashtags: "Suggest 8 to 12 relevant hashtags for this text and business (mix of local, branche and topic tags). Output only the hashtags on one line, separated by spaces.",
+  spelling: "Correct spelling, grammar and punctuation only. Do not change the wording, tone or length otherwise.",
+  translate_en: "Translate the text into natural English, keeping tone, emoji and line breaks.",
+  translate_nl: "Translate the text into natural Dutch, keeping tone, emoji and line breaks.",
+  headline: "Write 3 alternative headlines or opening lines for this text, separated by a line with only ---.",
 } as const;
 export type ContentEdit = keyof typeof CONTENT_EDITS;
 
 // Edit the owner's own text (trusted) for Content Studio quick actions.
-export async function editContent(action: ContentEdit, text: string, channel: "instagram" | "email", profile: Record<string, unknown>) {
+export async function editContent(action: ContentEdit, text: string, channel: "instagram" | "email" | "copy", profile: Record<string, unknown>) {
   if (text.trim().length < 5) throw new HttpError(400, "Er is nog geen tekst om te bewerken.");
   const out = await run(
     SYSTEM_CONTENT,
@@ -454,14 +459,14 @@ export async function editContent(action: ContentEdit, text: string, channel: "i
         role: "user",
         content: [
           { type: "text", text: "<business_context>\n" + data(businessContext(profile)) + "\n</business_context>" },
-          { type: "text", text: "<brief>\n" + data({ channel: channel === "instagram" ? "Instagram caption" : "Marketing e-mail body", current_text: text.slice(0, 6000) }) + "\n</brief>" },
-          { type: "text", text: CONTENT_EDITS[action] + " Keep the language of current_text. Output only the resulting text." },
+          { type: "text", text: "<brief>\n" + data({ channel: channel === "instagram" ? "Instagram caption" : channel === "email" ? "Marketing e-mail body" : "Marketing copy", current_text: text.slice(0, 6000) }) + "\n</brief>" },
+          { type: "text", text: CONTENT_EDITS[action] + (action.startsWith("translate") ? "" : " Keep the language of current_text.") + " Output only the resulting text." },
         ],
       },
     ],
     "low",
   );
-  return action === "alternatives"
+  return action === "alternatives" || action === "headline"
     ? out
         .split(/\n\s*-{3,}\s*\n/)
         .map((s) => s.trim())
@@ -520,6 +525,32 @@ export async function agentReply(
   const match = text.match(/\n?ACTIE:\s*(\S+)\s*$/);
   const href = match && AGENT_ROUTES[match[1]] ? match[1] : undefined;
   return { text: (match ? text.slice(0, match.index) : text).trim().slice(0, 8000), action: href ? { href, label: "Open " + AGENT_ROUTES[href] } : undefined };
+}
+
+// ---------- Marketing copy (Content Studio) ----------
+const COPY_TASK: Record<string, string> = {
+  website: "Write website copy: a short heading (## ), 2 to 4 short paragraphs and a closing call to action.",
+  advertentie: "Write ad copy: 3 headline options (max 40 characters each, one per line), then ---, then 2 short body texts (max 125 characters each), one per line.",
+  flyer: "Write flyer copy: a strong headline, a subline, 3 short bullet points and a call to action.",
+  productomschrijving: "Write a product description of 50 to 90 words, appetising and concrete, without invented ingredients, prices or claims.",
+  overig: "Write the requested marketing text.",
+};
+
+export async function generateMarketingCopy(kind: string, instruction: string, profile: Record<string, unknown>) {
+  return run(
+    SYSTEM_CONTENT,
+    [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "<business_context>\n" + data(businessContext(profile)) + "\n</business_context>" },
+          { type: "text", text: "<brief>\n" + data({ text_type: kind, instruction: instruction.slice(0, 1500) }) + "\n</brief>" },
+          { type: "text", text: (COPY_TASK[kind] || COPY_TASK.overig) + " Plain text with simple Markdown only (## headings, - bullets). Output only the text." },
+        ],
+      },
+    ],
+    "low",
+  );
 }
 
 // ---------- Google review replies ----------

@@ -32,7 +32,7 @@ export function generateEmailCampaign(request: EmailRequest): Promise<EmailCampa
   return postJson<EmailCampaign>("/api/generate/email", request);
 }
 
-export type ContentEditAction = "rewrite" | "shorter" | "longer" | "professional" | "friendly" | "clearer" | "cta" | "alternatives";
+export type ContentEditAction = "rewrite" | "shorter" | "longer" | "professional" | "friendly" | "clearer" | "cta" | "alternatives" | "hashtags" | "spelling" | "translate_en" | "translate_nl" | "headline";
 export const CONTENT_EDIT_LABELS: [ContentEditAction, string][] = [
   ["rewrite", "Herschrijven"],
   ["shorter", "Korter"],
@@ -42,11 +42,22 @@ export const CONTENT_EDIT_LABELS: [ContentEditAction, string][] = [
   ["clearer", "Duidelijker"],
   ["cta", "Sterkere call-to-action"],
   ["alternatives", "3 alternatieven"],
+  ["headline", "Andere openingszin"],
+  ["spelling", "Spelling en grammatica"],
+  ["translate_en", "Vertaal naar Engels"],
+  ["translate_nl", "Vertaal naar Nederlands"],
 ];
 
 /** AI quick action on the editor's own text. Returns suggestions; never edits by itself. */
-export async function editContentText(action: ContentEditAction, text: string, channel: "instagram" | "email"): Promise<string[]> {
+export async function editContentText(action: ContentEditAction, text: string, channel: "instagram" | "email" | "copy"): Promise<string[]> {
   if (isBrowserDemo()) throw new Error("AI-bewerken werkt alleen met een echt account. In de testmodus is je tekst niet gewijzigd.");
   const { results } = await postJson<{ results: string[] }>("/api/generate/edit", { action, text, channel });
   return results;
+}
+
+/** Marketing copy for Content Studio (server-side AI, metered). */
+export async function generateCopyText(kind: string, prompt: string): Promise<string> {
+  if (isBrowserDemo()) throw new Error("AI-teksten maken werkt alleen met een echt account. Je kunt de tekst wel zelf schrijven.");
+  const { text } = await postJson<{ text: string }>("/api/generate/copy", { kind, prompt });
+  return text;
 }

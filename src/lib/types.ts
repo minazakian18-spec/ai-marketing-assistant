@@ -3,6 +3,7 @@ import type { InstagramSettings, ContentType } from "./instagram-model";
 import type { Review, ReviewAutoReplySettings } from "./review-model";
 import type { LocalCalendarEvent } from "./calendar/local";
 import type { LibraryAsset } from "./library-model";
+import type { MarketingCopy } from "./studio";
 import type { AudienceSegment, Product, BrandVoice } from "./brand-model";
 import type { BrandStrategy } from "./brand-strategy";
 export type Profile = {
@@ -31,6 +32,8 @@ export type Profile = {
 };
 export type Post = {
   id: string;
+  /** Last edit (Content Studio); older records only have createdAt. */
+  updatedAt?: string;
   prompt: string;
   caption: string;
   hashtags: string;
@@ -111,4 +114,6 @@ export type Workspace = {
   integrations: Integrations;
   // Events in Mavix' own calendars (src/lib/calendar/local.ts).
   calendar?: { events: LocalCalendarEvent[] };
+  // Marketing copy made in Content Studio (src/lib/studio.ts).
+  copies?: MarketingCopy[];
 };

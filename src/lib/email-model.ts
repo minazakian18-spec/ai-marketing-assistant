@@ -30,6 +30,7 @@ export type EmailCampaign = {
   status: "draft" | "approved" | "scheduled" | "rejected" | "blocked" | "sent";
   date: string;
   createdAt: string;
+  updatedAt?: string;
   source: "manual" | "autopilot";
   variant: number;
   reason: string;
