@@ -33,6 +33,8 @@ export function AgentComposer({
   autoFocus = false,
   tools = {},
   suggestions,
+  defaultText = "",
+  attachments = true,
 }: {
   onSubmit: (text: string, attachments: AgentAttachment[], options: { webSearch: boolean; deepResearch: boolean }) => void;
   placeholder?: string;
@@ -42,8 +44,12 @@ export function AgentComposer({
   tools?: ComposerTools;
   /** Example prompts that animate in the empty input; Tab takes the current one. */
   suggestions?: string[];
+  /** Starting text (e.g. a prompt handed over from the dashboard). */
+  defaultText?: string;
+  /** File and image upload; off where the receiver cannot process files. */
+  attachments?: boolean;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(defaultText);
   const [suggestion, setSuggestion] = useState("");
   const rotating = !!suggestions?.length;
   const [files, setFiles] = useState<AgentAttachment[]>([]);
@@ -114,11 +120,12 @@ export function AgentComposer({
   }
 
   const drag = (e: DragEvent, on: boolean) => {
-    if (!e.dataTransfer.types.includes("Files")) return;
+    if (!attachments || !e.dataTransfer.types.includes("Files")) return;
     e.preventDefault();
     setDragging(on);
   };
   const paste = (e: ClipboardEvent) => {
+    if (!attachments) return;
     const pasted = Array.from(e.clipboardData.files);
     if (pasted.length) {
       e.preventDefault();
@@ -140,7 +147,7 @@ export function AgentComposer({
       }}
       onDrop={(e) => {
         drag(e, false);
-        add(e.dataTransfer.files);
+        if (attachments) add(e.dataTransfer.files);
       }}
     >
       {files.length > 0 && (
@@ -196,12 +203,16 @@ export function AgentComposer({
       )}
       <div className="composer-bar">
         <div className="composer-tools">
-          <IconButton label="Bestand toevoegen" onClick={() => filePicker.current?.click()}>
-            <Paperclip size={17} />
-          </IconButton>
-          <IconButton label="Afbeelding toevoegen" onClick={() => imagePicker.current?.click()}>
-            <ImagePlus size={17} />
-          </IconButton>
+          {attachments && (
+            <>
+              <IconButton label="Bestand toevoegen" onClick={() => filePicker.current?.click()}>
+                <Paperclip size={17} />
+              </IconButton>
+              <IconButton label="Afbeelding toevoegen" onClick={() => imagePicker.current?.click()}>
+                <ImagePlus size={17} />
+              </IconButton>
+            </>
+          )}
           {tools.webSearch && (
             <IconButton label="Web zoeken" active={webSearch} onClick={() => setWebSearch(!webSearch)}>
               <Globe size={17} />
@@ -216,10 +227,10 @@ export function AgentComposer({
             <span className="composer-hint">
               {rotating && !text ? (
                 <>
-                  <kbd>Tab</kbd> neemt het voorbeeld over · sleep of plak bestanden
+                  <kbd>Tab</kbd> neemt het voorbeeld over{attachments ? " · sleep of plak bestanden" : ""}
                 </>
               ) : (
-                "Sleep bestanden hierheen of plak een afbeelding"
+                attachments ? "Sleep bestanden hierheen of plak een afbeelding" : "Enter om te versturen · Shift+Enter voor een nieuwe regel"
               )}
             </span>
           )}

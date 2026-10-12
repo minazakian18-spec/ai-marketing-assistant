@@ -41,7 +41,7 @@ export function serverLoader(mocks) {
   return load;
 }
 
-export function memoryDb(tables) {
+export function memoryDb(tables, { uuid = false } = {}) {
   function from(table) {
     let operation = "read",
       values,
@@ -80,6 +80,11 @@ export function memoryDb(tables) {
       },
       gte(key, value) {
         predicates.push((row) => row[key] >= value);
+        return q;
+      },
+      ilike(key, pattern) {
+        const needle = pattern.replace(/^%|%$/g, "").replace(/\\([\\%_])/g, "$1").toLowerCase();
+        predicates.push((row) => String(row[key] ?? "").toLowerCase().includes(needle));
         return q;
       },
       lt(key, value) {
@@ -155,7 +160,7 @@ export function memoryDb(tables) {
           selected = [existing];
         } else {
           const row = {
-            id: "id-" + rows.length,
+            id: uuid ? crypto.randomUUID() : "id-" + rows.length,
             connection_generation: "generation-0",
             metadata: {},
             ...values,

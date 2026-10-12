@@ -1,22 +1,15 @@
 "use client";
-import { CalendarDays, ChartNoAxesCombined, Instagram, Mail, PenLine, Star, type LucideIcon } from "lucide-react";
-import { AGENT_PROMPTS, type AgentArea } from "@/lib/agent/engine";
+import { CalendarDays, Instagram, Lightbulb, ListChecks, Mail, type LucideIcon } from "lucide-react";
+import { AGENT_SUGGESTIONS } from "@/lib/agent/capabilities";
 
-const ICONS: Record<AgentArea, LucideIcon> = {
-  planning: CalendarDays,
-  social: Instagram,
-  email: Mail,
-  reviews: Star,
-  content: PenLine,
-  insights: ChartNoAxesCombined,
-};
+// Example prompts, only ones the agent can really handle (capability registry).
+const ICONS: LucideIcon[] = [Instagram, Mail, CalendarDays, Lightbulb, ListChecks];
 
-// Example prompts, shown as subtle chips. `limit` keeps small surfaces calm.
 export function AgentPrompts({ onPick, limit, disabled }: { onPick: (prompt: string) => void; limit?: number; disabled?: boolean }) {
   return (
     <ul className="agent-prompts" aria-label="Voorbeelden">
-      {AGENT_PROMPTS.slice(0, limit).map((p) => {
-        const Icon = ICONS[p.area];
+      {AGENT_SUGGESTIONS.slice(0, limit).map((p, i) => {
+        const Icon = ICONS[i % ICONS.length];
         return (
           <li key={p.prompt}>
             <button type="button" onClick={() => onPick(p.prompt)} disabled={disabled}>

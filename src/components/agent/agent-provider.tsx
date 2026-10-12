@@ -1,66 +1,64 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
-import { useWorkspace } from "@/components/workspace-provider";
-import { runAgent, type AgentMessage } from "@/lib/agent/engine";
-import type { AgentAttachment } from "@/lib/agent-handoff";
+import { usePathname, useRouter } from "next/navigation";
 import type { MaviState } from "@/components/mavi";
 
-// One Mavix Agent for the whole app: the top-bar panel, the dashboard
-// surface and the /agent page all read and write this conversation, so a
-// question started anywhere continues everywhere.
+// One Mavix Agent for the whole app. The dashboard input and the top-bar
+// panel do not keep their own chat: asking anywhere hands the prompt to the
+// persistent workspace on /agent (stored conversations in Supabase), which
+// sends it. The handoff lives in memory and sessionStorage, so it survives
+// the client-side navigation and a reload, and is consumed exactly once.
+const HANDOFF_KEY = "mavix-agent-handoff";
+
 type AgentContext = {
-  messages: AgentMessage[];
   state: MaviState;
   busy: boolean;
-  ask: (text: string, attachments?: AgentAttachment[]) => void;
-  reset: () => void;
+  /** Ask from anywhere: opens /agent and sends the prompt there. */
+  ask: (text: string) => void;
+  /** For the /agent workspace: take the prompt handed over, if any. */
+  takeHandoff: () => string | null;
+  /** The /agent workspace reports real request activity (Mavi animation). */
+  setActivity: (state: MaviState) => void;
   panelOpen: boolean;
   openPanel: () => void;
   closePanel: () => void;
 };
 
 const Context = createContext<AgentContext | null>(null);
-let seq = 0;
-const id = () => "m" + ++seq + "-" + Date.now().toString(36);
 
 export function AgentProvider({ children }: { children: ReactNode }) {
-  const { data } = useWorkspace();
   const pathname = usePathname();
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const router = useRouter();
   const [state, setState] = useState<MaviState>("idle");
   const [panelOpen, setPanelOpen] = useState(false);
-  const previews = useRef<string[]>([]);
-  const dataRef = useRef(data);
-  const messagesRef = useRef<AgentMessage[]>([]);
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-  useEffect(() => {
-    dataRef.current = data;
-  }, [data]);
+  const pending = useRef<string | null>(null);
 
   const ask = useCallback(
-    (text: string, attachments: AgentAttachment[] = []) => {
+    (text: string) => {
       const q = text.trim();
-      if (!q && !attachments.length) return;
-      for (const a of attachments) if (a.preview) previews.current.push(a.preview);
-      const info = attachments.map((a) => ({ name: a.file.name, kind: a.kind, preview: a.preview }));
-      setMessages((m) => [...m, { id: id(), role: "user", text: q, attachments: info }]);
-      setState("thinking");
-      runAgent({ text: q, attachments: info, page: pathname }, dataRef.current, messagesRef.current)
-        .then((reply) => setMessages((m) => [...m, { id: id(), role: "agent", ...reply }]))
-        .catch((e) => setMessages((m) => [...m, { id: id(), role: "agent", text: e instanceof Error ? e.message : "Er ging iets mis. Probeer het opnieuw." }]))
-        .finally(() => setState("done"));
+      if (!q) return;
+      pending.current = q;
+      try {
+        sessionStorage.setItem(HANDOFF_KEY, q);
+      } catch {
+        /* the in-memory handoff still works */
+      }
+      setPanelOpen(false);
+      router.push("/agent?handoff=1");
     },
-    [pathname],
+    [router],
   );
 
-  const reset = useCallback(() => {
-    previews.current.forEach((u) => URL.revokeObjectURL(u));
-    previews.current = [];
-    setMessages([]);
-    setState("idle");
+  const takeHandoff = useCallback(() => {
+    let q = pending.current;
+    try {
+      q ??= sessionStorage.getItem(HANDOFF_KEY);
+      sessionStorage.removeItem(HANDOFF_KEY);
+    } catch {
+      /* ignore */
+    }
+    pending.current = null;
+    return q;
   }, []);
 
   // Keyboard shortcut: Ctrl/⌘ + K toggles the panel (not on /agent itself).
@@ -75,25 +73,23 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("keydown", key);
   }, [pathname]);
 
-  // The full page replaces the panel.
+  // The full workspace replaces the panel.
   useEffect(() => {
     if (pathname === "/agent") setPanelOpen(false);
   }, [pathname]);
 
-  useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
-
   const value = useMemo(
     () => ({
-      messages,
       state,
       busy: state === "thinking",
       ask,
-      reset,
+      takeHandoff,
+      setActivity: setState,
       panelOpen,
       openPanel: () => setPanelOpen(true),
       closePanel: () => setPanelOpen(false),
     }),
-    [messages, state, ask, reset, panelOpen],
+    [state, ask, takeHandoff, panelOpen],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

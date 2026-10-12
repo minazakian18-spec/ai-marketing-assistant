@@ -20,14 +20,11 @@ function greeting(hour: number) {
   return "Goedenavond";
 }
 
-// The dashboard's Agent: a focused assistant surface rather than a search
-// bar. Asking here continues in the global Agent panel.
+// The dashboard's Agent: the primary entry point. Asking here opens the
+// persistent Mavix Agent workspace with this prompt as the first message.
 export function AgentSurface({ name }: { name?: string }) {
-  const { ask, openPanel, busy } = useAgent();
-  const send = (text: string, attachments: Parameters<typeof ask>[1] = []) => {
-    ask(text, attachments);
-    openPanel();
-  };
+  const { ask, busy } = useAgent();
+  const send = (text: string) => ask(text);
   const hello = greeting(new Date().getHours());
   return (
     <section className="agent-surface" aria-labelledby="agent-surface-title">
@@ -48,7 +45,8 @@ export function AgentSurface({ name }: { name?: string }) {
       <AgentComposer
         size="large"
         busy={busy}
-        onSubmit={(text, attachments) => send(text, attachments)}
+        attachments={false}
+        onSubmit={(text) => send(text)}
         placeholder="Vraag Mavi iets of geef een opdracht"
         suggestions={SUGGESTIONS}
       />

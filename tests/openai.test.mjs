@@ -12,7 +12,7 @@ function setup(tables, { role = "OWNER", access = "approved" } = {}) {
   tables.workspace_members ??= [{ user_id: "u1", workspace_id: "w1", role, created_at: "1" }];
   tables.workspaces ??= [{ id: "w1", deleted_at: null, access_status: access }];
   tables.ai_usage ??= [];
-  const db = memoryDb(tables);
+  const db = memoryDb(tables, { uuid: true });
   db.auth = { getUser: async () => ({ data: { user: { id: "u1" } }, error: null }) };
   const load = serverLoader({
     [path.resolve("src/lib/server/supabase.ts")]: { adminClient: () => db, authClient: async () => db, appUrl: () => origin },
@@ -167,11 +167,11 @@ test("Mavix Agent: answers from the caller's own workspace, metered, only allow-
     const { load, calls, setReply } = setup(tables);
     setReply(async () => ({ status: "completed", output_text: "Je hebt 1 concept klaarstaan.\nACTIE: /dashboard", usage: { input_tokens: 500, output_tokens: 60 } }));
     const route = load("src/app/api/agent/route.ts");
-    const res = await route.POST(agentRequest({ text: "Wat moet ik vandaag doen?", history: [{ role: "user", text: "Hoi" }] }));
+    const res = await route.POST(agentRequest({ text: "Wat moet ik vandaag doen?" }));
     const body = await res.json();
     assert.equal(res.status, 200, JSON.stringify(body));
-    assert.equal(body.text, "Je hebt 1 concept klaarstaan.");
-    assert.deepEqual(body.action, { href: "/dashboard", label: "Open Dashboard" });
+    assert.equal(body.reply.content, "Je hebt 1 concept klaarstaan.");
+    assert.deepEqual(body.reply.action, { href: "/dashboard", label: "Open Dashboard" });
     const sent = JSON.stringify(calls[0]);
     assert.match(sent, /Telepizza/);
     assert.ok(!sent.includes("Andere zaak") && !sent.includes("whatsapp"), "no data from another workspace");
@@ -180,7 +180,7 @@ test("Mavix Agent: answers from the caller's own workspace, metered, only allow-
 
     setReply(async () => ({ status: "completed", output_text: "Kijk hier.\nACTIE: https://evil.example", usage: { input_tokens: 1, output_tokens: 1 } }));
     const second = await (await route.POST(agentRequest({ text: "Waar?" }, { "Idempotency-Key": "agent-key-999999" }))).json();
-    assert.equal(second.action, undefined, "links outside Mavix are dropped");
+    assert.equal(second.reply.action, null, "links outside Mavix are dropped");
   }));
 
 test("Mavix Agent: no key means no AI call (navigation fallback in the browser)", (t) =>
