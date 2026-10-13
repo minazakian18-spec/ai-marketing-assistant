@@ -15,6 +15,7 @@ import "../contacts.css";
 import "../workspace.css";
 import "../polish.css";
 import "../design-system.css";
+import "../channel-themes.css";
 import "../motion.css";
 // The logged-in workspace is private: never indexed.
 export const metadata: Metadata = {

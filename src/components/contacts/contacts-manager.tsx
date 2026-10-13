@@ -13,7 +13,10 @@ import {
   Users,
   ShieldCheck,
   FileInput,
+  FolderInput,
+  Layers,
 } from "lucide-react";
+import { normalizeOrigin, originOf, OTHER_SOURCE, sourceFolders, sourceLabel, sourceTone } from "@/lib/contact-sources";
 import { usePresence } from "@/components/use-presence";
 import { useWorkspace } from "@/components/workspace-provider";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
@@ -135,6 +138,9 @@ export function ContactsManager() {
   const contacts = data.contacts;
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [source, setSource] = useState<string>("all");
+  const [sourcePromptOpen, setSourcePromptOpen] = useState(false);
+  const [sourceDraft, setSourceDraft] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -154,10 +160,15 @@ export function ContactsManager() {
   const fileInput = useRef<HTMLInputElement>(null);
   const groups = useMemo(() => distinctGroups(contacts).filter((g) => g !== NEWSLETTER_GROUP), [contacts]);
   const newsletterCount = useMemo(() => contacts.filter(isNewsletterContact).length, [contacts]);
+  const folders = useMemo(() => sourceFolders(contacts), [contacts]);
+  const folderIds = folders.map((f) => f.id).filter((id) => id !== OTHER_SOURCE);
+  // New contacts and imports start in the folder that is open.
+  const defaultOrigin = source !== "all" && source !== OTHER_SOURCE ? source : undefined;
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return contacts.filter((c) => {
+      if (source !== "all" && originOf(c) !== source) return false;
       if (filter === "recent") {
         const days = (Date.now() - new Date(c.createdAt).getTime()) / 86400000;
         if (days > 30) return false;
@@ -171,7 +182,7 @@ export function ContactsManager() {
         (c.company || "").toLowerCase().includes(term)
       );
     });
-  }, [contacts, search, filter]);
+  }, [contacts, search, filter, source]);
 
   async function persistContacts(next: Contact[], msg: string) {
     if (await save({ ...data, contacts: next })) setMessage(msg);
@@ -245,6 +256,17 @@ export function ContactsManager() {
     setGroupPromptFor(null);
     setGroupDraft("");
     if (target === "bulk") setSelected(new Set());
+  }
+  function applySource() {
+    const origin = normalizeOrigin(sourceDraft);
+    if (!origin) return;
+    persistContacts(
+      contacts.map((c) => (selected.has(c.id) ? { ...c, origin } : c)),
+      selected.size + " contact" + (selected.size === 1 ? "" : "en") + " verplaatst naar '" + sourceLabel(origin) + "'.",
+    );
+    setSourcePromptOpen(false);
+    setSourceDraft("");
+    setSelected(new Set());
   }
   function confirmDelete() {
     if (deleteTarget === "bulk") {
@@ -325,7 +347,49 @@ export function ContactsManager() {
           </div>
         </div>
       ) : (
-        <section className="panel">
+        <div className="contacts-layout">
+        <nav className="contacts-sources" aria-label="Bronnen">
+          <p className="contacts-sources-title">Bronnen</p>
+          <button
+            type="button"
+            className="contacts-source"
+            aria-pressed={source === "all"}
+            onClick={() => setSource("all")}
+          >
+            <span className="contacts-source-icon is-all" aria-hidden="true">
+              <Layers size={14} />
+            </span>
+            <span className="contacts-source-name">Alle contacten</span>
+            <span className="contacts-source-count">{contacts.length}</span>
+          </button>
+          {folders.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className={"contacts-source" + (f.count ? "" : " is-empty")}
+              aria-pressed={source === f.id}
+              onClick={() => setSource(f.id)}
+            >
+              <span className={"contacts-source-icon tone-" + f.tone} aria-hidden="true">
+                {f.label.charAt(0).toUpperCase()}
+              </span>
+              <span className="contacts-source-name">{f.label}</span>
+              <span className="contacts-source-count">{f.count}</span>
+            </button>
+          ))}
+          <p className="contacts-sources-note">
+            Een nieuwe bron maak je door bij een contact of import een eigen naam in te vullen.
+          </p>
+        </nav>
+        <section className="panel contacts-main">
+          <header className="contacts-main-head">
+            <div>
+              <h2>{source === "all" ? "Alle contacten" : sourceLabel(source)}</h2>
+              <p>
+                {filtered.length} van {source === "all" ? contacts.length : folders.find((f) => f.id === source)?.count || 0} zichtbaar
+              </p>
+            </div>
+          </header>
           <div className="contacts-toolbar">
             <div className="contacts-search">
               <Search size={15} />
@@ -398,6 +462,16 @@ export function ContactsManager() {
                   type="button"
                   className="button secondary"
                   onClick={() => {
+                    setSourceDraft("");
+                    setSourcePromptOpen(true);
+                  }}
+                >
+                  <FolderInput size={14} /> Bron wijzigen
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
                     const chosen = contacts.filter((c) => selected.has(c.id));
                     const groups = new Set(chosen.map((c) => c.group || ""));
                     if (groups.size > 1) {
@@ -442,6 +516,7 @@ export function ContactsManager() {
                   </th>
                   <th scope="col">Naam</th>
                   <th scope="col">E-mail</th>
+                  <th scope="col">Bron</th>
                   <th scope="col">Bedrijf</th>
                   <th scope="col">Tag / groep</th>
                   <th scope="col">Nieuwsbrief</th>
@@ -467,6 +542,9 @@ export function ContactsManager() {
                       {c.phone && <span>{c.phone}</span>}
                     </td>
                     <td>{c.email}</td>
+                    <td>
+                      <span className={"contacts-source-badge tone-" + sourceTone(originOf(c))}>{sourceLabel(originOf(c))}</span>
+                    </td>
                     <td>{c.company || "—"}</td>
                     <td>
                       {c.group ? (
@@ -512,7 +590,7 @@ export function ContactsManager() {
                 ))}
                 {!filtered.length && (
                   <tr>
-                    <td colSpan={8} className="field-note">
+                    <td colSpan={9} className="field-note">
                       Geen contacten gevonden voor dit filter.
                     </td>
                   </tr>
@@ -521,11 +599,14 @@ export function ContactsManager() {
             </table>
           </div>
         </section>
+        </div>
       )}
       <ContactFormDialog
         open={formOpen}
         contact={editingContact}
         groups={groups}
+        sources={folderIds}
+        defaultOrigin={defaultOrigin}
         existingEmails={contacts
           .filter((c) => c.id !== editingContact?.id)
           .map((c) => c.email.toLowerCase())}
@@ -556,6 +637,8 @@ export function ContactsManager() {
         sheet={importSheet}
         fileName={importFileName}
         existingContacts={contacts}
+        sources={folderIds}
+        defaultOrigin={defaultOrigin}
         onClose={() => setImportOpen(false)}
         onImport={handleImport}
       />
@@ -578,6 +661,29 @@ export function ContactsManager() {
           <datalist id="contacts-group-list">
             {groups.map((g) => (
               <option key={g} value={g} />
+            ))}
+          </datalist>
+        </label>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={sourcePromptOpen}
+        onClose={() => setSourcePromptOpen(false)}
+        title="Bron wijzigen"
+        confirmLabel="Verplaatsen"
+        onConfirm={applySource}
+      >
+        <label>
+          Bron
+          <input
+            list="contacts-source-list"
+            value={sourceDraft}
+            maxLength={60}
+            placeholder="Bijv. Thuisbezorgd, Sitedish of Uber Eats"
+            onChange={(e) => setSourceDraft(e.target.value)}
+          />
+          <datalist id="contacts-source-list">
+            {folderIds.map((id) => (
+              <option key={id} value={sourceLabel(id)} />
             ))}
           </datalist>
         </label>

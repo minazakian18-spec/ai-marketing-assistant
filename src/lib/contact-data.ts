@@ -62,6 +62,7 @@ export function contactValid(c: Record<string, unknown>): boolean {
     (c.phone === undefined || typeof c.phone === "string") &&
     (c.company === undefined || typeof c.company === "string") &&
     (c.group === undefined || typeof c.group === "string") &&
+    (c.origin === undefined || (typeof c.origin === "string" && c.origin.length > 0 && c.origin.length <= 60)) &&
     (c.newsletter === undefined || newsletterValid(c.newsletter))
   );
 }

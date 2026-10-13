@@ -2,6 +2,7 @@
 import { useEffect, useId, useState } from "react";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
 import type { Contact, ContactStatus } from "@/lib/types";
+import { normalizeOrigin, originOf, sourceLabel } from "@/lib/contact-sources";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -9,6 +10,8 @@ export function ContactFormDialog({
   open,
   contact,
   groups,
+  sources,
+  defaultOrigin,
   existingEmails,
   onClose,
   onSave,
@@ -16,11 +19,16 @@ export function ContactFormDialog({
   open: boolean;
   contact?: Contact | null;
   groups: string[];
+  /** Source folders to suggest (ids); `defaultOrigin` preselects one for new contacts. */
+  sources: string[];
+  defaultOrigin?: string;
   existingEmails: string[];
   onClose: () => void;
   onSave: (contact: Contact) => void;
 }) {
   const listId = useId();
+  const sourceListId = useId();
+  const [origin, setOrigin] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -39,9 +47,10 @@ export function ContactFormDialog({
     setPhone(contact?.phone || "");
     setCompany(contact?.company || "");
     setGroup(contact?.group || "");
+    setOrigin(sourceLabel(contact ? originOf(contact) : defaultOrigin || "manual"));
     setStatus(contact?.status || "Niet bevestigd");
     setError("");
-  }, [open, contact]);
+  }, [open, contact, defaultOrigin]);
   return (
     <ConfirmDialog
       open={open}
@@ -67,6 +76,7 @@ export function ContactFormDialog({
           phone: phone.trim() || undefined,
           company: company.trim() || undefined,
           group: group.trim() || undefined,
+          origin: normalizeOrigin(origin === sourceLabel("other") ? "" : origin),
           status,
           source: contact?.source || "manual",
           createdAt: contact?.createdAt || new Date().toISOString(),
@@ -117,6 +127,21 @@ export function ContactFormDialog({
           />
         </label>
       </div>
+      <label>
+        Bron
+        <input
+          value={origin}
+          list={sourceListId}
+          maxLength={60}
+          placeholder="Bijv. Thuisbezorgd, Uber Eats of Website"
+          onChange={(e) => setOrigin(e.target.value)}
+        />
+        <datalist id={sourceListId}>
+          {sources.map((s) => (
+            <option key={s} value={sourceLabel(s)} />
+          ))}
+        </datalist>
+      </label>
       <label>
         Tag / groep (optioneel)
         <input

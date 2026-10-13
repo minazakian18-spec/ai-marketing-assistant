@@ -12,12 +12,15 @@ import {
   type ParsedSheet,
 } from "@/lib/contact-import";
 import type { Contact } from "@/lib/types";
+import { normalizeOrigin, sourceLabel } from "@/lib/contact-sources";
 
 export function ImportWizard({
   open,
   sheet,
   fileName,
   existingContacts,
+  sources,
+  defaultOrigin,
   onClose,
   onImport,
 }: {
@@ -25,6 +28,8 @@ export function ImportWizard({
   sheet: ParsedSheet | null;
   fileName: string;
   existingContacts: Contact[];
+  sources: string[];
+  defaultOrigin?: string;
   onClose: () => void;
   onImport: (contacts: Contact[]) => void;
 }) {
@@ -32,14 +37,16 @@ export function ImportWizard({
   const [mapping, setMapping] = useState<Record<string, MavixField | "">>({});
   const [mappingError, setMappingError] = useState("");
   const [consented, setConsented] = useState(false);
+  const [origin, setOrigin] = useState("");
   useEffect(() => {
     if (open && sheet) {
       setMapping(guessMapping(sheet.headers));
       setStep("map");
       setMappingError("");
       setConsented(false);
+      setOrigin(defaultOrigin ? sourceLabel(defaultOrigin) : "");
     }
-  }, [open, sheet]);
+  }, [open, sheet, defaultOrigin]);
   if (!sheet) return null;
   const preview =
     step === "preview" ? buildImportPreview(sheet, mapping, existingContacts) : [];
@@ -67,7 +74,8 @@ export function ImportWizard({
           }
           setStep("preview");
         } else {
-          onImport(toImportedContacts(preview, consented));
+          const chosen = normalizeOrigin(origin);
+          onImport(toImportedContacts(preview, consented).map((c) => (chosen ? { ...c, origin: chosen } : c)));
           onClose();
         }
       }}
@@ -132,6 +140,21 @@ export function ImportWizard({
             Ongeldige e-mailadressen en contacten die al bestaan worden niet
             geïmporteerd.
           </p>
+          <label>
+            Bron van deze contacten
+            <input
+              value={origin}
+              list="import-source-list"
+              maxLength={60}
+              placeholder="Bijv. Thuisbezorgd, Sitedish of Uber Eats"
+              onChange={(e) => setOrigin(e.target.value)}
+            />
+            <datalist id="import-source-list">
+              {sources.map((s) => (
+                <option key={s} value={sourceLabel(s)} />
+              ))}
+            </datalist>
+          </label>
           <label className="contacts-consent-check">
             <input type="checkbox" checked={consented} onChange={(e) => setConsented(e.target.checked)} />
             <span>

@@ -66,6 +66,8 @@ export type Contact = {
   group?: string;
   status: ContactStatus;
   source: "manual" | "import" | "sample" | "newsletter";
+  /** Business source folder, e.g. "thuisbezorgd" or a custom label (src/lib/contact-sources.ts). */
+  origin?: string;
   createdAt: string;
   /** Set when the contact is (or was) a newsletter subscriber (src/lib/newsletter.ts). */
   newsletter?: ContactNewsletter;

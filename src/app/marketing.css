@@ -1968,3 +1968,203 @@
 .mkt-nav-dark .mkt-agent-btn .mavi {
   color: #fff;
 }
+
+/* ---------- Partners strip (under the hero) ---------- */
+.mkt-partners {
+  padding: 56px 0 48px;
+  border-bottom: 1px solid rgba(24, 18, 43, 0.06);
+  background: linear-gradient(180deg, #faf9fd, #fff);
+}
+.mkt-partners-head {
+  text-align: center;
+}
+.mkt-partners-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+.mkt-partners-head p {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: #5b5966;
+}
+.mkt-partners-row,
+.mkt-partners-track {
+  display: flex;
+  gap: 16px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mkt-partners-row {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.mkt-partner > a,
+.mkt-partner:not(.mkt-partner-invite) {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 240px;
+  padding: 12px 20px 12px 12px;
+  border: 1px solid rgba(24, 18, 43, 0.07);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(24, 18, 43, 0.04), 0 8px 24px -16px rgba(76, 29, 149, 0.18);
+}
+.mkt-partner-logo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+.mkt-partner-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.mkt-partner-text {
+  display: grid;
+  gap: 2px;
+}
+.mkt-partner-text strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: #18122b;
+}
+.mkt-partner-text small {
+  font-size: 13px;
+  color: #6b6878;
+}
+.mkt-partner-invite a {
+  border-style: dashed;
+  border-color: rgba(109, 40, 217, 0.28);
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+.mkt-partner-invite a:hover {
+  border-color: var(--color-primary);
+  background: #faf8ff;
+}
+.mkt-partner-invite .mkt-partner-logo {
+  background: #f3effd;
+  color: var(--color-primary);
+}
+/* Marquee (used once there are enough real partners). */
+.mkt-partners-marquee {
+  overflow: hidden;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+.mkt-partners-track {
+  width: max-content;
+  animation: mkt-marquee 40s linear infinite;
+}
+.mkt-partners-marquee:hover .mkt-partners-track {
+  animation-play-state: paused;
+}
+@keyframes mkt-marquee {
+  to {
+    transform: translateX(calc(-50% - 8px));
+  }
+}
+@media (max-width: 640px) {
+  .mkt-partner > a,
+  .mkt-partner:not(.mkt-partner-invite) {
+    min-width: 0;
+    width: 100%;
+  }
+  .mkt-partners-row > li {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mkt-partners-track {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: auto;
+    animation: none;
+  }
+}
+
+/* ---------- Auth split screen: branded light panel + white form sheet ----------
+   Left: deep Mavix purple with soft light blooming toward the split. Right: a
+   white sheet with rounded inner corners that overlaps the visual slightly,
+   so the split reads as one calm surface instead of a hard seam. */
+.mkt-auth {
+  position: relative;
+  background: #1a0b3d;
+}
+.mkt-auth-visual {
+  position: relative;
+  align-items: center;
+  overflow: hidden;
+  padding: 60px 88px 60px 60px;
+  text-align: center;
+  background:
+    radial-gradient(60% 55% at 92% 48%, rgba(196, 181, 253, 0.55), transparent 70%),
+    radial-gradient(45% 40% at 78% 30%, rgba(139, 92, 246, 0.45), transparent 75%),
+    radial-gradient(70% 60% at 20% 95%, rgba(91, 33, 182, 0.55), transparent 70%),
+    linear-gradient(160deg, #160733 0%, #24095a 45%, #3b1491 100%);
+}
+/* Soft white haze blending toward the white sheet. */
+.mkt-auth-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1));
+  filter: blur(24px);
+  pointer-events: none;
+}
+.mkt-auth-visual > * {
+  position: relative;
+  z-index: 1;
+}
+.mkt-auth-visual > a:first-child {
+  position: absolute !important;
+  top: 32px;
+  left: 36px;
+  margin: 0 !important;
+}
+.mkt-auth-visual h2 {
+  max-width: 460px;
+  margin: 0;
+  font-size: clamp(30px, 3.2vw, 40px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.mkt-auth-visual p {
+  max-width: 400px;
+  margin: 18px auto 0;
+  font-size: 15px;
+  color: rgba(237, 233, 254, 0.85);
+}
+.mkt-auth-form-side {
+  position: relative;
+  z-index: 2;
+  margin-left: -28px;
+  border-radius: 28px 0 0 28px;
+  background: #fff;
+  box-shadow: -18px 0 48px -24px rgba(17, 6, 46, 0.55);
+}
+@media (max-width: 860px) {
+  .mkt-auth {
+    background: #fff;
+  }
+  .mkt-auth-form-side {
+    margin-left: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}

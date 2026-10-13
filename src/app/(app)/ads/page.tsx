@@ -9,10 +9,10 @@ export default function AdsPage() {
     <div className="ads">
       <PageHeading
         eyebrow="Marketing"
-        title="Advertenties"
-        description="Je advertentiecampagnes, uitgaven en resultaten."
+        title="Google Ads"
+        description="Je Google Ads-campagnes, uitgaven en resultaten."
       />
-      <section className="ws-metrics" aria-label="Advertentiecijfers">
+      <section className="ws-metrics" aria-label="Google Ads-cijfers">
         {METRICS.map((label) => (
           <article key={label} className="ws-metric">
             <span>{label}</span>

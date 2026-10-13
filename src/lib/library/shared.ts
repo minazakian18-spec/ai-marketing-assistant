@@ -33,7 +33,7 @@ export const LIBRARY_MAX_BYTES = 50 * 1024 * 1024;
 export const SYSTEM_ALBUMS: { key: string; name: string }[] = [
   { key: "instagram", name: "Instagram" },
   { key: "email", name: "E-mail" },
-  { key: "ads", name: "Advertenties" },
+  { key: "ads", name: "Google Ads" },
   { key: "products", name: "Productfoto's" },
   { key: "brand", name: "Brand assets" },
   { key: "videos", name: "Video's" },

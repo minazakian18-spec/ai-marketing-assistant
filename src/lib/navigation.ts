@@ -44,7 +44,7 @@ export const navigationGroups: NavGroup[] = [
       { href: "/social", label: "Social", icon: Share2 },
       { href: "/email", label: "E-mail", icon: Mail },
       { href: "/reviews", label: "Reviews", icon: Star },
-      { href: "/ads", label: "Advertenties", icon: Megaphone },
+      { href: "/ads", label: "Google Ads", icon: Megaphone },
       { href: "/seo", label: "SEO Intelligence", icon: Search },
     ],
   },

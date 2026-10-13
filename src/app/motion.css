@@ -1,8 +1,8 @@
 /* Mavix motion layer (loaded last in the app layout).
-   Timings: 150ms for small interactions, 220ms for panels, 12s for the one
+   Timings: 150ms for small interactions, 220ms for panels, 9s for the one
    long decorative loop (the AI input light). Only opacity, transform and
-   offset-distance are animated; never layout. All motion stops under
-   prefers-reduced-motion, and every component looks finished without it. */
+   stroke-dashoffset are animated; never layout. Under prefers-reduced-motion
+   everything stops except the slow AI input light (product decision). */
 
 :root {
   --dur-fast: 150ms;
@@ -11,130 +11,114 @@
   --focus-ring: 0 0 0 2px #fff, 0 0 0 4px rgba(109, 40, 217, 0.55);
 }
 
-/* ================= AI input: travelling light =================
-   One short, soft light travels along the rounded border at a constant speed
-   (offset-path follows the real perimeter, so it never speeds up around
-   corners the way a rotating conic gradient does). It is only visible inside
-   a 2px band on top of the neutral border (.mx-ring), plus a faint 4px glow
-   outside the edge (.mx-halo). Component: components/glow-frame.tsx. */
+/* ================= AI input: gliding border light =================
+   A long, soft highlight glides around the input's rounded border.
+   Component: components/glow-border.tsx (SVG on the border's centre line;
+   the light is a set of centred dashes moved by stroke-dashoffset, so it
+   follows the real perimeter at a constant speed and adapts on resize). */
 .composer {
   isolation: isolate;
-  --mx-radius: 12px;
-  --mx-speed: 6.5s;
-  --mx-core: rgba(124, 58, 237, 1);
-  --mx-soft: rgba(167, 139, 250, 0.6);
-  --mx-ring-opacity: 0.9;
-  --mx-halo-opacity: 0.35;
-  border-color: rgba(124, 58, 237, 0.1);
+  --gb-share: 0.13; /* length of the light, as a share of the perimeter */
+  --gb-width: 2px; /* thickness of the line */
+  --gb-speed: 9s; /* one full lap */
+  --gb-line: #8b5cf6;
+  --gb-glow: #a78bfa;
+  --gb-glow-strength: 0.16;
+  /* Neutral, barely visible edge: the light is the only accent. */
+  --gb-edge: rgba(24, 18, 43, 0.07);
+  border-color: var(--gb-edge);
 }
-.composer-large {
-  --mx-radius: 16px;
+.composer:focus-within {
+  /* Focus is shown by the whole input (edge + stronger glow), so the global
+     textarea ring would only draw a second box inside it. */
+  --gb-edge: rgba(109, 40, 217, 0.26);
+  --gb-glow-strength: 0.22;
+  border-color: var(--gb-edge);
+  box-shadow: none;
 }
-.composer-compact {
-  --mx-radius: 12px;
+/* !important: the global field ring (design-system.css) uses a selector with
+   four :not() parts, which outranks any reasonable composer selector. */
+.app-shell .composer textarea:focus-visible {
+  box-shadow: none !important;
 }
 .composer > * {
   position: relative;
   z-index: 2;
 }
-.composer > .mx-frame {
-  position: absolute;
-  z-index: 1;
-  inset: -1px;
-  border-radius: calc(var(--mx-radius) + 1px);
-  pointer-events: none;
-}
 .composer .composer-drop {
   position: absolute;
   z-index: 3;
 }
-.mx-ring,
-.mx-halo {
+.composer > .glow-border {
   position: absolute;
-  border-radius: inherit;
-  overflow: hidden;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#000 0 0) content-box exclude,
-    linear-gradient(#000 0 0);
-}
-/* A 2px band over the border line. */
-.mx-ring {
-  inset: 0;
-  padding: 2px;
-  opacity: var(--mx-ring-opacity);
+  z-index: 1;
+  top: -1px;
+  left: -1px;
+  width: calc(100% + 2px);
+  height: calc(100% + 2px);
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0;
   transition: opacity var(--dur-panel) ease;
 }
-/* A faint band just outside the border; nothing inside the input. */
-.mx-halo {
-  inset: -4px;
-  padding: 4px;
-  border-radius: calc(var(--mx-radius) + 5px);
-  opacity: var(--mx-halo-opacity);
-  transition: opacity var(--dur-panel) ease;
+.composer > .glow-border[data-ready] {
+  opacity: 1;
 }
-.mx-light {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 110px;
-  height: 18px;
-  offset-path: inset(1px round calc(var(--mx-radius)));
-  offset-anchor: center;
-  offset-rotate: auto;
-  /* A comet: bright head in front, soft tail behind, faded ends. */
-  background: linear-gradient(90deg, transparent, var(--mx-soft) 45%, var(--mx-core) 82%, transparent);
-  animation: mx-travel var(--mx-speed) linear infinite;
-  will-change: offset-distance;
+/* Each dash is --gb-part of the full length and centred on the same point;
+   the pattern repeats exactly once per lap, so the loop has no seam. */
+.glow-border rect {
+  --gb-len: calc(var(--gb-perimeter, 4000px) * var(--gb-share));
+  --gb-seg: calc(var(--gb-len) * var(--gb-part));
+  --gb-shift: calc((var(--gb-seg) - var(--gb-len)) / 2);
+  fill: none;
+  stroke-linecap: butt;
+  stroke-dasharray: var(--gb-seg) calc(var(--gb-perimeter, 4000px) - var(--gb-seg));
+  stroke-dashoffset: var(--gb-shift);
+  animation: gb-glide var(--gb-speed) linear infinite;
 }
-.mx-halo .mx-light {
-  width: 90px;
-  height: 14px;
-  offset-path: inset(4.5px round calc(var(--mx-radius) + 1px));
-  filter: blur(4px);
+.gb-line {
+  filter: blur(0.7px);
 }
-@keyframes mx-travel {
+.gb-line rect {
+  stroke: var(--gb-line);
+  stroke-width: var(--gb-width);
+  opacity: 0.17;
+}
+.gb-glow {
+  filter: blur(5px);
+}
+.gb-glow rect {
+  stroke: var(--gb-glow);
+  stroke-width: calc(var(--gb-width) * 4);
+  opacity: var(--gb-glow-strength);
+}
+@keyframes gb-glide {
   from {
-    offset-distance: 0%;
+    stroke-dashoffset: var(--gb-shift);
   }
   to {
-    offset-distance: 100%;
+    stroke-dashoffset: calc(var(--gb-shift) - var(--gb-perimeter, 4000px));
   }
 }
-.composer:focus-within {
-  border-color: rgba(124, 58, 237, 0.16);
-  --mx-ring-opacity: 1;
-  --mx-halo-opacity: 0.45;
-}
-/* A real request is running: same single light, a little quicker. */
+/* A real request is running: the same light, a little quicker. */
 .composer[data-busy] {
-  --mx-speed: 4s;
-  --mx-ring-opacity: 1;
+  --gb-speed: 5s;
 }
-.composer[data-paused] .mx-light {
+.composer[data-paused] .glow-border rect {
   animation-play-state: paused;
 }
-.composer.is-dragging .mx-frame {
+.composer.is-dragging > .glow-border {
   opacity: 0;
-}
-/* Browsers without offset-path shapes keep the clean neutral border. */
-@supports not (offset-path: inset(0 round 1px)) {
-  .composer > .mx-frame {
-    display: none;
-  }
 }
 /* The dashboard composer is the primary action: a calm, slightly raised card. */
 .agent-surface .composer {
-  border-color: rgba(124, 58, 237, 0.1);
+  border-color: var(--gb-edge);
   box-shadow:
     0 1px 2px rgba(24, 18, 43, 0.04),
     0 10px 28px -14px rgba(76, 29, 149, 0.16);
 }
 .agent-surface .composer:focus-within {
-  border-color: rgba(124, 58, 237, 0.16);
+  border-color: var(--gb-edge);
   box-shadow:
     0 1px 2px rgba(24, 18, 43, 0.04),
     0 12px 30px -14px rgba(76, 29, 149, 0.2);
@@ -213,18 +197,15 @@
   .mavix-brand .mavix-mark {
     animation: none;
   }
-  /* The AI input light keeps moving (product choice): small, no layout,
-     slower, and without the outer glow. */
+  /* Product decision: the AI input light keeps gliding, more slowly.
+     !important beats the global animation: none in interactions.css. */
   .composer {
-    --mx-speed: 9s;
+    --gb-speed: 14s;
   }
-  /* Overrides the global "* { animation: none !important }" (interactions.css). */
-  .composer .mx-light {
-    animation: mx-travel var(--mx-speed) linear infinite !important;
+  .glow-border rect {
+    animation: gb-glide var(--gb-speed) linear infinite !important;
   }
-  .mx-halo {
-    display: none;
-  }
+
   .mavi-avatar .mavi,
   .mavix-brand .mavix-mark,
   .app-shell .button,

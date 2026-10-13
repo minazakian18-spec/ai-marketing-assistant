@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Hero } from "@/components/marketing/hero";
+import { PartnersStrip } from "@/components/marketing/partners-strip";
 import { CoreProducts } from "@/components/marketing/core-products";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { Audiences } from "@/components/marketing/audiences";
@@ -25,6 +26,7 @@ export default function MarketingHome() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, "\\u003c") }}
       />
       <Hero />
+      <PartnersStrip />
       <CoreProducts />
       <HowItWorks />
       <Audiences />
