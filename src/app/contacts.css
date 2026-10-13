@@ -469,8 +469,8 @@
   background: #f6f5fa;
 }
 .contacts-source[aria-pressed="true"] {
-  background: #f3effd;
-  color: #3b1a86;
+  background: var(--mod-soft, #f3effd);
+  color: var(--mod-strong, #3b1a86);
   font-weight: 600;
 }
 .contacts-source.is-empty .contacts-source-name {
@@ -495,7 +495,7 @@
 }
 .contacts-source[aria-pressed="true"] .contacts-source-count {
   background: #fff;
-  color: #5b21b6;
+  color: var(--mod-strong, #5b21b6);
 }
 .contacts-source-icon {
   display: grid;

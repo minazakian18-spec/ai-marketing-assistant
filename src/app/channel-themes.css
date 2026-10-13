@@ -1,92 +1,210 @@
-/* Channel accents for the Marketing pages: each channel gets one small,
-   recognisable colour set (Social: Instagram gradient, E-mail: blue to
-   violet, Reviews: gold with Mavix purple) used only on accents: eyebrow,
-   active tab, KPI cards, icon chips and empty states. Text and buttons keep
-   the shared Mavix tokens, so pages stay consistent and readable.
-   Roots: .instagram-workspace (Social), .email-workspace, .rv-workspace. */
+/* Marketing module colours. Each module has ONE accent (Social blue, E-mail
+   red, Reviews yellow, Google Ads green), defined once below as --mod-*
+   tokens. Inside a module root the shared accent tokens (buttons, tabs,
+   focus rings, soft surfaces) are pointed at that module's tokens, so shared
+   components follow the module without knowing about it. Everything outside
+   these roots (sidebar, topbar, Dashboard, Mavix Agent) keeps Mavix purple.
+   Status colours (errors red, success green) are not touched.
 
+   Roots: .instagram-workspace (Social), .email-workspace (E-mail, which also
+   carries .instagram-workspace), .rv-workspace (Reviews), .ads (Google Ads). */
+
+/* ---- Tokens per module -------------------------------------------------
+   --mod        accent (fills, lines, icons)
+   --mod-hover  hover/pressed fill
+   --mod-strong accent as text on white (AA contrast)
+   --mod-soft   tinted background
+   --mod-line   tinted border
+   --mod-on     text on an accent fill
+   --mod-fill   button fill (defaults to --mod; darker where white text needs it) */
 .instagram-workspace:not(.email-workspace) {
-  --ch-grad: linear-gradient(90deg, #f58529, #dd2a7b 55%, #8134af);
-  --ch-soft: #fdf0f6;
-  --ch-ink: #a3195b;
+  --mod: #2563eb;
+  --mod-hover: #1d4ed8;
+  --mod-strong: #1d4ed8;
+  --mod-soft: #eff6ff;
+  --mod-line: rgba(37, 99, 235, 0.24);
+  --mod-on: #fff;
 }
 .email-workspace {
-  --ch-grad: linear-gradient(90deg, #2563eb, #7c3aed);
-  --ch-soft: #eef2ff;
-  --ch-ink: #3538cd;
+  --mod: #dc2626;
+  --mod-hover: #b91c1c;
+  --mod-strong: #b91c1c;
+  --mod-soft: #fef2f2;
+  --mod-line: rgba(220, 38, 38, 0.24);
+  --mod-on: #fff;
 }
 .rv-workspace {
-  --ch-grad: linear-gradient(90deg, #f5b301, #f59e0b 45%, #7c3aed);
-  --ch-soft: #fff7e0;
-  --ch-ink: #8a5a00;
+  --mod: #eab308;
+  --mod-hover: #ca8a04;
+  --mod-strong: #854d0e; /* yellow is unreadable as text: dark amber instead */
+  --mod-soft: #fefce8;
+  --mod-line: rgba(202, 138, 4, 0.32);
+  --mod-on: #422006; /* dark text on yellow buttons */
+}
+.ads {
+  --mod: #16a34a;
+  --mod-fill: #15803d; /* white text on #16a34a is only 3.3:1; this is 5.0:1 */
+  --mod-hover: #166534;
+  --mod-strong: #15803d;
+  --mod-soft: #f0fdf4;
+  --mod-line: rgba(22, 163, 74, 0.24);
+  --mod-on: #fff;
 }
 
-/* Eyebrow: channel colour with a small gradient dot. */
-:is(.instagram-workspace, .rv-workspace) > .page-heading .eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--ch-ink);
-}
-:is(.instagram-workspace, .rv-workspace) > .page-heading .eyebrow::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ch-grad);
-}
-
-/* Active tab: gradient underline instead of a flat line. */
-.main-shell :is(.instagram-workspace, .rv-workspace) .ws-tabs a[aria-current="page"] {
-  border-bottom-color: transparent;
-  background: var(--ch-grad) bottom / 100% 2px no-repeat;
-}
-
-/* KPI cards: a thin channel-coloured top edge. */
-:is(.instagram-workspace, .rv-workspace) :is(.channel-kpis, .motion-kpis) > * {
-  background:
-    var(--ch-grad) top / 100% 3px no-repeat,
-    var(--ds-surface, #fff);
+/* ---- Shared tokens follow the module ---------------------------------- */
+:is(.instagram-workspace, .rv-workspace, .ads) {
+  --mod-fill-color: var(--mod-fill, var(--mod));
+  --app-accent: var(--mod-fill-color);
+  --app-accent-700: var(--mod-hover);
+  --app-accent-soft: var(--mod-soft);
+  --ds-accent: var(--mod);
+  --ds-accent-hover: var(--mod-hover);
+  --ds-accent-soft: var(--mod-soft);
+  --ds-accent-line: var(--mod-line);
+  --ds-ring: 0 0 0 3px var(--mod-line);
+  --focus-ring: 0 0 0 2px #fff, 0 0 0 4px var(--mod);
+  --color-primary: var(--mod);
+  --color-primary-hover: var(--mod-hover);
+  --color-primary-dark: var(--mod-strong);
+  --primary: var(--mod-fill-color);
+  --gradient-primary: var(--mod-fill-color);
+  --gradient-primary-hover: var(--mod-hover);
+  --gradient-soft: var(--mod-soft);
 }
 
-/* Icon chips and empty states. */
-:is(.instagram-workspace, .rv-workspace)
+/* Heading: accent label in the module colour, title in neutral ink. */
+:is(.instagram-workspace, .rv-workspace, .ads) > .page-heading .eyebrow {
+  color: var(--mod-strong);
+}
+.app-shell .main-shell :is(.instagram-workspace, .rv-workspace, .ads) > .page-heading h1 {
+  color: #18122b;
+}
+
+/* Primary buttons: solid module colour (global ones use a purple gradient). */
+.main-shell :is(.instagram-workspace, .rv-workspace, .ads) .button.primary {
+  background: var(--mod-fill-color);
+  color: var(--mod-on);
+  box-shadow: 0 1px 2px rgba(24, 18, 43, 0.12);
+}
+.main-shell :is(.instagram-workspace, .rv-workspace, .ads) .button.primary:hover:not(:disabled) {
+  background: var(--mod-hover);
+  box-shadow: 0 4px 14px -4px var(--mod-line);
+}
+
+/* Selected tab and selected pills/chips. */
+.main-shell :is(.instagram-workspace, .rv-workspace, .ads) .ws-tabs a[aria-current="page"] {
+  border-bottom-color: var(--mod);
+  color: var(--mod-strong);
+}
+:is(.instagram-workspace, .rv-workspace, .ads) :is(.lib-filter-pill, .social-platform)[aria-pressed="true"],
+:is(.instagram-workspace, .rv-workspace, .ads) .social-platform.is-active {
+  border-color: var(--mod-line);
+  background: var(--mod-soft);
+  color: var(--mod-strong);
+}
+
+/* Links and progress. */
+:is(.instagram-workspace, .rv-workspace, .ads) .text-link {
+  color: var(--mod-strong);
+}
+:is(.instagram-workspace, .rv-workspace, .ads) progress {
+  accent-color: var(--mod);
+}
+
+/* Icon chips, empty states and the mode card. */
+:is(.instagram-workspace, .rv-workspace, .ads)
   :is(.channel-summary-icon, .ws-connect-icon, .ws-empty-icon, [class*="modeIcon"]) {
-  background: var(--ch-soft);
-  color: var(--ch-ink);
-}
-:is(.instagram-workspace, .rv-workspace) :is(.ig-empty, [class*="empty"]) > svg:first-child {
-  color: var(--ch-ink);
+  background: var(--mod-soft);
+  color: var(--mod-strong);
 }
 
-/* Section titles: short gradient bar before the text. */
-:is(.instagram-workspace, .rv-workspace) .ig-section-title h2 {
+/* KPI cards: a thin top edge in the module colour. */
+:is(.instagram-workspace, .rv-workspace, .ads) :is(.channel-kpis, .motion-kpis, .ws-metrics) > * {
+  box-shadow: inset 0 3px 0 var(--mod);
+}
+
+/* Section titles: short accent bar. */
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-section-title h2 {
   display: inline-flex;
   align-items: center;
   gap: 9px;
 }
-:is(.instagram-workspace, .rv-workspace) .ig-section-title h2::before {
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-section-title h2::before {
   content: "";
   width: 3px;
   height: 16px;
   border-radius: 2px;
-  background: var(--ch-grad);
+  background: var(--mod);
 }
 
-/* Reviews: warm reputation accents around the score. */
-.rv-workspace .rv-summary-strip {
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--ch-soft), transparent 60%),
-    var(--ds-surface, #fff);
+/* Subtle highlighted cards: hover tint on interactive cards. */
+:is(.instagram-workspace, .rv-workspace, .ads) a.panel:hover,
+:is(.instagram-workspace, .rv-workspace, .ads) :is(.channel-mode-cards, .channel-recent) > :is(a, button):hover {
+  border-color: var(--mod-line);
 }
-.rv-workspace .rv-summary-score strong,
-.rv-workspace .rv-summary-strip strong {
-  color: #6d28d9;
-}
+
+/* Reviews: stars stay gold; mode banner and score in yellow tones. */
 .rv-workspace .rv-stars {
-  color: #f5b301;
+  color: var(--mod);
+}
+.rv-workspace .rv-summary-strip strong {
+  color: var(--mod-strong);
 }
 .rv-workspace .rv-mode-banner {
-  border-color: rgba(245, 179, 1, 0.35);
-  background: linear-gradient(90deg, #fffaf0, #f7f3ff);
+  border-color: var(--mod-line);
+  background: var(--mod-soft);
+}
+
+/* Leftover purple inside modules: icon glow, AI suggestion block, avatars,
+   "scheduled" badge and the sparkle icon in the mode banner. */
+:is(.instagram-workspace, .rv-workspace, .ads) :is(.ws-connect-icon, .ws-empty-icon) {
+  box-shadow: none;
+}
+:is(.instagram-workspace, .rv-workspace, .ads) .badge.scheduled {
+  border-color: var(--mod-line);
+  background: var(--mod-soft);
+  color: var(--mod-strong);
+}
+.rv-workspace .rv-ai-block {
+  border-color: var(--mod-line);
+  background: var(--mod-soft);
+}
+.rv-workspace .rv-ai-label,
+.rv-workspace .rv-mode-banner :is(strong, svg) {
+  border-color: var(--mod-line);
+  color: var(--mod-strong);
+}
+.rv-workspace .rv-avatar {
+  border-color: var(--mod-line);
+  background: var(--mod-soft);
+  box-shadow: none;
+  color: var(--mod-strong);
+}
+/* Content Studio inside a module ("Maken" tab): neutral headings instead of
+   the global dark purple, module colour for selections. */
+:is(.instagram-workspace, .rv-workspace, .ads) {
+  --ds-heading: #18122b;
+}
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-mode-selector > button[aria-pressed="true"] {
+  border-color: var(--mod-line);
+  background: var(--mod-soft);
+  box-shadow: 0 0 0 1px var(--mod-line);
+}
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-mode-selector button:hover:not(:disabled),
+:is(.instagram-workspace, .rv-workspace, .ads) .channel-mode-cards a:hover {
+  border-color: var(--mod-line);
+}
+.rv-workspace .rv-filter-pill[aria-pressed="true"] {
+  border-color: var(--mod-line);
+}
+/* Content-mix bar: the module colour in steps (data, not status). */
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-mix-bar span {
+  background: var(--mod);
+}
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-mix-bar span:nth-child(2) { opacity: 0.75; }
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-mix-bar span:nth-child(3) { opacity: 0.55; }
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-mix-bar span:nth-child(4) { opacity: 0.4; }
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-mix-bar span:nth-child(n + 5) { opacity: 0.28; }
+:is(.instagram-workspace, .rv-workspace, .ads) .ig-phone-avatar {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--mod-line);
 }
