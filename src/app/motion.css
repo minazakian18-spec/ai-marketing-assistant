@@ -18,12 +18,12 @@
    follows the real perimeter at a constant speed and adapts on resize). */
 .composer {
   isolation: isolate;
-  --gb-share: 0.13; /* length of the light, as a share of the perimeter */
+  --gb-share: 0.1; /* length of the light, as a share of the perimeter */
   --gb-width: 2px; /* thickness of the line */
   --gb-speed: 9s; /* one full lap */
   --gb-line: #8b5cf6;
   --gb-glow: #a78bfa;
-  --gb-glow-strength: 0.16;
+  --gb-glow-strength: 0.11;
   /* Neutral, barely visible edge: the light is the only accent. */
   --gb-edge: rgba(24, 18, 43, 0.07);
   border-color: var(--gb-edge);
@@ -32,7 +32,7 @@
   /* Focus is shown by the whole input (edge + stronger glow), so the global
      textarea ring would only draw a second box inside it. */
   --gb-edge: rgba(109, 40, 217, 0.26);
-  --gb-glow-strength: 0.22;
+  --gb-glow-strength: 0.15;
   border-color: var(--gb-edge);
   box-shadow: none;
 }
@@ -77,15 +77,15 @@
   animation: gb-glide var(--gb-speed) linear infinite;
 }
 .gb-line {
-  filter: blur(0.7px);
+  filter: blur(1px);
 }
 .gb-line rect {
   stroke: var(--gb-line);
   stroke-width: var(--gb-width);
-  opacity: 0.17;
+  opacity: 0.13;
 }
 .gb-glow {
-  filter: blur(5px);
+  filter: blur(6px);
 }
 .gb-glow rect {
   stroke: var(--gb-glow);
