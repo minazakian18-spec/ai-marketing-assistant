@@ -20,12 +20,12 @@
 .composer {
   isolation: isolate;
   --mx-radius: 12px;
-  --mx-speed: 12s;
-  --mx-core: rgba(124, 58, 237, 0.9);
-  --mx-soft: rgba(196, 181, 253, 0.55);
-  --mx-ring-opacity: 0.7;
-  --mx-halo-opacity: 0.22;
-  border-color: #e4e1ec;
+  --mx-speed: 6.5s;
+  --mx-core: rgba(124, 58, 237, 1);
+  --mx-soft: rgba(167, 139, 250, 0.6);
+  --mx-ring-opacity: 0.9;
+  --mx-halo-opacity: 0.35;
+  border-color: rgba(124, 58, 237, 0.1);
 }
 .composer-large {
   --mx-radius: 16px;
@@ -80,20 +80,21 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 120px;
+  width: 110px;
   height: 18px;
   offset-path: inset(1px round calc(var(--mx-radius)));
   offset-anchor: center;
   offset-rotate: auto;
-  background: radial-gradient(closest-side, var(--mx-core), var(--mx-soft) 50%, transparent);
+  /* A comet: bright head in front, soft tail behind, faded ends. */
+  background: linear-gradient(90deg, transparent, var(--mx-soft) 45%, var(--mx-core) 82%, transparent);
   animation: mx-travel var(--mx-speed) linear infinite;
   will-change: offset-distance;
 }
 .mx-halo .mx-light {
-  width: 96px;
+  width: 90px;
   height: 14px;
   offset-path: inset(4.5px round calc(var(--mx-radius) + 1px));
-  filter: blur(3px);
+  filter: blur(4px);
 }
 @keyframes mx-travel {
   from {
@@ -104,13 +105,13 @@
   }
 }
 .composer:focus-within {
-  border-color: #d9d3ea;
+  border-color: rgba(124, 58, 237, 0.16);
   --mx-ring-opacity: 1;
-  --mx-halo-opacity: 0.34;
+  --mx-halo-opacity: 0.45;
 }
 /* A real request is running: same single light, a little quicker. */
 .composer[data-busy] {
-  --mx-speed: 7s;
+  --mx-speed: 4s;
   --mx-ring-opacity: 1;
 }
 .composer[data-paused] .mx-light {
@@ -127,13 +128,13 @@
 }
 /* The dashboard composer is the primary action: a calm, slightly raised card. */
 .agent-surface .composer {
-  border-color: #e4e1ec;
+  border-color: rgba(124, 58, 237, 0.1);
   box-shadow:
     0 1px 2px rgba(24, 18, 43, 0.04),
     0 10px 28px -14px rgba(76, 29, 149, 0.16);
 }
 .agent-surface .composer:focus-within {
-  border-color: #d9d3ea;
+  border-color: rgba(124, 58, 237, 0.16);
   box-shadow:
     0 1px 2px rgba(24, 18, 43, 0.04),
     0 12px 30px -14px rgba(76, 29, 149, 0.2);
@@ -209,13 +210,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mx-light,
   .mavix-brand .mavix-mark {
     animation: none;
   }
-  /* Static, elegant fallback: one soft highlight resting on the top edge. */
-  .mx-light {
-    offset-distance: 6%;
+  /* The AI input light keeps moving (product choice): small, no layout,
+     slower, and without the outer glow. */
+  .composer {
+    --mx-speed: 9s;
+  }
+  /* Overrides the global "* { animation: none !important }" (interactions.css). */
+  .composer .mx-light {
+    animation: mx-travel var(--mx-speed) linear infinite !important;
   }
   .mx-halo {
     display: none;
