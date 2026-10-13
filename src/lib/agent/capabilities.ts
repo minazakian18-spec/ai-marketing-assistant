@@ -20,16 +20,20 @@ export type Capability = {
   href?: string;
 };
 
+// Server tools behind the "read" entries: src/lib/server/agent/tools.ts.
 export const CAPABILITIES: Capability[] = [
-  { id: "workspace_overview", kind: "read", status: "available", label: "Werkruimte-overzicht", description: "Counts of drafts waiting for approval, scheduled posts and e-mails, Brand Hub completeness and which integrations are connected." },
-  { id: "brand_context", kind: "read", status: "available", label: "Brand Hub", description: "The business profile, tone of voice, audience, products and calls to action from Brand Hub.", href: "/brand-hub" },
-  { id: "marketing_advice", kind: "draft", status: "available", label: "Marketingadvies en ideeën", description: "Marketing plans, campaign ideas, content calendars as text, and ideas to win more customers or reservations, based only on Brand Hub facts." },
-  { id: "draft_texts", kind: "draft", status: "available", label: "Teksten schrijven", description: "Draft Instagram captions, newsletters, e-mails and review replies as text in the chat for the user to copy or refine in Content Studio.", href: "/studio" },
-  { id: "read_reviews", kind: "read", status: "unavailable", label: "Reviews lezen", description: "Reading Google reviews is not connected to the agent. The user can answer reviews in Reviews.", href: "/reviews?tab=inbox" },
+  { id: "workspace_overview", kind: "read", status: "available", label: "Werkruimte-overzicht", description: "Counts of drafts waiting for approval, scheduled posts and e-mails, Brand Hub completeness and connected integrations (get_integrations)." },
+  { id: "brand_context", kind: "read", status: "available", label: "Brand Hub", description: "The business profile, tone of voice, audience, products and calls to action from Brand Hub (get_brand_context).", href: "/brand-hub" },
+  { id: "read_schedule", kind: "read", status: "available", label: "Planning", description: "What is planned in the Mavix content calendar for a period (get_schedule).", href: "/calendar" },
+  { id: "read_content", kind: "read", status: "available", label: "Bestaande content", description: "Existing Instagram posts, e-mail campaigns and Content Studio texts (list_content).", href: "/studio" },
+  { id: "read_media", kind: "read", status: "available", label: "Mediabibliotheek", description: "Search photo and video names and albums in the Media Library (search_media); no image recognition.", href: "/library" },
+  { id: "read_reviews", kind: "read", status: "available", label: "Google-reviews", description: "Recent Google reviews, only when Google Business Profile is connected (list_reviews).", href: "/reviews?tab=inbox" },
+  { id: "marketing_advice", kind: "draft", status: "available", label: "Marketingadvies en ideeën", description: "Marketing plans, campaign ideas, content calendars as proposals, and ideas to win more customers or reservations, based only on real workspace data." },
+  { id: "draft_texts", kind: "draft", status: "available", label: "Teksten schrijven", description: "Draft Instagram captions, Reel concepts and scripts, newsletters, e-mails and review replies in the chat for the user to copy or refine in Content Studio.", href: "/studio" },
   { id: "read_inbox", kind: "read", status: "unavailable", label: "Inbox lezen", description: "The agent cannot read customer conversations. Reply suggestions are available inside the Inbox.", href: "/inbox" },
-  { id: "read_insights", kind: "read", status: "unavailable", label: "Statistieken", description: "Reach and engagement numbers are not available to the agent.", href: "/inzichten" },
-  { id: "save_drafts", kind: "write", status: "unavailable", label: "Concepten opslaan", description: "The agent cannot save drafts into Content Studio or the calendar yet; the user does that in Content Studio.", href: "/studio" },
-  { id: "publish_or_send", kind: "write", status: "unavailable", label: "Publiceren of versturen", description: "The agent never publishes posts, sends e-mails or messages, or deletes anything." },
+  { id: "read_insights", kind: "read", status: "unavailable", label: "Statistieken", description: "Reach and engagement numbers (Instagram, Google) are not available in Mavix yet.", href: "/inzichten" },
+  { id: "save_drafts", kind: "write", status: "unavailable", label: "Concepten opslaan of plannen", description: "The agent cannot save drafts or schedule them in Content Studio, Social, E-mail or the calendar yet; the user does that in Content Studio.", href: "/studio" },
+  { id: "publish_or_send", kind: "write", status: "unavailable", label: "Publiceren of versturen", description: "The agent never publishes posts, sends e-mails, messages or review replies, or deletes anything." },
 ];
 
 export const available = (kind?: CapabilityKind) => CAPABILITIES.filter((c) => c.status === "available" && (!kind || c.kind === kind));
@@ -41,6 +45,7 @@ export const AGENT_SUGGESTIONS: { prompt: string; capability: string }[] = [
   { prompt: "Maak een marketingplanning voor de komende maand", capability: "marketing_advice" },
   { prompt: "Geef me ideeën om meer reserveringen te krijgen", capability: "marketing_advice" },
   { prompt: "Wat moet ik deze week als eerste oppakken?", capability: "workspace_overview" },
+  { prompt: "Wat staat er morgen gepland?", capability: "read_schedule" },
 ].filter((s) => CAPABILITIES.some((c) => c.id === s.capability && c.status === "available"));
 
 /** Text block for the model: what it may and may not claim. */

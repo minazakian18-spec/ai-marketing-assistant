@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { workspace, failure, limited, sameOrigin, HttpError } from "@/lib/server/access";
-import { agentReply } from "@/lib/server/ai";
+import { agentReply } from "@/lib/server/agent/agent";
 import { metered } from "@/lib/server/ai-usage";
 import { aiConfigured, modelFor } from "@/lib/server/openai";
 import { addMessage, createConversation, getConversation, listMessages, workspaceContext, type Owner } from "@/lib/server/agent-store";
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     const ctx = await workspaceContext(auth.workspaceId);
 
     try {
-      const reply = await metered(auth, "agent", () => agentReply(ctx.profile, ctx.state, history, question), request.headers.get("idempotency-key"));
+      const reply = await metered(auth, "agent", () => agentReply({ workspaceId: auth.workspaceId, userId: auth.user.id, role: auth.role }, ctx.profile, ctx.state, history, question), request.headers.get("idempotency-key"));
       const saved = await addMessage(owner, conversation!.id, { role: "assistant", content: reply.text, model: modelFor("advanced"), action: reply.action || null });
       return NextResponse.json({ configured: true, conversation: await getConversation(owner, conversation!.id), userMessage, reply: saved }, { headers });
     } catch (e) {

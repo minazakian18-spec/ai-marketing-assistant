@@ -1,7 +1,8 @@
 import "server-only";
 import OpenAI from "openai";
 import { HttpError } from "./access";
-import { currentOutputLimit, recordTokens, DEFAULT_MODEL, DEFAULT_ADVANCED_MODEL, MAX_INPUT_TOKENS } from "./ai-usage";
+import type { FunctionTool, ResponseInputItem, ResponseFunctionToolCall } from "openai/resources/responses/responses";
+import { currentOutputLimit, currentInputLimit, recordTokens, takeStep, DEFAULT_MODEL, DEFAULT_ADVANCED_MODEL } from "./ai-usage";
 export { DEFAULT_MODEL, DEFAULT_ADVANCED_MODEL };
 
 // Central OpenAI configuration for every Mavix AI feature (Responses API,
@@ -50,7 +51,8 @@ export async function aiText(instructions: string, messages: AiMessage[], tier: 
   // Hard input cap (about 3 characters per token, conservative for Dutch):
   // a request can never cost more than the budget reservation assumed.
   const chars = instructions.length + messages.reduce((s, m) => s + m.content.reduce((t, c) => t + c.text.length, 0), 0);
-  if (chars > MAX_INPUT_TOKENS * 3) throw new HttpError(413, "Deze opdracht is te lang voor Mavi. Maak hem korter.");
+  if (chars > currentInputLimit() * 3) throw new HttpError(413, "Deze opdracht is te lang voor Mavi. Maak hem korter.");
+  takeStep();
   try {
     const response = await openai().responses.create({
       model,
@@ -68,6 +70,56 @@ export async function aiText(instructions: string, messages: AiMessage[], tier: 
     // output_tokens already includes reasoning tokens (billed as output).
     console.info(JSON.stringify({ event: "ai_generated", model, input: usage?.input_tokens || 0, output: usage?.output_tokens || 0, reasoning: usage?.output_tokens_details?.reasoning_tokens || 0 }));
     return text;
+  } catch (e) {
+    throw aiError(e);
+  }
+}
+
+export type AiStepResult = {
+  text: string;
+  calls: ResponseFunctionToolCall[];
+  /** Items to send back on the next step (function calls and reasoning; store is off). */
+  carry: ResponseInputItem[];
+};
+
+/**
+ * One model call that may request tools (Mavix Agent). Same key handling,
+ * input cap, token recording and error mapping as aiText; each call uses one
+ * step of the request's reservation. `final` forbids further tool calls, so
+ * the model must answer in text (the tools stay declared because earlier
+ * steps in `input` refer to them).
+ */
+export async function aiStep(instructions: string, input: ResponseInputItem[], tools: FunctionTool[], final = false, tier: AiTier = "advanced"): Promise<AiStepResult> {
+  const model = modelFor(tier);
+  const chars = instructions.length + JSON.stringify(input).length;
+  if (chars > currentInputLimit() * 3) throw new HttpError(413, "Deze vraag heeft te veel gegevens nodig voor één antwoord. Maak hem kleiner.");
+  takeStep();
+  try {
+    const response = await openai().responses.create({
+      model,
+      instructions,
+      input,
+      tools,
+      tool_choice: tools.length && !final ? "auto" : "none",
+      parallel_tool_calls: true,
+      max_output_tokens: currentOutputLimit(1500),
+      reasoning: { effort: tier === "advanced" ? "low" : "none" },
+      // store is off, so reasoning travels with the next request encrypted.
+      include: ["reasoning.encrypted_content"],
+      store: false,
+    });
+    const usage = response.usage;
+    if (usage) recordTokens(model, usage.input_tokens || 0, usage.output_tokens || 0);
+    const output = response.output || [];
+    const calls = output.filter((o): o is ResponseFunctionToolCall => o.type === "function_call");
+    const carry = output.filter((o) => o.type === "function_call" || o.type === "reasoning") as ResponseInputItem[];
+    const text = (response.output_text || "").trim();
+    if (!calls.length && !text) {
+      if (response.status === "incomplete") throw new HttpError(502, "Mavi kreeg geen volledig antwoord. Probeer een kortere vraag.");
+      throw new HttpError(502, "Mavi gaf geen antwoord terug. Probeer het opnieuw.");
+    }
+    console.info(JSON.stringify({ event: "ai_step", model, input: usage?.input_tokens || 0, output: usage?.output_tokens || 0, tools: calls.map((c) => c.name) }));
+    return { text, calls, carry };
   } catch (e) {
     throw aiError(e);
   }

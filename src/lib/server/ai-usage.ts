@@ -56,7 +56,17 @@ export const PRICES: Record<string, { input: number; output: number }> = {
   "gpt-5-mini": { input: 0.25, output: 2 },
   "gpt-5-nano": { input: 0.05, output: 0.4 },
 };
-type Store = { feature: AiFeature; maxTokens: number; usage: { input: number; output: number; model: string } | null };
+// Model calls one metered request may make (the agent's tool loop: each step
+// is one call). The budget reservation covers all of them, so a multi-step
+// request can never spend more than was reserved up front.
+export const MAX_STEPS: Partial<Record<AiFeature, number>> = { agent: 4 };
+// Input cap per model call, in tokens. The agent carries tool results and a
+// compact history, so it gets more room; everything else keeps the default.
+export const INPUT_LIMIT: Partial<Record<AiFeature, number>> = { agent: 12_000 };
+export const stepsFor = (feature: AiFeature) => MAX_STEPS[feature] ?? 1;
+export const inputLimitFor = (feature: AiFeature) => INPUT_LIMIT[feature] ?? MAX_INPUT_TOKENS;
+
+type Store = { feature: AiFeature; maxTokens: number; maxInput: number; steps: number; usage: { input: number; output: number; model: string } | null };
 const als = new AsyncLocalStorage<Store>();
 
 /** Called by the AI service after each model response. */
@@ -69,6 +79,21 @@ export function recordTokens(model: string, input: number, output: number) {
 /** Output limit for the current metered request (fallback for unmetered calls). */
 export function currentOutputLimit(fallback = 2000) {
   return als.getStore()?.maxTokens ?? fallback;
+}
+/** Input limit (tokens) per model call for the current metered request. */
+export function currentInputLimit() {
+  return als.getStore()?.maxInput ?? MAX_INPUT_TOKENS;
+}
+/**
+ * Counts one model call against the current request's step allowance. The
+ * reservation was made for exactly that many calls; one more is refused
+ * before it reaches the provider.
+ */
+export function takeStep() {
+  const s = als.getStore();
+  if (!s) return;
+  if (s.steps <= 0) throw new HttpError(429, "Mavi heeft te veel stappen nodig voor deze vraag. Maak de vraag kleiner.");
+  s.steps--;
 }
 
 const num = (v: string | undefined, d: number) => {
@@ -116,7 +141,7 @@ export function reservationMicroUsd(feature: AiFeature) {
   const prices = configuredModels().map((m) => priceFor(m) || FALLBACK_PRICE);
   const input = Math.max(...prices.map((p) => p.input)),
     output = Math.max(...prices.map((p) => p.output));
-  return Math.round(MAX_INPUT_TOKENS * input + OUTPUT_LIMIT[feature] * output);
+  return Math.round(stepsFor(feature) * (inputLimitFor(feature) * input + OUTPUT_LIMIT[feature] * output));
 }
 export async function usageSummary(workspaceId: string) {
   const db = adminClient();
@@ -225,7 +250,7 @@ export async function metered<T>(
   }
 
   // 3. Run, then replace the reservation by the real tokens and cost.
-  const store: Store = { feature, maxTokens: OUTPUT_LIMIT[feature], usage: null };
+  const store: Store = { feature, maxTokens: OUTPUT_LIMIT[feature], maxInput: inputLimitFor(feature), steps: stepsFor(feature), usage: null };
   let ok = false;
   try {
     const result = await als.run(store, fn);
