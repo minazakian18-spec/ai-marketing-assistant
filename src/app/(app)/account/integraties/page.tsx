@@ -39,7 +39,7 @@ const INTEGRATIONS: Integration[] = [
   { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", group: "recommended", provider: "instagram" },
   { id: "gmail", brand: "gmail", name: "Gmail", description: "E-mails versturen en klantmails in de Inbox lezen.", group: "recommended", provider: "gmail" },
   { id: "google_business", brand: "google_business", name: "Google Bedrijfsprofiel", description: "Bedrijfsprofiel en Google-reviews, met één koppeling.", group: "recommended", provider: "google_business" },
-  { id: "whatsapp", brand: "whatsapp", name: "WhatsApp Business", description: "Ontvang en beantwoord WhatsApp-berichten in de Inbox.", group: "communication", provider: "whatsapp" },
+  { id: "whatsapp", brand: "whatsapp", name: "WhatsApp Business", description: "Ontvang en beantwoord WhatsApp-berichten in de Inbox. Koppelen gaat nu nog met hulp van een technisch beheerder.", group: "communication", provider: "whatsapp" },
   { id: "messenger", brand: "messenger", name: "Facebook Messenger", description: "Berichten aan je Facebook-pagina in de Inbox.", group: "communication", provider: "messenger" },
   { id: "google_calendar", brand: "google_calendar", name: "Google Agenda", description: "Je afspraken naast je Mavix-planning, in twee richtingen gesynchroniseerd.", group: "productivity", provider: "google_calendar" },
   { id: "google_search_console", brand: "search_console", name: "Google Search Console", description: "Klikken, vertoningen en zoekwoorden van je website.", group: "productivity", provider: "google_search_console" },
@@ -318,7 +318,7 @@ export default function IntegrationsPage() {
                       disabled={demo || busy}
                       onClick={() => (item.provider === "whatsapp" ? open(item) : void call(item.provider!, "connect"))}
                     >
-                      Koppelen
+                      {item.provider === "whatsapp" ? "Bekijken" : "Koppelen"}
                     </button>
                   )}
                 </li>
@@ -452,9 +452,21 @@ export default function IntegrationsPage() {
                 </div>
               )}
 
+              {m.provider === "whatsapp" && ms === "disconnected" && (
+                <div className="int-section">
+                  <h3>Wat kun je ermee?</h3>
+                  <p className="int-hint">WhatsApp-berichten van klanten komen binnen in je Inbox, waar je ze kunt beantwoorden. Mavix stelt antwoorden voor; jij verstuurt.</p>
+                  <h3>Zo koppel je WhatsApp</h3>
+                  <p className="int-hint">
+                    Koppelen met één klik via Meta is nog niet beschikbaar in Mavix. Tot die tijd koppelt een technisch beheerder WhatsApp met gegevens uit Meta
+                    Business Suite. Liever hulp? Neem contact op met Mavix, dan doen we het samen.
+                  </p>
+                </div>
+              )}
               {m.provider === "whatsapp" && (
-                <form className="int-section int-form" onSubmit={(e) => void connectWhatsApp(e)}>
-                  <h3>{ms === "disconnected" ? "WhatsApp koppelen" : "Nieuwe gegevens invoeren"}</h3>
+                <details className="int-section" open={ms !== "disconnected"}>
+                  <summary>{ms === "disconnected" ? "Handmatig koppelen (voor technische beheerders)" : "Nieuwe gegevens invoeren"}</summary>
+                <form className="int-form" onSubmit={(e) => void connectWhatsApp(e)}>
                   <p className="int-hint">
                     Gebruik de gegevens uit Meta Business Suite (WhatsApp Manager) en een systeemgebruiker-token. Het token wordt versleuteld opgeslagen en is
                     daarna niet meer zichtbaar.
@@ -475,6 +487,7 @@ export default function IntegrationsPage() {
                     {busy ? "Controleren…" : "WhatsApp koppelen"}
                   </button>
                 </form>
+                </details>
               )}
 
               {m.provider === "gmail" && mc?.status === "connected" && (

@@ -1,0 +1,21 @@
+<!-- Supabase Dashboard -> Authentication -> Emails -> "Confirm signup".
+     Subject: Bevestig je e-mailadres voor Mavix
+     Uses Supabase's own variable {{ .ConfirmationURL }}; no passwords or tokens are shown. -->
+<!doctype html>
+<html lang="nl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bevestig je e-mailadres</title></head>
+<body style="margin:0;background:#f6f5fa;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f5fa;padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;border:1px solid #ece9f3">
+<tr><td style="padding:28px 28px 8px"><div style="font-size:20px;font-weight:700;color:#2e1065">Mavix</div></td></tr>
+<tr><td style="padding:8px 28px 28px">
+<h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#18122b">Bevestig je e-mailadres</h1>
+<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#2b2838">Je hebt een Mavix-account aangemaakt. Bevestig je e-mailadres met de knop hieronder.</p>
+<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#2b2838">Je werkruimte wordt geactiveerd nadat je aanvraag is goedgekeurd en het abonnement is betaald.</p>
+<p style="margin:22px 0 6px"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#6d28d9;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 20px;border-radius:10px">E-mailadres bevestigen</a></p>
+<p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#6b6878">Heb jij dit account niet aangemaakt? Dan kun je deze e-mail negeren.</p>
+</td></tr>
+<tr><td style="padding:16px 28px 24px;border-top:1px solid #ece9f3;font-size:12px;line-height:1.5;color:#8a8796">Dit is een automatisch bericht van Mavix over je account. Dit is geen marketingbericht.</td></tr>
+</table></td></tr></table>
+</body>
+</html>
