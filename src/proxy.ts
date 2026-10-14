@@ -1,12 +1,23 @@
 import {DEMO_COOKIE, demoSession} from '@/lib/demo';
 import {supabaseUrl,supabasePublicKey} from '@/lib/supabase-config';
 import {requiresAuthentication} from '@/lib/security';
+import {siteUrl} from '@/lib/site';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 // Public marketing pages need no session work: skipping the Supabase call
 // keeps them fast (TTFB) and cacheable for visitors and search engines.
 const isPublic=(p:string)=>p==='/'||p==='/pricing'||p.startsWith('/legal/');
+// One canonical host for search engines: www.<domain> redirects permanently to
+// the APP_URL origin (only when that is exactly the www-less host).
+function canonicalRedirect(request:NextRequest){
+ const host=(request.headers.get('host')||'').toLowerCase().split(':')[0];
+ if(!host.startsWith('www.'))return null;
+ const canonical=new URL(siteUrl());
+ if(canonical.hostname!==host.slice(4))return null;
+ return NextResponse.redirect(new URL(request.nextUrl.pathname+request.nextUrl.search,canonical),308);
+}
 export async function proxy(request:NextRequest) {
+ const www=canonicalRedirect(request);if(www)return www;
  let response=NextResponse.next({request});
  if(isPublic(request.nextUrl.pathname)&&!demoSession(request.cookies.get(DEMO_COOKIE)?.value,process.env.NODE_ENV))return response;
  if(demoSession(request.cookies.get(DEMO_COOKIE)?.value,process.env.NODE_ENV)) {

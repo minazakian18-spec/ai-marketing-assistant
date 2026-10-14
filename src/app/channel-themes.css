@@ -1,4 +1,4 @@
-/* Marketing module colours. Each module has ONE accent (Social blue, E-mail
+/* Marketing module colours. Each module has ONE accent (Social Mavix purple, E-mail
    red, Reviews yellow, Google Ads green), defined once below as --mod-*
    tokens. Inside a module root the shared accent tokens (buttons, tabs,
    focus rings, soft surfaces) are pointed at that module's tokens, so shared
@@ -18,11 +18,12 @@
    --mod-on     text on an accent fill
    --mod-fill   button fill (defaults to --mod; darker where white text needs it) */
 .instagram-workspace:not(.email-workspace) {
-  --mod: #2563eb;
-  --mod-hover: #1d4ed8;
-  --mod-strong: #1d4ed8;
-  --mod-soft: #eff6ff;
-  --mod-line: rgba(37, 99, 235, 0.24);
+  /* Social uses the Mavix brand purple (same values as the global tokens). */
+  --mod: #6d28d9;
+  --mod-hover: #5b21b6;
+  --mod-strong: #5b21b6;
+  --mod-soft: #f3effd;
+  --mod-line: rgba(109, 40, 217, 0.24);
   --mod-on: #fff;
 }
 .email-workspace {

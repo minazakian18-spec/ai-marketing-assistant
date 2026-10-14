@@ -7,7 +7,7 @@ import { compareRows, pricingPlans } from "@/lib/pricing-data";
 import { pageMetadata } from "@/lib/site";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Prijzen",
+  title: "Prijzen en abonnementen voor AI-marketing",
   description:
     "Bekijk de Mavix-abonnementen voor AI-marketing: Starter, Growth en Autopilot. Maandelijks opzegbaar, prijzen exclusief btw.",
   path: "/pricing",

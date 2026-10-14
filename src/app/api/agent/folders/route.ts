@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const { name } = input.parse(await request.json());
     return NextResponse.json({ folder: await createFolder({ workspaceId: auth.workspaceId, userId: auth.user.id }, name) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {
-    if (e instanceof z.ZodError) return failure(new HttpError(400, "Geef de map een naam van maximaal 60 tekens."));
+    if (e instanceof z.ZodError) return failure(new HttpError(400, "Geef het project een naam van maximaal 60 tekens."));
     return failure(e);
   }
 }

@@ -276,7 +276,7 @@ export function AgentWorkspace() {
   }
   async function createFolder(name: string) {
     const r = await api<{ folder: FolderRow }>("/api/agent/folders", { method: "POST", json: { name } });
-    if (!r.ok) return setNotice(r.body.error || "De map kon niet worden aangemaakt.");
+    if (!r.ok) return setNotice(r.body.error || "Het project kon niet worden aangemaakt.");
     setFolders((f) => [...f, r.body.folder].sort((a, b) => a.name.localeCompare(b.name)));
     setOpenFolders((o) => ({ ...o, [r.body.folder.id]: true }));
   }
@@ -287,7 +287,7 @@ export function AgentWorkspace() {
   }
   async function removeFolder(id: string) {
     const r = await api("/api/agent/folders/" + id, { method: "DELETE" });
-    if (!r.ok) return setNotice(r.body.error || "De map kon niet worden verwijderd.");
+    if (!r.ok) return setNotice(r.body.error || "Het project kon niet worden verwijderd.");
     setFolders((f) => f.filter((x) => x.id !== id));
     setConversations((list) => list.map((c) => (c.folder_id === id ? { ...c, folder_id: null } : c)));
   }
@@ -320,9 +320,9 @@ export function AgentWorkspace() {
       { label: c.pinned ? "Losmaken" : "Vastzetten", icon: c.pinned ? <PinOff size={14} /> : <Pin size={14} />, onSelect: () => void patchConversation(c.id, { pinned: !c.pinned }) },
       ...(folders.length || c.folder_id
         ? [
-            { type: "heading" as const, label: "Verplaatsen naar" },
+            { type: "heading" as const, label: "Verplaats naar project" },
             ...folders.map((f) => ({ label: f.name, icon: <FolderInput size={14} />, checked: c.folder_id === f.id, onSelect: () => void patchConversation(c.id, { folderId: f.id }) })),
-            { label: "Geen map", checked: !c.folder_id, onSelect: () => void patchConversation(c.id, { folderId: null }) },
+            { label: "Geen project", checked: !c.folder_id, onSelect: () => void patchConversation(c.id, { folderId: null }) },
           ]
         : []),
       { type: "separator" as const },
@@ -406,11 +406,11 @@ export function AgentWorkspace() {
           <>
             {!archivedView && section("Vastgezet", groups.pinned)}
             {!archivedView && (
-              <section className="ag-group" aria-label="Mappen">
+              <section className="ag-group" aria-label="Projecten">
                 <div className="ag-group-head">
-                  <h3>Mappen</h3>
+                  <h3>Projecten</h3>
                   {!demo && (
-                    <IconButton label="Nieuwe map" onClick={() => setNewFolder("")}>
+                    <IconButton label="Nieuw project" onClick={() => setNewFolder("")}>
                       <FolderPlus size={14} />
                     </IconButton>
                   )}
@@ -419,8 +419,8 @@ export function AgentWorkspace() {
                   <input
                     className="ag-rename"
                     autoFocus
-                    aria-label="Naam van de nieuwe map"
-                    placeholder="Naam van de map"
+                    aria-label="Naam van het nieuwe project"
+                    placeholder="Naam van het project"
                     maxLength={60}
                     value={newFolder}
                     onChange={(e) => setNewFolder(e.target.value)}
@@ -434,7 +434,7 @@ export function AgentWorkspace() {
                     }}
                   />
                 )}
-                {!folders.length && newFolder === null && <p className="ag-muted ag-small">Nog geen mappen. Orden gesprekken per campagne of onderwerp.</p>}
+                {!folders.length && newFolder === null && <p className="ag-muted ag-small">Nog geen projecten. Een project bundelt gesprekken over één campagne of onderwerp.</p>}
                 <ul>
                   {folders.map((f) => {
                     const open = openFolders[f.id] ?? false;
@@ -445,7 +445,7 @@ export function AgentWorkspace() {
                           <input
                             className="ag-rename"
                             autoFocus
-                            aria-label="Nieuwe naam voor map"
+                            aria-label="Nieuwe naam voor project"
                             value={renaming.value}
                             maxLength={60}
                             onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
@@ -464,17 +464,17 @@ export function AgentWorkspace() {
                               <small>{items.length || ""}</small>
                             </button>
                             <Menu
-                              label={"Acties voor map " + f.name}
+                              label={"Acties voor project " + f.name}
                               className="ag-conv-menu"
                               trigger={<MoreHorizontal size={15} />}
                               items={[
-                                { label: "Naam wijzigen", icon: <Pencil size={14} />, onSelect: () => setRenaming({ kind: "folder", id: f.id, value: f.name }) },
-                                { label: "Map verwijderen", icon: <Trash2 size={14} />, danger: true, onSelect: () => setConfirm({ kind: "folder", id: f.id, name: f.name }) },
+                                { label: "Project hernoemen", icon: <Pencil size={14} />, onSelect: () => setRenaming({ kind: "folder", id: f.id, value: f.name }) },
+                                { label: "Project verwijderen", icon: <Trash2 size={14} />, danger: true, onSelect: () => setConfirm({ kind: "folder", id: f.id, name: f.name }) },
                               ]}
                             />
                           </div>
                         )}
-                        {open && (items.length ? <ul className="ag-folder-items">{items.map(row)}</ul> : <p className="ag-muted ag-small ag-indent">Deze map is leeg.</p>)}
+                        {open && (items.length ? <ul className="ag-folder-items">{items.map(row)}</ul> : <p className="ag-muted ag-small ag-indent">Dit project heeft nog geen gesprekken.</p>)}
                       </li>
                     );
                   })}
@@ -643,7 +643,7 @@ export function AgentWorkspace() {
       <ConfirmDialog
         open={!!confirm}
         onClose={() => setConfirm(null)}
-        title={confirm?.kind === "folder" ? "Map verwijderen?" : "Gesprek verwijderen?"}
+        title={confirm?.kind === "folder" ? "Project verwijderen?" : "Gesprek verwijderen?"}
         confirmLabel="Verwijderen"
         danger
         onConfirm={() => {
@@ -654,7 +654,7 @@ export function AgentWorkspace() {
         }}
       >
         {confirm?.kind === "folder"
-          ? `De map “${confirm.name}” wordt verwijderd. De gesprekken erin blijven bewaard, zonder map.`
+          ? `Het project “${confirm.name}” wordt verwijderd. De gesprekken erin blijven bewaard, zonder project.`
           : `“${confirm?.name}” en alle berichten erin worden definitief verwijderd. Dit kan niet ongedaan worden gemaakt.`}
       </ConfirmDialog>
     </div>

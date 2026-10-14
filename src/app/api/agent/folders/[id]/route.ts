@@ -15,7 +15,7 @@ export async function PATCH(request: Request, { params }: Context) {
     const { name } = input.parse(await request.json());
     return NextResponse.json({ folder: await renameFolder({ workspaceId: auth.workspaceId, userId: auth.user.id }, (await params).id, name) }, { headers });
   } catch (e) {
-    if (e instanceof z.ZodError) return failure(new HttpError(400, "Geef de map een naam van maximaal 60 tekens."));
+    if (e instanceof z.ZodError) return failure(new HttpError(400, "Geef het project een naam van maximaal 60 tekens."));
     return failure(e);
   }
 }

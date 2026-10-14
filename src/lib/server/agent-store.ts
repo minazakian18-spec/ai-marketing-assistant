@@ -162,33 +162,33 @@ export async function listFolders(o: Owner) {
   return (data || []) as FolderRow[];
 }
 export async function getFolder(o: Owner, folderId: string) {
-  const { data, error } = await db().from("agent_folders").select("id,name,created_at").eq("id", id(folderId, "map")).eq("workspace_id", o.workspaceId).eq("user_id", o.userId).maybeSingle();
+  const { data, error } = await db().from("agent_folders").select("id,name,created_at").eq("id", id(folderId, "project")).eq("workspace_id", o.workspaceId).eq("user_id", o.userId).maybeSingle();
   check(error);
-  if (!data) throw new HttpError(404, "Deze map bestaat niet.");
+  if (!data) throw new HttpError(404, "Dit project bestaat niet.");
   return data as FolderRow;
 }
 export async function createFolder(o: Owner, name: string) {
   const { count, error: countError } = await db().from("agent_folders").select("id", { count: "exact", head: true }).eq("workspace_id", o.workspaceId).eq("user_id", o.userId);
   check(countError);
-  if ((count || 0) >= 100) throw new HttpError(400, "Je kunt maximaal 100 mappen maken.");
+  if ((count || 0) >= 100) throw new HttpError(400, "Je kunt maximaal 100 projecten maken.");
   const now = new Date().toISOString();
   const { data, error } = await db().from("agent_folders").insert({ workspace_id: o.workspaceId, user_id: o.userId, name: name.trim().slice(0, 60), created_at: now, updated_at: now }).select("id,name,created_at").single();
-  check(error, "De map kon niet worden aangemaakt.");
+  check(error, "Het project kon niet worden aangemaakt.");
   return data as FolderRow;
 }
 export async function renameFolder(o: Owner, folderId: string, name: string) {
   await getFolder(o, folderId);
   const { data, error } = await db().from("agent_folders").update({ name: name.trim().slice(0, 60), updated_at: new Date().toISOString() }).eq("id", folderId).eq("workspace_id", o.workspaceId).eq("user_id", o.userId).select("id,name,created_at").single();
-  check(error, "De map kon niet worden hernoemd.");
+  check(error, "Het project kon niet worden hernoemd.");
   return data as FolderRow;
 }
 /** Removes the folder only; its conversations move to "no folder". */
 export async function deleteFolder(o: Owner, folderId: string) {
   await getFolder(o, folderId);
   const { error: moveError } = await db().from("agent_conversations").update({ folder_id: null }).eq("folder_id", folderId).eq("workspace_id", o.workspaceId).eq("user_id", o.userId);
-  check(moveError, "De map kon niet worden verwijderd.");
+  check(moveError, "Het project kon niet worden verwijderd.");
   const { error } = await db().from("agent_folders").delete().eq("id", folderId).eq("workspace_id", o.workspaceId).eq("user_id", o.userId);
-  check(error, "De map kon niet worden verwijderd.");
+  check(error, "Het project kon niet worden verwijderd.");
 }
 
 // ---------- Business context for the model (server-side, own workspace) ----------
