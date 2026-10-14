@@ -26,6 +26,7 @@ export const SITE_DESCRIPTION =
 export const PUBLIC_PAGES: { path: string; priority: number; changeFrequency: "weekly" | "monthly" }[] = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
   { path: "/pricing", priority: 0.8, changeFrequency: "monthly" },
+  { path: "/demo", priority: 0.7, changeFrequency: "monthly" },
 ];
 
 export function structuredData() {

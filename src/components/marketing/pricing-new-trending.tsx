@@ -7,13 +7,13 @@ const cards = [
     badge: "New",
     title: "Mavix Agent",
     description: "Werk samen met Mavix vanuit één gesprek.",
-    href: "/register",
+    href: "/demo",
   },
   {
     badge: "Trending",
     title: "Review AI",
     description: "Reageer sneller en persoonlijker op je Google-reviews.",
-    href: "/register",
+    href: "/demo",
   },
 ];
 

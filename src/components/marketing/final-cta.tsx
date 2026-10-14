@@ -8,8 +8,8 @@ export function FinalCta() {
       <div className="mkt-container mkt-final-cta-minimal">
         <Reveal>
           <h2 className="mkt-h2">Laat Mavix je marketingteam versterken.</h2>
-          <Link href="/register" className="mkt-btn mkt-btn-primary mkt-btn-lg">
-            Get started <ArrowRight size={18} />
+          <Link href="/demo" className="mkt-btn mkt-btn-primary mkt-btn-lg">
+            Demo aanvragen <ArrowRight size={18} />
           </Link>
         </Reveal>
       </div>

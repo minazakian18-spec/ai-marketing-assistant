@@ -15,7 +15,8 @@ const columns = [
     title: "Bedrijf",
     links: [
       ["/login", "Inloggen"],
-      ["/register", "Gratis starten"],
+      ["/demo", "Demo aanvragen"],
+      ["/aanvragen", "Account aanvragen"],
     ],
   },
   {

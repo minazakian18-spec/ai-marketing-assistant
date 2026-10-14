@@ -53,7 +53,7 @@ export function PartnersStrip() {
                 <PartnerCard key={p.name} partner={p} />
               ))}
               <li className="mkt-partner mkt-partner-invite">
-                <Link href="/register">
+                <Link href="/aanvragen">
                   <span className="mkt-partner-logo">
                     <Plus size={20} aria-hidden="true" />
                   </span>

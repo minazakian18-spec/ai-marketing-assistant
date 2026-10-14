@@ -6,7 +6,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 // Public marketing pages need no session work: skipping the Supabase call
 // keeps them fast (TTFB) and cacheable for visitors and search engines.
-const isPublic=(p:string)=>p==='/'||p==='/pricing'||p.startsWith('/legal/');
+const isPublic=(p:string)=>p==='/'||p==='/pricing'||p==='/demo'||p==='/aanvragen'||p.startsWith('/aanvragen/')||p.startsWith('/legal/');
+// Public endpoints that also work for visitors in test mode.
+const publicApi=(p:string)=>p==='/api/applications';
 // One canonical host for search engines: www.<domain> redirects permanently to
 // the APP_URL origin (only when that is exactly the www-less host).
 function canonicalRedirect(request:NextRequest){
@@ -21,7 +23,7 @@ export async function proxy(request:NextRequest) {
  let response=NextResponse.next({request});
  if(isPublic(request.nextUrl.pathname)&&!demoSession(request.cookies.get(DEMO_COOKIE)?.value,process.env.NODE_ENV))return response;
  if(demoSession(request.cookies.get(DEMO_COOKIE)?.value,process.env.NODE_ENV)) {
-  if(request.nextUrl.pathname.startsWith('/api/')) return NextResponse.json({error:'Deze functie vereist een echt account. In de testmodus worden alleen lokale voorbeeldgegevens gebruikt.'},{status:403});
+  if(request.nextUrl.pathname.startsWith('/api/')&&!publicApi(request.nextUrl.pathname)) return NextResponse.json({error:'Deze functie vereist een echt account. In de testmodus worden alleen lokale voorbeeldgegevens gebruikt.'},{status:403});
   response.headers.set('Cache-Control','private, no-store');
   return response;
  }

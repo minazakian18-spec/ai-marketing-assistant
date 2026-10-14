@@ -40,7 +40,7 @@ function LoginForm() {
       visualBody="Reviews, Instagram, e-mail en content — allemaal op één plek, aangestuurd door AI die jouw merk kent."
       footer={
         <p className="mkt-auth-footer-link">
-          Nog geen account? <Link href="/register">Gratis starten</Link>
+          Nog geen account? <Link href="/aanvragen">Account aanvragen</Link>
         </p>
       }
     >

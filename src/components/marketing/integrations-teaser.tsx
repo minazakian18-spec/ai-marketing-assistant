@@ -51,7 +51,7 @@ export function IntegrationsTeaser() {
           ))}
         </div>
         <p style={{ textAlign: "center", marginTop: 28 }}>
-          <Link href="/register" className="mkt-btn mkt-btn-secondary">
+          <Link href="/demo" className="mkt-btn mkt-btn-secondary">
             Bekijk integraties
           </Link>
         </p>

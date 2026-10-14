@@ -40,19 +40,18 @@ function RegisterForm() {
   return (
     <AuthShell
       title="Maak je Mavix-account"
-      subtitle="Start gratis, geen creditcard nodig."
+      subtitle="Gebruik het e-mailadres van je goedgekeurde aanvraag. Je werkruimte wordt geactiveerd na goedkeuring en betaling."
       visualTitle="Van eerste idee naar gepubliceerde content, in minuten."
       visualBody="Vertel Mavix over je bedrijf en het regelt de rest — jij houdt overal de controle."
       footer={
         <p className="mkt-auth-footer-link">
-          Al een account? <Link href="/login">Inloggen</Link>
+          Al een account? <Link href="/login">Inloggen</Link> · Nog geen aanvraag gedaan? <Link href="/aanvragen">Account aanvragen</Link>
         </p>
       }
     >
       {plan && (
         <div className="mkt-auth-banner mkt-auth-banner-info">
-          Je start met het <strong>{plan.name}</strong>-abonnement. Je kunt dit
-          later altijd wijzigen.
+          Gekozen pakket: <strong>{plan.name}</strong>. Je betaalt pas nadat je aanvraag is goedgekeurd.
         </div>
       )}
       {(validationError || status === "error") && (
@@ -121,7 +120,7 @@ function RegisterForm() {
               <Loader2 size={16} className="mkt-spin" /> Account aanmaken…
             </>
           ) : (
-            "Gratis starten"
+            "Account aanmaken"
           )}
         </button>
       </form>

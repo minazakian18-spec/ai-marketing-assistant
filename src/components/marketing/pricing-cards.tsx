@@ -60,7 +60,7 @@ export function PricingCards() {
                 ))}
               </ul>
               <Link
-                href={"/register?plan=" + plan.id}
+                href={"/aanvragen?plan=" + plan.id}
                 className={
                   "mkt-btn " +
                   (plan.recommended ? "mkt-btn-primary" : "mkt-btn-secondary")

@@ -26,8 +26,8 @@ export function Hero() {
         </Reveal>
         <Reveal delay={180}>
           <div className="mkt-hero-actions">
-            <Link href="/register" className="mkt-btn mkt-hero-cta">
-              Get started
+            <Link href="/demo" className="mkt-btn mkt-hero-cta">
+              Demo aanvragen
             </Link>
           </div>
           <p className="mkt-hero-confidence">

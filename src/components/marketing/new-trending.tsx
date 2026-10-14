@@ -8,20 +8,20 @@ const cards = [
     title: "Mavix Agent",
     description:
       "Vraag Mavix om content te maken, te verbeteren of je marketing te beheren — in één gesprek.",
-    href: "/register",
+    href: "/demo",
   },
   {
     badge: "Populair",
     title: "Review AI",
     description:
       "Zet binnenkomende Google-reviews om in persoonlijke reacties, zonder je dag door te brengen in Google Business Profile.",
-    href: "/register",
+    href: "/demo",
   },
   {
     badge: "Binnenkort",
     title: "Instagram AI",
     description: "Maak en plan content die past bij jouw merk.",
-    href: "/register",
+    href: "/demo",
   },
 ];
 

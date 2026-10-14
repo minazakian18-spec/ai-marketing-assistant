@@ -87,11 +87,11 @@ export function MarketingNav() {
                 Inloggen
               </Link>
               <Link
-                href="/register"
+                href="/demo"
                 className="mkt-btn mkt-btn-primary"
                 onClick={() => setOpen(false)}
               >
-                Get started
+                Demo aanvragen
               </Link>
             </div>
           </nav>

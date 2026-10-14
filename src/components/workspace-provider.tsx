@@ -201,12 +201,18 @@ export function WorkspaceProvider({
       {access ? (
         <div className="ws-boot ws-access" role="status">
           <MaviAvatar size={56} />
-          <strong>{access === "suspended" ? "Toegang gepauzeerd" : "Welkom bij de besloten beta"}</strong>
-          <p>
-            {access === "suspended"
-              ? "De toegang van deze werkruimte is gepauzeerd. Neem contact op met Mavix als je denkt dat dit niet klopt."
-              : "Je account is aangemaakt. Mavix is nog in besloten beta: zodra je toegang is goedgekeurd, kun je meteen aan de slag."}
-          </p>
+          <strong>{access === "suspended" ? "Toegang gepauzeerd" : "Bedankt voor uw aanvraag!"}</strong>
+          {access === "suspended" ? (
+            <p>De toegang van deze werkruimte is gepauzeerd. Neem contact op met Mavix als u denkt dat dit niet klopt.</p>
+          ) : (
+            <>
+              <p>
+                Wij hebben uw aanvraag voor Mavix ontvangen. Uw account wordt momenteel beoordeeld. Zodra de controle is afgerond, ontvangt u van ons
+                bericht per e-mail.
+              </p>
+              <p>U hoeft voorlopig niets te doen. Er is nog niets afgeschreven: betalen gebeurt pas na goedkeuring.</p>
+            </>
+          )}
           <button type="button" className="button secondary" onClick={() => void authRequest("logout").catch(() => window.location.reload())}>
             Uitloggen
           </button>

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { PageHeading, EmptyState, Badge } from "@/components/ui";
+import { ApplicationsAdmin } from "@/components/admin/applications-admin";
 
 // Private beta administration for Mavix staff (public.platform_admins). The
 // server refuses everyone else; this page only shows what the API returns.
@@ -39,12 +40,13 @@ export default function AdminPage() {
   const pending = rows?.filter((r) => r.status === "pending").length || 0;
   return (
     <div className="admin-page">
-      <PageHeading eyebrow="Mavix-beheer" title="Besloten beta" description="Keur nieuwe werkruimtes goed, pauzeer toegang en stel per werkruimte een AI-limiet in." />
+      <PageHeading eyebrow="Mavix-beheer" title="Klanten en toegang" description="Beoordeel demo-aanvragen en accountaanvragen, keur werkruimtes goed, pauzeer toegang en stel per werkruimte een AI-limiet in." />
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
+      {!error && <ApplicationsAdmin />}
       {rows === null ? (
         <div className="admin-skeleton" aria-busy="true" aria-label="Laden" />
       ) : !rows.length ? (

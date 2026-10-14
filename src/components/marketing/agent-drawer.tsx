@@ -41,7 +41,7 @@ function reply(question: string): Message {
     return {
       role: "agent",
       text: "Maak een account aan, vul je merkgegevens in de Brand Hub in en koppel je kanalen. Daarna kan Mavix direct content voor je voorbereiden.",
-      link: { href: "/register", label: "Get started" },
+      link: { href: "/demo", label: "Demo aanvragen" },
     };
   if (/mail|nieuwsbrief|campagne/.test(q))
     return {
