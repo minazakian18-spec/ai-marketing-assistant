@@ -11,6 +11,7 @@ import type { Role } from "../../security";
 import { campaignSummary } from "../../campaigns";
 import { unreadByChannel } from "../inbox";
 import { listSites } from "../seo";
+import { insights } from "../insights";
 import { campaignPayload, proposeAction, WRITE_ROLES, type CampaignPayload } from "./actions";
 import type { Workspace } from "../../types";
 
@@ -337,6 +338,18 @@ const seo: AgentTool<Record<string, never>> = {
   },
 };
 
+const insightTool: AgentTool<Record<string, never>> = {
+  name: "get_insights",
+  description: "Read measured marketing results per source (Mavix activity, Google Search Console, Google reviews, e-mail sends) with the comparison period, and which sources have no data and why. Use for questions about results, growth or what is working.",
+  parameters: noArgs,
+  args: z.object({}).strict(),
+  roles: ALL,
+  async run(ctx) {
+    const { blocks } = await insights(ctx.workspaceId);
+    return { sources: blocks.map((b) => ({ source: b.source, title: b.title, available: b.available, reason: b.reason, period: b.period, metrics: b.metrics })) };
+  },
+};
+
 const s = { type: "string" };
 const nullable = (props: Record<string, unknown>) => ({ anyOf: [{ type: "object", properties: props, required: Object.keys(props), additionalProperties: false }, { type: "null" }] });
 const prepareCampaign: AgentTool<CampaignPayload> = {
@@ -367,7 +380,7 @@ const prepareCampaign: AgentTool<CampaignPayload> = {
   },
 };
 
-export const AGENT_TOOLS: AgentTool[] = [brandContext, integrations, schedule, content, media, reviews, campaigns, inbox, seo, prepareCampaign] as AgentTool[];
+export const AGENT_TOOLS: AgentTool[] = [brandContext, integrations, schedule, content, media, reviews, campaigns, inbox, seo, insightTool, prepareCampaign] as AgentTool[];
 
 /** The tools this caller may use right now (role and connected integrations). */
 export async function toolsFor(ctx: AgentCtx, load: Loader): Promise<AgentTool[]> {

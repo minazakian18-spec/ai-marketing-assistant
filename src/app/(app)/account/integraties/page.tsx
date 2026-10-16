@@ -1,4 +1,5 @@
 "use client";
+import { IntegrationHealth } from "@/components/account/integration-health";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { PageHeading, IconButton } from "@/components/ui";
@@ -260,6 +261,7 @@ export default function IntegrationsPage() {
           {error}
         </p>
       )}
+      <IntegrationHealth />
 
       <div className="int-tabs" role="tablist" aria-label="Onderdeel">
         <button type="button" role="tab" aria-selected={group === "all"} onClick={() => setGroup("all")}>

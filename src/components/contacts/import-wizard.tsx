@@ -13,6 +13,7 @@ import {
 } from "@/lib/contact-import";
 import type { Contact } from "@/lib/types";
 import { normalizeOrigin, sourceLabel } from "@/lib/contact-sources";
+import { mergeInto } from "@/lib/contact-segments";
 
 export function ImportWizard({
   open,
@@ -31,19 +32,21 @@ export function ImportWizard({
   sources: string[];
   defaultOrigin?: string;
   onClose: () => void;
-  onImport: (contacts: Contact[]) => void;
+  onImport: (contacts: Contact[], updated: Contact[]) => void;
 }) {
   const [step, setStep] = useState<"map" | "preview">("map");
   const [mapping, setMapping] = useState<Record<string, MavixField | "">>({});
   const [mappingError, setMappingError] = useState("");
   const [consented, setConsented] = useState(false);
   const [origin, setOrigin] = useState("");
+  const [merge, setMerge] = useState(false);
   useEffect(() => {
     if (open && sheet) {
       setMapping(guessMapping(sheet.headers));
       setStep("map");
       setMappingError("");
       setConsented(false);
+      setMerge(false);
       setOrigin(defaultOrigin ? sourceLabel(defaultOrigin) : "");
     }
   }, [open, sheet, defaultOrigin]);
@@ -53,6 +56,14 @@ export function ImportWizard({
   const valid = preview.filter((r) => r.status === "valid").length;
   const invalid = preview.filter((r) => r.status === "invalid-email").length;
   const duplicate = preview.filter((r) => r.status === "duplicate").length;
+  // Duplicates of existing contacts can fill that contact's empty fields (name,
+  // phone, company, group). Consent, status and source never change.
+  const byEmail = new Map(existingContacts.map((c) => [c.email.toLowerCase(), c]));
+  const merges = preview
+    .filter((r) => r.status === "duplicate" && byEmail.has((r.data.email || "").trim().toLowerCase()))
+    .map((r) => mergeInto(byEmail.get((r.data.email || "").trim().toLowerCase())!, r.data))
+    .filter((m) => m.changed.length)
+    .filter((m, i, all) => all.findIndex((x) => x.contact.id === m.contact.id) === i);
   const hasEmailMapped = Object.values(mapping).includes("email");
   return (
     <ConfirmDialog
@@ -75,7 +86,10 @@ export function ImportWizard({
           setStep("preview");
         } else {
           const chosen = normalizeOrigin(origin);
-          onImport(toImportedContacts(preview, consented).map((c) => (chosen ? { ...c, origin: chosen } : c)));
+          onImport(
+            toImportedContacts(preview, consented).map((c) => (chosen ? { ...c, origin: chosen } : c)),
+            merge ? merges.map((m) => m.contact) : [],
+          );
           onClose();
         }
       }}
@@ -138,8 +152,18 @@ export function ImportWizard({
           </div>
           <p className="field-note">
             Ongeldige e-mailadressen en contacten die al bestaan worden niet
-            geïmporteerd.
+            als nieuw contact geïmporteerd.
           </p>
+          {merges.length > 0 && (
+            <label className="contacts-consent-check">
+              <input type="checkbox" checked={merge} onChange={(e) => setMerge(e.target.checked)} />
+              <span>
+                Vul lege gegevens aan bij {merges.length} bestaande {merges.length === 1 ? "contact" : "contacten"} (bijvoorbeeld{" "}
+                {merges[0].contact.email}: {merges[0].changed.map((k) => mavixFieldLabel[k as MavixField] || k).join(", ").toLowerCase()}). Ingevulde gegevens en
+                toestemming blijven zoals ze zijn.
+              </span>
+            </label>
+          )}
           <label>
             Bron van deze contacten
             <input

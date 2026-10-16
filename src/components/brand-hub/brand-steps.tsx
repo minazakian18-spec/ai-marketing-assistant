@@ -34,6 +34,7 @@ import {
 } from "@/lib/brand-strategy";
 import { prepareImage } from "@/lib/image-prep";
 import { BrandPreview, type PreviewText } from "./brand-preview";
+import { WebsiteImport } from "./website-import";
 
 // The four Brand Hub steps. Every field writes straight into the draft
 // profile; saving happens in brand-hub.tsx.
@@ -279,6 +280,7 @@ export function StepIdentity({
           placeholder="https://jouwbedrijf.nl"
         />
       </Field>
+      <WebsiteImport profile={profile} onApply={(patch) => setProfile(patch)} />
       <Field
         label="Belangrijkste producten of diensten"
         optional

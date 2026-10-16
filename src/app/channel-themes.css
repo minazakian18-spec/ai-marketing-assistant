@@ -209,3 +209,21 @@
 :is(.instagram-workspace, .rv-workspace, .ads) .ig-phone-avatar {
   box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--mod-line);
 }
+
+/* Google Ads: readiness and the planned overview (no numbers until connected). */
+.ads-status { display: flex; gap: 14px; align-items: flex-start; }
+.app-shell .main-shell .ads-status h2, .app-shell .main-shell .ads-section h2 { margin: 0 0 6px; font-size: 16px; color: var(--text-heading); }
+.ads-status p { margin: 0; color: var(--text-body); }
+.ads-section { display: grid; gap: 10px; margin-top: 14px; }
+.ads-check, .ads-plan { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ads-check li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #f8f7fb; }
+.ads-check li > svg { flex: none; margin-top: 2px; color: var(--ds-muted); }
+.ads-check li.is-done > svg { color: #067647; }
+.ads-check li > div, .ads-plan li { display: grid; gap: 2px; min-width: 0; flex: 1; font-size: 13.5px; }
+.ads-check strong, .ads-plan strong { color: var(--text-heading); }
+.ads-check span, .ads-plan span { color: var(--ds-muted); }
+.ads-note { margin: -4px 0 0; font-size: 12.5px; color: var(--ds-muted); }
+.ads-future { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.ads-future div { display: grid; gap: 4px; padding: 12px; border: 1px dashed var(--ds-border-strong, #d8d3e6); border-radius: 10px; }
+.ads-future span { font-size: 12.5px; color: var(--ds-muted); }
+.ads-future em { font-style: normal; font-weight: 600; color: #a6a1b5; }

@@ -95,6 +95,10 @@ export function memoryDb(tables, { uuid = false } = {}) {
         predicates.push((row) => row[key] <= value);
         return q;
       },
+      not(key, op, value) {
+        predicates.push((row) => (op === "is" ? row[key] !== value && !(value === null && row[key] === undefined) : row[key] !== value));
+        return q;
+      },
       is(key, value) {
         predicates.push((row) => row[key] === value);
         return q;

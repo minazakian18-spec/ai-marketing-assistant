@@ -7,6 +7,7 @@ import type { MarketingCopy } from "./studio";
 import type { Campaign, ContentVersion } from "./campaigns";
 import type { AudienceSegment, Product, BrandVoice } from "./brand-model";
 import type { BrandStrategy } from "./brand-strategy";
+import type { Goal } from "./insights";
 export type Profile = {
   name: string;
   industry: string;
@@ -133,4 +134,6 @@ export type Workspace = {
   copies?: MarketingCopy[];
   // Multi-channel campaigns; their items stay in posts / email / copies (src/lib/campaigns.ts).
   campaigns?: Campaign[];
+  /** Insights goals (src/lib/insights.ts). */
+  goals?: Goal[];
 };

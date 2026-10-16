@@ -78,6 +78,7 @@ export default function LibraryPage() {
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [selected, setSelected] = useState<string[]>([]);
   const [uploading, setUploading] = useState("");
+  const [failedUploads, setFailedUploads] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [viewer, setViewer] = useState<LibraryFile | null>(null);
   const [rename, setRename] = useState<{ file: LibraryFile; name: string } | null>(null);
@@ -147,26 +148,45 @@ export default function LibraryPage() {
   async function upload(list: FileList | File[] | null) {
     if (!list || !canEdit) return;
     const all = Array.from(list);
-    const ok = all.filter((f) => LIBRARY_TYPES[f.type] && f.size <= LIBRARY_MAX_BYTES);
-    const skipped = all.length - ok.length;
-    if (!ok.length) return setMessage("Deze bestanden kunnen niet worden geüpload (type niet ondersteund of groter dan 50 MB).");
-    try {
-      for (let i = 0; i < ok.length; i += 5) {
-        setUploading(`Uploaden… ${Math.min(i + 5, ok.length)} van ${ok.length}`);
-        const form = new FormData();
-        ok.slice(i, i + 5).forEach((f) => form.append("files", f));
-        if (section.type === "album") form.append("albumId", section.id);
-        if (section.type === "kind" && (section.kind === "logo" || section.kind === "ai")) form.append("kind", section.kind);
+    const supported = all.filter((f) => LIBRARY_TYPES[f.type] && f.size <= LIBRARY_MAX_BYTES);
+    // The same file (name and size) is not stored twice.
+    const ok = supported.filter((f) => !files.some((x) => x.name === f.name && x.size === f.size));
+    const duplicates = supported.length - ok.length;
+    const skipped = all.length - supported.length;
+    if (!ok.length)
+      return setMessage(duplicates ? "Deze bestanden staan al in je bibliotheek." : "Deze bestanden kunnen niet worden geüpload (type niet ondersteund of groter dan 50 MB).");
+    const failed: File[] = [];
+    let lastError = "";
+    for (let i = 0; i < ok.length; i += 5) {
+      const batch = ok.slice(i, i + 5);
+      setUploading(`Uploaden… ${Math.min(i + 5, ok.length)} van ${ok.length}`);
+      const form = new FormData();
+      batch.forEach((f) => form.append("files", f));
+      if (section.type === "album") form.append("albumId", section.id);
+      if (section.type === "kind" && (section.kind === "logo" || section.kind === "ai")) form.append("kind", section.kind);
+      try {
         await api("/api/library/files", { method: "POST", body: form });
+      } catch (e) {
+        // Keep going with the next batch; failed files can be retried.
+        failed.push(...batch);
+        lastError = e instanceof Error ? e.message : "Uploaden is niet gelukt.";
       }
-      setMessage(ok.length + (ok.length === 1 ? " bestand geüpload." : " bestanden geüpload.") + (skipped ? ` ${skipped} overgeslagen.` : ""));
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Uploaden is niet gelukt.");
-    } finally {
-      setUploading("");
-      if (fileInput.current) fileInput.current.value = "";
-      await load();
     }
+    setUploading("");
+    setFailedUploads(failed);
+    if (fileInput.current) fileInput.current.value = "";
+    const done = ok.length - failed.length;
+    setMessage(
+      [
+        done ? done + (done === 1 ? " bestand geüpload." : " bestanden geüpload.") : "",
+        failed.length ? `${failed.length} niet gelukt: ${lastError}` : "",
+        duplicates ? `${duplicates} stond${duplicates === 1 ? "" : "en"} er al.` : "",
+        skipped ? `${skipped} overgeslagen (type of grootte).` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    );
+    await load();
   }
   async function run(work: () => Promise<unknown>, done: string) {
     try {
@@ -248,6 +268,11 @@ export default function LibraryPage() {
                 <Upload size={16} />
                 {uploading || "Upload bestanden"}
               </button>
+              {failedUploads.length > 0 && !uploading && (
+                <button className="button secondary" onClick={() => void upload(failedUploads)}>
+                  Opnieuw proberen ({failedUploads.length})
+                </button>
+              )}
             </>
           )
         }

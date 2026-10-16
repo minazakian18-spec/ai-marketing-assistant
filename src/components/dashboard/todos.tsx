@@ -25,7 +25,12 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
 // A small task center: what needs you first, then the next onboarding steps.
 export function DashboardTodos({ todos }: { todos: Todo[] }) {
   const [showDone, setShowDone] = useState(false);
-  const open = todos.filter((t) => !t.done);
+  const [showAll, setShowAll] = useState(false);
+  const allOpen = todos.filter((t) => !t.done);
+  // The three most important first; urgent fixes are never hidden.
+  const visible = Math.max(3, allOpen.filter((t) => t.urgent).length);
+  const open = showAll ? allOpen : allOpen.slice(0, visible);
+  const hidden = allOpen.length - open.length;
   const done = todos.filter((t) => t.done);
   const { done: doneSteps, total } = todoProgress(todos);
 
@@ -33,7 +38,7 @@ export function DashboardTodos({ todos }: { todos: Todo[] }) {
     <Card className="dash-card todo-card">
       <SectionHeader
         title="Jouw to-do's"
-        description={open.length ? "Je volgende stappen, op volgorde van belang." : "Alles staat klaar."}
+        description={allOpen.length ? "De drie belangrijkste eerst." : "Alles staat klaar."}
         icon={<ListChecks size={16} />}
         action={<ProgressRing done={doneSteps} total={total} />}
       />
@@ -65,7 +70,7 @@ export function DashboardTodos({ todos }: { todos: Todo[] }) {
             </li>
           ))}
         </ol>
-      ) : (
+      ) : allOpen.length ? null : (
         <div className="todo-all-done">
           <span className="todo-all-done-icon" aria-hidden="true">
             <PartyPopper size={20} />
@@ -75,6 +80,12 @@ export function DashboardTodos({ todos }: { todos: Todo[] }) {
             <p>Mavi laat het je hier weten zodra er iets nieuws op je wacht.</p>
           </div>
         </div>
+      )}
+      {(hidden > 0 || showAll) && allOpen.length > 3 && (
+        <button type="button" className="todo-done-toggle" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
+          {showAll ? "Alleen de belangrijkste tonen" : `Nog ${hidden} ${hidden === 1 ? "stap" : "stappen"}`}
+          <ChevronDown size={14} aria-hidden="true" />
+        </button>
       )}
       {done.length > 0 && (
         <div className="todo-done">

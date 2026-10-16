@@ -133,7 +133,7 @@ test("tools are declared strict; the only write tool proposes drafts and the ins
     env.script(answer("Hier is een idee."));
     await env.send("Geef me een campagne-idee");
     const tools = env.calls[0].tools;
-    assert.deepEqual(tools.map((x) => x.name).sort(), ["get_brand_context", "get_campaigns", "get_integrations", "get_schedule", "get_seo_summary", "list_content", "prepare_campaign_drafts", "search_media"]);
+    assert.deepEqual(tools.map((x) => x.name).sort(), ["get_brand_context", "get_campaigns", "get_insights", "get_integrations", "get_schedule", "get_seo_summary", "list_content", "prepare_campaign_drafts", "search_media"]);
     assert.ok(tools.every((x) => x.type === "function" && x.strict === true && x.parameters.additionalProperties === false));
     for (const x of tools) assert.deepEqual([...x.parameters.required].sort(), Object.keys(x.parameters.properties).sort(), x.name + ": strict needs all properties required");
     assert.ok(!tools.some((x) => /schedule_post|publish|send|delete|update/.test(x.name)), "no publish, send, change or delete tools");

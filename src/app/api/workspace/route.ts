@@ -7,6 +7,7 @@ import {brandProfileSchema,brandAssetsValid} from '@/lib/server/brand-validation
 import {z} from 'zod';
 import {copyValid} from '@/lib/studio';
 import {campaignValid,campaignLinksValid} from '@/lib/campaigns';
+import {goalsValid} from '@/lib/insights';
 // Newsletter signups are merged into the stored contacts when the workspace is
 // loaded (syncNewsletterContacts); saves keep unsubscribes and suppressions in
 // step with the Contacts module.
@@ -21,6 +22,8 @@ export async function PUT(request:Request){try{sameOrigin(request);const {db,wor
  const profile=brandProfileSchema.parse(data.profile);
  // Content Studio marketing copy: own records in the same workspace blob.
  if(data.copies!==undefined&&(!Array.isArray(data.copies)||data.copies.length>1000||!data.copies.every(copyValid)))throw new HttpError(400,'Ongeldige marketingteksten.');
+ // Insights goals: at most one per kind, within sane ranges.
+ if(!goalsValid(data.goals))throw new HttpError(400,'Ongeldige doelen.');
  // Content Studio campaigns: own small records; items only link to them (campaignId).
  if(data.campaigns!==undefined&&(!Array.isArray(data.campaigns)||data.campaigns.length>500||!data.campaigns.every(campaignValid)))throw new HttpError(400,'Ongeldige campagnes.');
  if(!campaignLinksValid(data as unknown as Parameters<typeof campaignLinksValid>[0]))throw new HttpError(400,'Een concept verwijst naar een campagne die niet bestaat.');

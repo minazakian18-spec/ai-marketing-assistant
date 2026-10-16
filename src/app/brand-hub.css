@@ -1020,3 +1020,13 @@
   border-radius: inherit;
   background: var(--app-accent);
 }
+
+/* Website import: facts from the homepage, confirmed one by one. */
+.bh-import { display: grid; gap: 8px; justify-items: start; }
+.bh-import-list { display: grid; gap: 8px; width: 100%; margin: 0; padding: 12px 14px; border: 1px solid var(--ds-border, #e7e4ef); border-radius: 12px; background: #fbfaff; }
+.bh-import-list legend { padding: 0 4px; font-weight: 600; color: var(--text-heading); }
+.bh-import-item { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.bh-import-item > span { display: grid; gap: 2px; min-width: 0; }
+.bh-import-item > span > span { overflow-wrap: anywhere; color: var(--text-body); }
+.bh-import-item small { color: var(--ds-muted); }
+.bh-import-actions { display: flex; flex-wrap: wrap; gap: 8px; }

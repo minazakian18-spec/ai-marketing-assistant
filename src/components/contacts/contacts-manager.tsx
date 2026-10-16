@@ -26,6 +26,7 @@ import { NewsletterForms } from "./newsletter-forms";
 import { ConsentDialog } from "./consent-dialog";
 import { isNewsletterContact, NEWSLETTER_GROUP } from "@/lib/newsletter";
 import { contactName, distinctGroups, segmentForGroup } from "@/lib/contact-data";
+import { CONSENT_LABEL, SMART_SEGMENTS, consentOf } from "@/lib/contact-segments";
 import { parseContactFile, type ParsedSheet } from "@/lib/contact-import";
 import type { Contact } from "@/lib/types";
 
@@ -174,6 +175,8 @@ export function ContactsManager() {
         if (days > 30) return false;
       } else if (filter === NEWSLETTER_FILTER) {
         if (!isNewsletterContact(c)) return false;
+      } else if (filter.startsWith("smart:")) {
+        if (!SMART_SEGMENTS.find((s) => s.id === filter)?.test(c)) return false;
       } else if (filter !== "all" && c.group !== filter) return false;
       if (!term) return true;
       return (
@@ -218,10 +221,11 @@ export function ContactsManager() {
       if (fileInput.current) fileInput.current.value = "";
     }
   }
-  function handleImport(imported: Contact[]) {
+  function handleImport(imported: Contact[], updated: Contact[] = []) {
+    const byId = new Map(updated.map((c) => [c.id, c]));
     persistContacts(
-      [...imported, ...contacts],
-      imported.length + " contacten geïmporteerd.",
+      [...imported, ...contacts.map((c) => byId.get(c.id) || c)],
+      `${imported.length} ${imported.length === 1 ? "contact" : "contacten"} geïmporteerd` + (updated.length ? `, ${updated.length} bestaande aangevuld.` : "."),
     );
     setImportSheet(null);
   }
@@ -431,6 +435,14 @@ export function ContactsManager() {
                   Nieuwsbriefabonnees ({newsletterCount})
                 </button>
               )}
+              {SMART_SEGMENTS.map((s) => {
+                const n = contacts.filter(s.test).length;
+                return n ? (
+                  <button key={s.id} type="button" className="lib-filter-pill is-smart" aria-pressed={filter === s.id} onClick={() => setFilter(s.id)}>
+                    {s.label} ({n})
+                  </button>
+                ) : null;
+              })}
               {groups.map((g) => (
                 <button
                   key={g}
@@ -554,7 +566,8 @@ export function ContactsManager() {
                       )}
                     </td>
                     <td className="contacts-status-cell">
-                      <span className={"contacts-status " + STATUS_CLASS[c.status]}>{c.status}</span>
+                      <span className={"contacts-status " + STATUS_CLASS[c.status]} title={CONSENT_LABEL[consentOf(c)]}>{c.status}</span>
+                      {consentOf(c) === "stated" && <small>niet aantoonbaar · geen campagnes</small>}
                       {c.newsletter && (
                         <small>
                           via formulier

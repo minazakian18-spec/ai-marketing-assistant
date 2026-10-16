@@ -1348,3 +1348,19 @@ details.int-section summary {
 .int-list > li:hover {
   background: #fcfbfe;
 }
+
+/* Integration health overview. */
+.ih { display: grid; gap: 8px; margin: 0 0 20px; padding: 16px 18px; border: 1px solid var(--ds-border, #e7e4ef); border-radius: 14px; background: #fff; }
+.app-shell .main-shell .ih h2 { margin: 0; font-size: 16px; color: var(--text-heading); }
+.ih-sub { margin: 0; font-size: 13.5px; color: var(--ds-muted); }
+.ih-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ih-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #f8f7fb; }
+.ih-item > svg { flex: none; margin-top: 2px; color: var(--ds-muted); }
+.ih-item.is-ready > svg { color: #067647; }
+.ih-item.is-attention { background: #fff7e8; }
+.ih-item.is-attention > svg { color: #b54708; }
+.ih-item > div { display: grid; gap: 2px; min-width: 0; flex: 1; font-size: 13.5px; }
+.ih-item strong { color: var(--text-heading); }
+.ih-item small { color: var(--ds-muted); }
+.ih-item .button { flex: none; }
+@media (max-width: 560px) { .ih-item { flex-wrap: wrap; } .ih-item .button { margin-left: 26px; } }
