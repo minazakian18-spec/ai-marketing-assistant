@@ -314,7 +314,7 @@ export default function IntegrationsPage() {
                   ) : (
                     <button
                       type="button"
-                      className="button primary"
+                      className="button secondary"
                       disabled={demo || busy}
                       onClick={() => (item.provider === "whatsapp" ? open(item) : void call(item.provider!, "connect"))}
                     >

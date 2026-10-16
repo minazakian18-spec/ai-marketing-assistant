@@ -366,7 +366,7 @@ export function GoogleIntegrationCard({
         ) : view.kind === "reconnect" ? (
           connectButton("Opnieuw koppelen")
         ) : (
-          connectButton("Koppelen")
+          connectButton("Koppelen", false)
         )}
       </div>
 

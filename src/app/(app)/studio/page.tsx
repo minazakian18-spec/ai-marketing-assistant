@@ -161,7 +161,7 @@ export default function StudioPage() {
             <div className="st2-empty">
               <Sparkles size={22} aria-hidden="true" />
               <p>Je hebt nog geen content gemaakt. Begin met een idee of kies hierboven een kanaal.</p>
-              <Link href="/studio/nieuw" className="button primary">
+              <Link href="/studio/nieuw" className="button secondary">
                 Nieuwe content maken
               </Link>
             </div>

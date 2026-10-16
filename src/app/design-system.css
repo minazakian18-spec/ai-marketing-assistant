@@ -634,3 +634,82 @@ button:focus-visible > .cs-chip, .cs-chip:focus-visible { outline: none; box-sha
 .admin-app-detail h3 { margin: 6px 0; font-size: 13px; }
 .admin-history { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--ds-text); }
 .admin-history time { color: var(--ds-muted); }
+
+/* =================== Design system refinements (phase 2) ===================
+   Shared rules that fix inconsistencies found in the screen audit, instead of
+   per-page patches. Tokens: typography.css (sizes, weights), this file (ds-*). */
+
+/* Buttons never shrink below their label (text was clipped by 3-4 px at
+   768 px); their rows wrap instead. */
+.app-shell .button {
+  flex-shrink: 0;
+}
+.bh-actions,
+.contacts-header-actions {
+  flex-wrap: wrap;
+}
+
+/* Smallest readable text: badges, chips and status labels use the micro
+   token (12 px) instead of 10-11 px. */
+.app-shell :is(.badge, .rv-platform-badge, .rv-auto-tag, .rv-card-date, .contacts-group-chip, .contacts-status, .cal-state, .cal-foot, .st-group-label) {
+  font-size: var(--fs-micro);
+}
+
+/* Grid and flex children with wide tables must be allowed to shrink, so the
+   table scrolls inside its card instead of pushing the page wider. */
+.contacts-layout > *,
+.contacts-main,
+.invoice-scroll {
+  min-width: 0;
+}
+
+/* Brand Hub steps on phones: only the current step shows its label (the
+   others stay available to screen readers). */
+@media (max-width: 520px) {
+  .bh-step:not(.is-current) .bh-step-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .bh-step.is-current .bh-step-label {
+    white-space: nowrap;
+  }
+  .bh-step {
+    overflow: visible;
+  }
+}
+
+/* Calm reveal for content that opens: accordions and tab panels. */
+@keyframes ds-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.app-shell details[open] > :not(summary),
+.seo-panel,
+.seo-rec-body {
+  animation: ds-reveal 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.app-shell details > summary {
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell details[open] > :not(summary),
+  .seo-panel,
+  .seo-rec-body {
+    animation: none;
+  }
+}
+/* The contacts toolbar may shrink so its buttons wrap to a second line. */
+.contacts-header-actions {
+  flex-shrink: 1;
+  min-width: 0;
+}
