@@ -123,12 +123,43 @@ export function matchesFilter(r: GoogleReview, f: ReviewFilter) {
   return true;
 }
 
+/** Unanswered 1–2 star reviews: these need the owner first. */
+export const isUrgent = (r: GoogleReview) => !r.reply && r.rating !== null && r.rating <= 2;
+
 /** Metrics derived only from the reviews that were actually loaded. */
 export function loadedStats(reviews: GoogleReview[], now = Date.now()) {
   const month = now - 30 * 86400000;
   return {
     loaded: reviews.length,
     unanswered: reviews.filter((r) => !r.reply).length,
+    urgent: reviews.filter(isUrgent).length,
     lastThirtyDays: reviews.filter((r) => Date.parse(r.createTime) >= month).length,
   };
+}
+
+/** Waiting reviews, most important first: negative, then neutral, then newest. */
+export function replyQueue(reviews: GoogleReview[]) {
+  const weight = (r: GoogleReview) => (r.rating === null ? 3 : r.rating <= 2 ? 0 : r.rating === 3 ? 1 : 2);
+  return reviews.filter((r) => !r.reply).sort((a, b) => weight(a) - weight(b) || b.createTime.localeCompare(a.createTime));
+}
+
+/**
+ * Count and average rating per calendar month for the last `months` months,
+ * from the loaded reviews only (Google returns newest first). Months older
+ * than the oldest loaded review are left out rather than shown as zero.
+ */
+export function monthlyTrend(reviews: GoogleReview[], months = 6, now = new Date()) {
+  const dated = reviews.filter((r) => r.createTime);
+  if (!dated.length) return [];
+  const oldest = dated.reduce((m, r) => (r.createTime < m ? r.createTime : m), dated[0].createTime).slice(0, 7);
+  const out: { month: string; count: number; average: number | null }[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = d.toISOString().slice(0, 7);
+    if (key < oldest) continue;
+    const inMonth = dated.filter((r) => r.createTime.slice(0, 7) === key);
+    const rated = inMonth.filter((r) => r.rating !== null);
+    out.push({ month: key, count: inMonth.length, average: rated.length ? Math.round((rated.reduce((s, r) => s + (r.rating || 0), 0) / rated.length) * 10) / 10 : null });
+  }
+  return out;
 }

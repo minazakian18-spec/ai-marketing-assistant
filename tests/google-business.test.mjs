@@ -272,5 +272,5 @@ test("pure helpers: safe photos, anonymous reviewers, filters and loaded-only st
   assert.equal(normalizeReview({ reviewId: "../bad" }, "l"), null);
   const page = normalizeReviewsPage({ reviews: [{ reviewId: "a", starRating: "ONE" }, { reviewId: "b", starRating: "THREE", reviewReply: { comment: "ok" } }] }, "l", true);
   assert.deepEqual(["low", "mid", "unanswered", "answered"].map((f) => page.reviews.filter((x) => matchesFilter(x, f)).length), [1, 1, 1, 1]);
-  assert.deepEqual(loadedStats([r], Date.parse("2026-10-07T00:00:00Z")), { loaded: 1, unanswered: 1, lastThirtyDays: 1 });
+  assert.deepEqual(loadedStats([r], Date.parse("2026-10-07T00:00:00Z")), { loaded: 1, unanswered: 1, urgent: r.rating !== null && r.rating <= 2 ? 1 : 0, lastThirtyDays: 1 });
 });

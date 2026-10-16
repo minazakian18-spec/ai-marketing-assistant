@@ -4,6 +4,7 @@ import { adminClient } from "../supabase";
 import { HttpError } from "../access";
 import { addCampaign, buildCampaignRecords, campaignValid } from "../../campaigns";
 import type { Role } from "../../security";
+import { mutateWorkspace } from "../workspace-store";
 
 // Mavix Agent write actions (phase 3).
 //
@@ -116,28 +117,7 @@ async function ownAction(o: { workspaceId: string; userId: string }, id: string)
 
 const view = (a: ActionRow) => ({ id: a.id, status: a.status, summary: a.summary, result: a.result, error: a.error });
 
-/**
- * Applies a change to the workspace document with optimistic locking:
- * read data+version, apply, write only if the version is unchanged; retry on
- * a concurrent save. Browsers then see a newer version and reload.
- */
-export async function mutateWorkspace<T>(workspaceId: string, change: (data: Record<string, unknown>) => { data: Record<string, unknown>; result: T }, attempts = 3): Promise<T> {
-  for (let i = 0; i < attempts; i++) {
-    const { data: row, error } = await db().from("business_profiles").select("data,version").eq("workspace_id", workspaceId).single();
-    if (error || !row) throw new HttpError(503, "De werkruimte kon niet worden geladen.");
-    const { data, result } = change((row.data || {}) as Record<string, unknown>);
-    const { data: updated, error: saveError } = await db()
-      .from("business_profiles")
-      .update({ data, version: (row.version as number) + 1, updated_at: new Date().toISOString() })
-      .eq("workspace_id", workspaceId)
-      .eq("version", row.version)
-      .select("version")
-      .maybeSingle();
-    if (saveError) throw new HttpError(503, "Opslaan is niet gelukt.");
-    if (updated) return result;
-  }
-  throw new HttpError(409, "De werkruimte werd tegelijk gewijzigd. Probeer het opnieuw.");
-}
+export { mutateWorkspace } from "../workspace-store";
 
 /** Carries out (confirm) or drops (cancel) a pending action, at most once. */
 export async function decideAction(o: { workspaceId: string; userId: string; role: Role }, id: string, decision: "confirm" | "cancel") {

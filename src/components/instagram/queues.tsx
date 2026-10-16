@@ -4,6 +4,7 @@ import { Check, X, Pencil, CalendarDays } from "lucide-react";
 import type { Post } from "@/lib/types";
 import { Status } from "@/components/ui";
 import { PostVisual } from "./shared";
+import { PublishButton, PublishStatus, usePublishCapability } from "./publish";
 export function ApprovalQueue({
   posts,
   onChange,
@@ -114,11 +115,12 @@ export function ScheduledContent({
   onEdit: (p: Post) => void;
   onExamples: () => void;
 }) {
+  const capability = usePublishCapability();
   const items = posts
     .filter((p) =>
-      ["scheduled", "blocked", "failed", "published"].includes(p.status),
+      ["approved", "scheduled", "blocked", "failed", "published"].includes(p.status),
     )
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => (a.date || "9").localeCompare(b.date || "9"));
   return (
     <section>
       <div className="ig-section-title">
@@ -144,6 +146,8 @@ export function ScheduledContent({
                 {post.failureReason && (
                   <p className="field-error">{post.failureReason}</p>
                 )}
+                <PublishStatus post={post} />
+                <PublishButton post={post} capability={capability} />
               </div>
               <time dateTime={post.date}>
                 {post.date
@@ -181,8 +185,9 @@ export function ScheduledContent({
         )}
       </div>
       <p className="field-note ig-bottom-note">
-        Geplande content wordt in dit prototype niet echt gepubliceerd. Er is
-        geen verbinding met Instagram.
+        {capability?.ready
+          ? "Publiceren gaat via de officiële Instagram-API en alleen na jouw bevestiging. Automatisch publiceren op het geplande moment zet je aan bij Automatisering."
+          : (capability?.message || "Publicatiestatus laden…") + " Ingeplande posts blijven tot dan een planning in Mavix."}
       </p>
     </section>
   );

@@ -1,4 +1,5 @@
 "use client";
+import { AutomationPanel } from "@/components/automation/automation-panel";
 import { SettingsGroup } from "@/components/channel/workspace-ui";
 import { useState, useRef } from "react";
 import { Save, Play, ShieldCheck, Plane, CalendarClock } from "lucide-react";
@@ -80,6 +81,7 @@ export function AutopilotSettings({
   const policy = effectivePolicy(form, new Date());
   return (
     <div className="ig-autopilot-grid">
+      <AutomationPanel module="social" />
       <form
         ref={ref}
         onInvalidCapture={(e) => {

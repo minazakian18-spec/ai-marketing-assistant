@@ -1,4 +1,5 @@
 "use client";
+import { AutomationPanel } from "@/components/automation/automation-panel";
 import { PenLine, Layers, Sparkles } from "lucide-react";
 import type { ReviewAutoReplySettings, ResponseMode } from "@/lib/review-model";
 import { responseModeName, responseModeDescription } from "@/lib/review-model";
@@ -22,6 +23,7 @@ export function ReviewAutoReply({
 }) {
   return (
     <section>
+      <AutomationPanel module="reviews" />
       <div className="ig-section-title">
         <div>
           <h2>Welke modus gebruik je?</h2>

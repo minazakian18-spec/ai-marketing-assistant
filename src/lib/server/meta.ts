@@ -24,6 +24,12 @@ export const metaScopes={
  // more (instagram_content_publish, pages_read_engagement, business_management).
  instagramFacebook:['instagram_basic','instagram_manage_messages','pages_show_list','pages_manage_metadata'],
 };
+// Publishing (instagram_business_content_publish) is only requested when
+// INSTAGRAM_PUBLISH_SCOPE=1: asking for a permission Meta has not approved for
+// the app would break the whole login for customers. With Facebook Login for
+// Business the configuration in the Meta dashboard decides the permissions
+// (add instagram_content_publish there).
+export const instagramRequestScopes=()=>process.env.INSTAGRAM_PUBLISH_SCOPE==='1'?[...metaScopes.instagram,'instagram_business_content_publish']:metaScopes.instagram;
 // Which Instagram login new connections use.
 export const instagramMode=():'facebook'|'instagram'=>process.env.INSTAGRAM_APP_ID&&!process.env.META_INSTAGRAM_CONFIG_ID?'instagram':'facebook';
 const version=()=>/^v\d+\.\d+$/.test(process.env.META_GRAPH_VERSION||'')?process.env.META_GRAPH_VERSION!:'v25.0';
@@ -59,7 +65,7 @@ export function authorizeUrl(provider:'instagram'|'messenger',state:string){
  // Facebook Login for Business: the configuration decides the permissions and
  // token type, so no scope is sent.
  if(provider==='instagram'&&instagramMode()==='facebook'){const u=new URL('https://www.facebook.com/'+version()+'/dialog/oauth');u.search=new URLSearchParams({client_id:process.env.META_CLIENT_ID!,config_id:process.env.META_INSTAGRAM_CONFIG_ID!,redirect_uri:metaCallback('instagram'),response_type:'code',state}).toString();return u.toString();}
- if(provider==='instagram'){const u=new URL('https://www.instagram.com/oauth/authorize');u.search=new URLSearchParams({client_id:process.env.INSTAGRAM_APP_ID!,redirect_uri:metaCallback('instagram'),response_type:'code',scope:metaScopes.instagram.join(','),state}).toString();return u.toString();}
+ if(provider==='instagram'){const u=new URL('https://www.instagram.com/oauth/authorize');u.search=new URLSearchParams({client_id:process.env.INSTAGRAM_APP_ID!,redirect_uri:metaCallback('instagram'),response_type:'code',scope:instagramRequestScopes().join(','),state}).toString();return u.toString();}
  const u=new URL('https://www.facebook.com/'+version()+'/dialog/oauth');u.search=new URLSearchParams({client_id:process.env.META_CLIENT_ID!,redirect_uri:metaCallback('messenger'),response_type:'code',scope:metaScopes.messenger.join(','),state}).toString();return u.toString();
 }
 

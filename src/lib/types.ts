@@ -61,6 +61,12 @@ export type Post = {
   visualBrief?: string;
   /** Previous texts, newest first. */
   history?: ContentVersion[];
+  /**
+   * Set only by the server after Instagram confirmed the publication
+   * (src/lib/server/instagram-publish.ts). A "published" post without it
+   * comes from the earlier simulation.
+   */
+  instagram?: { mediaId: string; permalink?: string; publishedAt: string };
 };
 export type ContactStatus = "Ingeschreven" | "Niet bevestigd" | "Uitgeschreven";
 export type Contact = {

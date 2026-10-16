@@ -147,7 +147,11 @@ export function memoryDb(tables, { uuid = false } = {}) {
       let selected = rows.filter((row) =>
         predicates.every((predicate) => predicate(row)),
       );
-      if (operation === "insert" || operation === "upsert") {
+      if (operation === "insert" && Array.isArray(values)) {
+        // Bulk insert: one row per element.
+        selected = values.map((v) => ({ id: uuid ? crypto.randomUUID() : "id-" + rows.length, connection_generation: "generation-0", metadata: {}, ...v }));
+        rows.push(...selected);
+      } else if (operation === "insert" || operation === "upsert") {
         const existing =
           operation === "upsert" &&
           rows.find((row) =>

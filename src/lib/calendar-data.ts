@@ -28,6 +28,8 @@ export type CalendarItem = {
   href: string;
   variant: number;
   source: CalendarSource;
+  /** "published" from the earlier simulation, not confirmed by Instagram or the e-mail provider. */
+  simulated?: boolean;
 };
 
 function splitLocal(date: string): { date: string; time: string } {
@@ -53,6 +55,7 @@ function postToItem(p: Post): CalendarItem {
     href: "/social?tab=assist&post=" + encodeURIComponent(p.id),
     variant: p.variant,
     source: { kind: "post", id: p.id },
+    simulated: p.status === "published" && !p.instagram?.mediaId,
   };
 }
 
@@ -73,6 +76,7 @@ function emailToItem(c: EmailCampaign): CalendarItem {
     href: "/email?tab=create&campaign=" + encodeURIComponent(c.id),
     variant: c.variant,
     source: { kind: "email", id: c.id },
+    simulated: c.status === "sent" && !c.delivery,
   };
 }
 
@@ -83,19 +87,20 @@ export function toCalendarItems(data: Workspace): CalendarItem[] {
   ];
 }
 
-export function statusMeta(status: CalendarStatus): {
+export function statusMeta(status: CalendarStatus, simulated = false): {
   label: string;
   className: string;
 } {
   switch (status) {
+    case "published":
+      // Only content Instagram or the e-mail provider confirmed counts as published.
+      return simulated ? { label: "Gepubliceerd (simulatie)", className: "cal-published" } : { label: "Gepubliceerd", className: "cal-published" };
     case "review":
       return { label: "Wacht op jouw goedkeuring", className: "cal-review" };
     case "approved":
       return { label: "Goedgekeurd", className: "cal-approved" };
     case "scheduled":
       return { label: "Ingepland", className: "cal-scheduled" };
-    case "published":
-      return { label: "Gepubliceerd", className: "cal-published" };
     case "rejected":
       return { label: "Afgewezen", className: "cal-rejected" };
     case "blocked":

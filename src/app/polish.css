@@ -1028,6 +1028,31 @@
   font-variant-numeric: tabular-nums;
   color: var(--app-text);
 }
+.rvl-summary dl .is-urgent dd {
+  color: var(--ds-danger, #b42318);
+}
+.rvl-trend {
+  display: flex;
+  flex-basis: 100%;
+  align-items: flex-end;
+  gap: 14px;
+  padding-top: 12px;
+  overflow-x: auto;
+}
+.rvl-trend-col {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 44px;
+  font-size: 11.5px;
+  color: var(--ds-muted);
+}
+.rvl-trend-bar {
+  width: 18px;
+  border-radius: 5px 5px 2px 2px;
+  background: var(--ds-accent, #6d28d9);
+  opacity: 0.75;
+}
 .rvl-scope {
   display: flex;
   flex-basis: 100%;

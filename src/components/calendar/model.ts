@@ -131,7 +131,8 @@ export function mavixEntries(items: CalendarItem[]): Entry[] {
         end: start + 30 * 60000,
         allDay: false,
         color: STATUS_COLOR[i.status],
-        editable: true,
+        // Published or sent content is history: moving it would not change Instagram or the mailbox.
+        editable: i.status !== "published",
         channel: i.channel,
         item: i,
       };

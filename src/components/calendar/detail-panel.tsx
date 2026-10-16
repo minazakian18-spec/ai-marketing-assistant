@@ -64,7 +64,7 @@ export function CalendarDetailPanel({
   }, [open, onClose]);
   if (!present || !shown) return null;
   const Icon = channelIcon[shown.channel];
-  const meta = statusMeta(shown.status);
+  const meta = statusMeta(shown.status, shown.simulated);
   return (
     <>
       <div className="cal-panel-scrim" onClick={onClose} />

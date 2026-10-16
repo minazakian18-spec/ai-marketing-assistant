@@ -14,6 +14,7 @@ import { emailLengths, type EmailLength } from "@/lib/ai/email-instruction";
 import { formalityOptions, type Formality } from "@/lib/brand-model";
 import type { Profile } from "@/lib/types";
 import { EmailStatus } from "./shared";
+import { SendPanel } from "./send-panel";
 import { PlanningNotice } from "@/components/calendar/planning-notice";
 
 // Content Studio for e-mail, same structure as Instagram: controls, editor,
@@ -276,7 +277,7 @@ export function EmailCreate({
     setMessage("");
     setError("");
     if (await persist(next))
-      setMessage(next === "scheduled" ? "Ingepland en zichtbaar in de kalender. Mavix verstuurt nog geen e-mails; dit is je planning." : "Goedgekeurd. Kies een verzendmoment om in te plannen.");
+      setMessage(next === "scheduled" ? "Ingepland en zichtbaar in de kalender. Versturen gebeurt na jouw bevestiging, of automatisch als je dat bij Automatisering hebt toegestaan." : "Goedgekeurd. Stuur een testmail, verstuur hem of kies een verzendmoment.");
   }
 
   const count = recipients(draft?.audience || audience).length;
@@ -318,10 +319,14 @@ export function EmailCreate({
           )}
         </div>
 
-        <p className="cs-publish-note">
-          <Send size={14} aria-hidden="true" />
-          <span>Mavix verstuurt nog geen campagnes. Een ingeplande e-mail staat in je <Link href="/calendar">kalender</Link> als planning; versturen doe je zelf in je e-mailprogramma.</span>
-        </p>
+        {saved ? (
+          <SendPanel campaign={saved} />
+        ) : (
+          <p className="cs-publish-note">
+            <Send size={14} aria-hidden="true" />
+            <span>Sla je e-mail op en keur hem goed. Daarna kun je een testmail naar jezelf sturen en versturen naar ontvangers met toestemming. Ingeplande e-mails staan in je <Link href="/calendar">kalender</Link>.</span>
+          </p>
+        )}
         <div className="cs-grid" data-view={view}>
           <aside className="cs-controls" aria-label="Instellingen">
             <fieldset className="cs-field">

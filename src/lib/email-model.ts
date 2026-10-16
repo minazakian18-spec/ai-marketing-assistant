@@ -39,6 +39,12 @@ export type EmailCampaign = {
   campaignId?: string;
   /** Previous texts, newest first. */
   history?: ContentVersion[];
+  /**
+   * Set only by the server after a real send through the e-mail provider
+   * (src/lib/server/email-campaigns.ts). "sent" without it comes from the
+   * earlier simulation.
+   */
+  delivery?: { runId: string; sentAt: string; recipients: number };
 };
 export const emailModes = [
   {

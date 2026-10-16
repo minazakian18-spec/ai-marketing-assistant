@@ -169,6 +169,24 @@
 }
 .cs-field small,
 .cs-hint { margin: 0; font-size: 12px; color: var(--ds-muted); }
+/* Instagram limits while editing; publish state per post. */
+.cs-checks { margin: 8px 0 0; padding: 8px 12px 8px 28px; border-radius: 8px; background: var(--ds-warning-soft, #fff7e0); color: var(--ds-warning, #6b4e00); font-size: 12.5px; line-height: 1.5; }
+.cs-over { color: var(--ds-danger, #b42318); font-weight: 600; }
+.ig-publish { display: grid; gap: 4px; justify-items: start; margin-top: 8px; }
+.ig-pub { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 12.5px; font-weight: 600; }
+.ig-pub.is-live { color: var(--ds-success, #067647); }
+.ig-pub.is-sim { color: var(--ds-muted); font-weight: 500; }
+.ig-pub a { display: inline-flex; align-items: center; gap: 3px; }
+/* E-mail: pre-flight, test e-mail and real send. */
+.em-send { display: grid; gap: 10px; margin: 0 0 16px; padding: 14px 16px; border: 1px solid var(--ds-border, #e7e4ef); border-radius: 12px; background: #fff; }
+.em-send-head { display: flex; gap: 8px; align-items: flex-start; }
+.em-send-head p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-body); }
+.em-send-head svg { flex: none; margin-top: 2px; color: var(--ds-success, #067647); }
+.em-send-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.em-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin: 0; }
+.em-stats div { padding: 8px 10px; border-radius: 8px; background: var(--ds-surface-muted, #f6f4fa); }
+.em-stats dt { font-size: 12px; color: var(--ds-muted); }
+.em-stats dd { margin: 2px 0 0; font-weight: 700; color: var(--text-heading); }
 .cs-field small a { color: var(--ds-accent); font-weight: 600; }
 .cs-formats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .cs-formats button {

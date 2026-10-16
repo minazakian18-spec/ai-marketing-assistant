@@ -1,4 +1,5 @@
 "use client";
+import { AutomationPanel } from "@/components/automation/automation-panel";
 import { SettingsGroup } from "@/components/channel/workspace-ui";
 import { useRef, useState } from "react";
 import Link from "next/link";
@@ -60,6 +61,7 @@ export function EmailAutopilot({
     update({ vacation: { ...form.vacation, ...part } });
   return (
     <div className="ig-autopilot-grid">
+      <AutomationPanel module="email" />
       <form
         ref={ref}
         onInvalidCapture={(e) => {

@@ -305,6 +305,7 @@ function Workspace() {
                   onExamples={examples}
                   onChange={persist}
                 />
+                <ScheduledContent posts={data.posts} onEdit={(p) => navigate("assist", p)} onExamples={examples} />
               </div>
             ) : (
               <>

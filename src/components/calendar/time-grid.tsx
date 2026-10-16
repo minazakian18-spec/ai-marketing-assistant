@@ -189,7 +189,7 @@ export function TimeGrid({
                         }
                         onSelect(entry);
                       }}
-                      aria-label={`${entry.title}, ${formatTime(entry.start)} tot ${formatTime(entry.end)}${entry.item ? ", " + statusMeta(entry.item.status).label : ""}`}
+                      aria-label={`${entry.title}, ${formatTime(entry.start)} tot ${formatTime(entry.end)}${entry.item ? ", " + statusMeta(entry.item.status, entry.item.simulated).label : ""}`}
                     >
                       <span className="tg-event-title">
                         <EntryIcon entry={entry} />

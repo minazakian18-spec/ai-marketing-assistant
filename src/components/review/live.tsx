@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { BrandIcon } from "@/components/brand-icon";
 import { API_ACCESS_TEXT } from "@/components/account/google-integration-card";
-import { REVIEW_FILTERS, loadedStats, matchesFilter, type GoogleReview, type ReviewFilter, type ReviewsPage } from "@/lib/reviews/google";
+import { REVIEW_FILTERS, loadedStats, matchesFilter, monthlyTrend, replyQueue, type GoogleReview, type ReviewFilter, type ReviewsPage } from "@/lib/reviews/google";
 import { StarRating } from "./shared";
 import { LiveReviewCard } from "./live-card";
 
@@ -81,6 +81,8 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
 
   const reviews = useMemo(() => data?.reviews || [], [data]);
   const stats = useMemo(() => loadedStats(reviews), [reviews]);
+  const trend = useMemo(() => monthlyTrend(reviews), [reviews]);
+  const maxCount = Math.max(1, ...trend.map((m) => m.count));
   const shown = reviews.filter((r) => matchesFilter(r, filter));
   const update = (next: GoogleReview) => setData((d) => (d ? { ...d, reviews: d.reviews.map((r) => (r.id === next.id ? next : r)) } : d));
 
@@ -128,21 +130,40 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
           <dt>Onbeantwoord</dt>
           <dd>{data ? stats.unanswered : "—"}</dd>
         </div>
+        <div className={stats.urgent ? "is-urgent" : undefined}>
+          <dt>Negatief en onbeantwoord</dt>
+          <dd>{data ? stats.urgent : "—"}</dd>
+        </div>
         <div>
           <dt>Nieuw (30 dagen)</dt>
           <dd>{data ? stats.lastThirtyDays : "—"}</dd>
         </div>
       </dl>
+      {trend.length > 1 && (
+        <div className="rvl-trend" aria-label="Reviews per maand">
+          {trend.map((m) => (
+            <div key={m.month} className="rvl-trend-col">
+              <span className="rvl-trend-bar" style={{ height: Math.max(4, (m.count / maxCount) * 48) + "px" }} aria-hidden="true" />
+              <small>{new Date(m.month + "-01T12:00:00Z").toLocaleDateString("nl-NL", { month: "short" })}</small>
+              <span className="sr-only">
+                {m.count} reviews{m.average !== null ? `, gemiddeld ${m.average}` : ""}
+              </span>
+              <small aria-hidden="true">{m.count ? `${m.count} · ${m.average ?? "—"}★` : "0"}</small>
+            </div>
+          ))}
+        </div>
+      )}
       <p className="rvl-scope">
         <BrandIcon brand="google_business" size={13} />
         {status.location?.name}
-        {data ? ` · onbeantwoord en nieuw gebaseerd op de ${stats.loaded} meest recente reviews` : ""}
+        {data ? ` · onbeantwoord, negatief, nieuw en het verloop zijn gebaseerd op de ${stats.loaded} geladen reviews` : ""}
       </p>
     </section>
   );
 
   if (tab === "overview") {
-    const waiting = reviews.filter((r) => !r.reply).slice(0, 3);
+    // Negative reviews first: they need a personal answer soonest.
+    const waiting = replyQueue(reviews).slice(0, 3);
     return (
       <>
         {summary}

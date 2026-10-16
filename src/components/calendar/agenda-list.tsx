@@ -43,7 +43,7 @@ export function AgendaList({
                     <EntryIcon entry={x} />
                     {x.title}
                   </span>
-                  {x.item && <small className="ag-status">{statusMeta(x.item.status).label}</small>}
+                  {x.item && <small className="ag-status">{statusMeta(x.item.status, x.item.simulated).label}</small>}
                 </button>
               </li>
             ))}

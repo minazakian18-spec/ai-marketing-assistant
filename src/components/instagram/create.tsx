@@ -36,6 +36,7 @@ import { instagramGoals, type InstagramGoal } from "@/lib/ai/instagram-instructi
 import { PostVisual } from "./shared";
 import { PlanningNotice } from "@/components/calendar/planning-notice";
 import { LibraryPicker } from "@/components/library/library-picker";
+import { CAPTION_LIMIT, HASHTAG_LIMIT, hashtagCount, instagramCaption, publishProblems, scheduleProblems } from "@/lib/instagram-publish";
 
 // Content Studio for Instagram: controls (left), the editor (centre, the main
 // workspace) and a realistic post preview (right). Generation, rewrites and
@@ -287,9 +288,17 @@ export function CreateStudio({
   async function approve() {
     setMessage("");
     setError("");
+    const when = date ? scheduleProblems(date) : [];
+    if (when.length) return setError(when[0]);
     if (await persist(date ? "scheduled" : "approved"))
-      setMessage(date ? "Goedgekeurd en ingepland in de kalender. Publiceren naar Instagram is nog niet gekoppeld." : "Goedgekeurd. Kies een datum om het in te plannen.");
+      setMessage(date ? "Goedgekeurd en ingepland in de kalender. Publiceren gebeurt alleen na jouw bevestiging, of automatisch als je dat bij Automatisering hebt toegestaan." : "Goedgekeurd. Kies een datum om het in te plannen, of publiceer het via Geplande content.");
   }
+
+  // Instagram's own limits, checked while editing (same rules as the server).
+  const captionTotal = instagramCaption({ caption, hashtags }).length;
+  const tags = hashtagCount(caption + " " + hashtags);
+  const publishable = ["Post", "Carousel"].includes(post?.contentType || type);
+  const checks = [...(publishable ? publishProblems({ caption, hashtags, media: photos, contentType: post?.contentType || type }) : []), ...(date && post?.status !== "published" ? scheduleProblems(date) : [])];
 
   const video = VIDEO.includes(post?.contentType || type);
   const generating = busy === "generate";
@@ -526,7 +535,9 @@ export function CreateStudio({
                 </div>
                 <label className="cs-label" htmlFor="ig-caption">
                   {type === "Content Ideas" ? "Ideeën" : "Caption"}
-                  <small>{caption.length} / 2200</small>
+                  <small className={captionTotal > CAPTION_LIMIT ? "cs-over" : undefined}>
+                    {captionTotal} / {CAPTION_LIMIT} incl. hashtags · {tags} / {HASHTAG_LIMIT} hashtags
+                  </small>
                 </label>
                 <textarea id="ig-caption" className="cs-caption" rows={10} maxLength={4000} value={caption} onChange={(e) => setCaption(e.target.value)} />
                 {alternatives.length > 0 && (
@@ -566,8 +577,15 @@ export function CreateStudio({
                 <label className="cs-label" htmlFor="ig-date">
                   {fromCalendar ? "Publicatiemoment" : "Inplannen (optioneel)"}
                 </label>
-                <input id="ig-date" type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />
+                <input id="ig-date" type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} aria-describedby="ig-checks" />
                 {video && <p className="cs-hint">Dit concept is een video-idee. Mavix maakt nog geen videobestanden.</p>}
+                {type !== "Content Ideas" && checks.length > 0 && (
+                  <ul id="ig-checks" className="cs-checks" aria-label="Controle voor Instagram">
+                    {checks.map((c) => (
+                      <li key={c}>{c}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ) : (
               <div className="cs-empty">
