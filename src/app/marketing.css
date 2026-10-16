@@ -2276,3 +2276,11 @@
   font-size: 15px;
   line-height: 1.6;
 }
+
+/* Homepage: how onboarding works (closed beta). */
+.mkt-onboarding { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+.mkt-onboarding li { display: grid; gap: 6px; align-content: start; padding: 18px; border: 1px solid rgba(91, 33, 182, 0.12); border-radius: 16px; background: #fff; }
+.mkt-onboarding h3 { margin: 4px 0 0; font-size: 16px; color: #2e1065; }
+.mkt-onboarding p { margin: 0; font-size: 14.5px; line-height: 1.55; color: #4a4560; }
+.mkt-onboarding-note { margin: 18px 0 0; text-align: center; font-size: 14.5px; color: #4a4560; }
+.mkt-onboarding-note a { font-weight: 600; }

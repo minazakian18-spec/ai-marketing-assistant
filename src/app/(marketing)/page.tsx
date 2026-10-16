@@ -7,6 +7,8 @@ import { Audiences } from "@/components/marketing/audiences";
 import { PricingNewTrending } from "@/components/marketing/pricing-new-trending";
 import { IntegrationsStrip } from "@/components/marketing/integrations-strip";
 import { FinalCta } from "@/components/marketing/final-cta";
+import { OnboardingSteps } from "@/components/marketing/onboarding-steps";
+import { Faq } from "@/components/marketing/faq";
 import { pageMetadata, structuredData } from "@/lib/site";
 
 export const metadata: Metadata = pageMetadata({
@@ -32,6 +34,8 @@ export default function MarketingHome() {
       <Audiences />
       <PricingNewTrending />
       <IntegrationsStrip />
+      <OnboardingSteps />
+      <Faq />
       <FinalCta />
     </main>
   );

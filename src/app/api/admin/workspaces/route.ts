@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { platformAdmin, failure, limited, sameOrigin, HttpError } from "@/lib/server/access";
 import { adminClient } from "@/lib/server/supabase";
+import { billingState } from "@/lib/billing-state";
 
 // Private beta administration (Mavix staff only, public.platform_admins):
 // list workspaces and approve, pause or set an AI quota. No customer content
@@ -25,9 +26,14 @@ export async function GET() {
       .limit(500);
     if (error) throw new HttpError(503, "Werkruimtes konden niet worden geladen.");
     const ids = (spaces || []).map((s) => s.id as string);
-    const [{ data: owners }, { data: usage }] = await Promise.all([
-      ids.length ? db.from("workspace_members").select("workspace_id,user_id").eq("role", "OWNER").in("workspace_id", ids) : Promise.resolve({ data: [] }),
-      ids.length ? db.from("ai_usage").select("workspace_id,input_tokens,output_tokens").gte("created_at", monthStart()).in("workspace_id", ids).limit(50000) : Promise.resolve({ data: [] }),
+    const none = Promise.resolve({ data: [] as Record<string, unknown>[] });
+    const [{ data: owners }, { data: usage }, { data: subs }, { data: conns }, { data: audit }] = await Promise.all([
+      ids.length ? db.from("workspace_members").select("workspace_id,user_id").eq("role", "OWNER").in("workspace_id", ids) : none,
+      ids.length ? db.from("ai_usage").select("workspace_id,input_tokens,output_tokens").gte("created_at", monthStart()).in("workspace_id", ids).limit(50000) : none,
+      ids.length ? db.from("subscriptions").select("workspace_id,plan,status").in("workspace_id", ids) : none,
+      ids.length ? db.from("integration_connections").select("workspace_id,provider,status").in("workspace_id", ids) : none,
+      // Recent administrative and billing events (event names only, no content).
+      db.from("audit_logs").select("workspace_id,event,created_at").order("created_at", { ascending: false }).limit(40),
     ]);
     const emails = new Map<string, string>();
     for (const o of owners || []) {
@@ -47,7 +53,13 @@ export async function GET() {
           createdAt: s.created_at,
           ownerEmail: emails.get(s.id as string) || null,
           tokensThisMonth: tokens.get(s.id as string) || 0,
+          billing: billingState(((subs || []).find((x) => x.workspace_id === s.id) as Parameters<typeof billingState>[0]) || null),
+          integrations: {
+            connected: (conns || []).filter((c) => c.workspace_id === s.id && c.status === "connected").map((c) => c.provider as string),
+            attention: (conns || []).filter((c) => c.workspace_id === s.id && ["reconnect_required", "permission_missing", "error", "selection_required"].includes(c.status as string)).map((c) => c.provider as string),
+          },
         })),
+        audit: (audit || []).map((a) => ({ workspace: (spaces || []).find((s) => s.id === a.workspace_id)?.name || null, event: a.event, at: a.created_at })),
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );

@@ -6,7 +6,9 @@ import { ApplicationsAdmin } from "@/components/admin/applications-admin";
 
 // Private beta administration for Mavix staff (public.platform_admins). The
 // server refuses everyone else; this page only shows what the API returns.
-type Row = { id: string; name: string; status: "pending" | "approved" | "suspended"; aiLimit: number | null; createdAt: string; ownerEmail: string | null; tokensThisMonth: number };
+type Row = { id: string; name: string; status: "pending" | "approved" | "suspended"; aiLimit: number | null; createdAt: string; ownerEmail: string | null; tokensThisMonth: number; billing?: string; integrations?: { connected: string[]; attention: string[] } };
+type AuditRow = { workspace: string | null; event: string; at: string };
+const BILLING: Record<string, string> = { beta: "Beta (geen betaling)", active: "Betaald, actief", trialing: "Proefperiode", past_due: "Betaling mislukt", incomplete: "Betaling niet afgerond", canceled: "Opgezegd" };
 const LABEL = { pending: "Wacht op goedkeuring", approved: "Toegang", suspended: "Gepauzeerd" } as const;
 const TONE = { pending: "warn", approved: "success", suspended: "neutral" } as const;
 const fmt = new Intl.NumberFormat("nl-NL");
@@ -15,6 +17,7 @@ export default function AdminPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [audit, setAudit] = useState<AuditRow[]>([]);
   const load = useCallback(async () => {
     const r = await fetch("/api/admin/workspaces", { cache: "no-store" });
     const body = await r.json().catch(() => ({}));
@@ -24,6 +27,7 @@ export default function AdminPage() {
       return;
     }
     setRows(body.workspaces);
+    setAudit(body.audit || []);
   }, []);
   useEffect(() => {
     void load();
@@ -71,6 +75,10 @@ export default function AdminPage() {
                   <small>
                     {r.ownerEmail || "Eigenaar onbekend"} · {new Date(r.createdAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })}
                   </small>
+                  <small>
+                    {BILLING[r.billing || "beta"]} · {r.integrations?.connected.length || 0} koppeling(en)
+                    {r.integrations?.attention.length ? ` · aandacht: ${r.integrations.attention.join(", ")}` : ""}
+                  </small>
                 </span>
                 <span role="cell">
                   <Badge tone={TONE[r.status]}>{LABEL[r.status]}</Badge>
@@ -109,6 +117,22 @@ export default function AdminPage() {
               </div>
             ))}
           </div>
+        </section>
+      )}
+      {audit.length > 0 && (
+        <section className="ui-card admin-card">
+          <header className="admin-card-head">
+            <h2>Recente gebeurtenissen</h2>
+          </header>
+          <ul className="admin-audit">
+            {audit.map((a, i) => (
+              <li key={i}>
+                <time dateTime={a.at}>{new Date(a.at).toLocaleString("nl-NL", { dateStyle: "short", timeStyle: "short" })}</time>
+                <span>{a.workspace || "—"}</span>
+                <code>{a.event}</code>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </div>

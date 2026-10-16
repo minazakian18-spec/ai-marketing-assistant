@@ -22,7 +22,11 @@ export const generalFaq: FaqItem[] = [
   },
   {
     q: "Welke integraties ondersteunt Mavix?",
-    a: "Op dit moment Google Business Profile, Instagram en Gmail. We voegen bewust geen koppelingen toe die nog niet goed werken.",
+    a: "Google Bedrijfsprofiel, Gmail, Google Agenda, Google Search Console, Instagram, Facebook Messenger en WhatsApp Business. Sommige koppelingen wachten nog op goedkeuring van Google of Meta; in Mavix zie je per koppeling precies wat al werkt.",
+  },
+  {
+    q: "Hoe start ik met Mavix?",
+    a: "Je vraagt een demo of account aan. We bekijken je aanvraag persoonlijk, laten Mavix zien en zetten daarna je werkruimte voor je klaar. Pas na goedkeuring krijg je toegang; tijdens de besloten beta betaal je niets.",
   },
   {
     q: "Kan ik op elk moment opzeggen?",
