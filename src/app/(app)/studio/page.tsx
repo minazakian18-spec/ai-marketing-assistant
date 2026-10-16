@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { ArrowRight, CheckCircle2, FileText, Film, Instagram, Mail, Plus, Sparkles, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, FileText, Film, Instagram, Mail, Megaphone, Plus, Sparkles, X } from "lucide-react";
+import { campaignSummary } from "@/lib/campaigns";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Mavi } from "@/components/mavi";
 import { brandGaps, CHANNELS, studioCounts, studioItems, type StudioChannel, type StudioStatus } from "@/lib/studio";
@@ -76,9 +77,10 @@ export default function StudioPage() {
           <p>Maak, bewerk en plan je marketingcontent op één plek.</p>
         </div>
         <div className="st2-head-actions">
-          <a href="#mijn-content" className="button secondary">
-            Mijn concepten
-          </a>
+          <Link href="/studio/campagne" className="button secondary">
+            <Megaphone size={16} />
+            Campagne maken
+          </Link>
           <Link href="/studio/nieuw" className="button primary">
             <Plus size={16} />
             Nieuwe content maken
@@ -143,6 +145,43 @@ export default function StudioPage() {
           })}
         </ul>
       </section>
+
+      {!!data.campaigns?.length && (
+        <section className="st2-panel" aria-labelledby="st2-campaigns">
+          <div className="st2-panel-head">
+            <h2 id="st2-campaigns">Campagnes</h2>
+            <Link href="/studio/campagne" className="st2-link">
+              Nieuwe campagne <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          </div>
+          <ul className="st2-items">
+            {data.campaigns.slice(0, 6).map((c) => {
+              const s = campaignSummary(data, c);
+              return (
+                <li key={c.id}>
+                  <Link href={"/studio/campagne?id=" + c.id} className="st2-item">
+                    <span className="st2-thumb">
+                      <Megaphone size={16} aria-hidden="true" />
+                    </span>
+                    <span className="st2-item-main">
+                      <strong>{c.title}</strong>
+                      <span>{c.goal}</span>
+                    </span>
+                    <span className="st2-item-meta">
+                      <span className="st2-status is-draft">
+                        {s.total} {s.total === 1 ? "onderdeel" : "onderdelen"}
+                      </span>
+                      <small>
+                        {s.approved + s.scheduled} van {s.total} goedgekeurd of ingepland
+                      </small>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <div className="st2-grid">
         <section id="mijn-content" className="st2-panel" aria-labelledby="st2-mine">

@@ -120,7 +120,9 @@ export async function deleteConversation(o: Owner, conversationId: string) {
   check(error, "Het gesprek kon niet worden verwijderd.");
 }
 
-export type MessageRow = { id: string; role: "user" | "assistant"; content: string; status: "ok" | "failed"; model: string | null; action: { href: string; label: string } | null; created_at: string };
+/** Extra data shown with an answer: a link, the tools used, a proposal awaiting confirmation. All optional (older messages only have href/label). */
+export type MessageAction = { href?: string; label?: string; tools?: string[]; proposal?: { id: string; summary: string; status: string; href?: string } };
+export type MessageRow = { id: string; role: "user" | "assistant"; content: string; status: "ok" | "failed"; model: string | null; action: MessageAction | null; created_at: string };
 const MSG_COLUMNS = "id,role,content,status,model,action,created_at";
 
 /** Newest page of messages (chronological), with a cursor for older ones. */
@@ -141,7 +143,7 @@ const stamp = () => {
   return new Date(lastStamp).toISOString();
 };
 
-export async function addMessage(o: Owner, conversationId: string, m: { role: "user" | "assistant"; content: string; status?: "ok" | "failed"; model?: string | null; action?: { href: string; label: string } | null }) {
+export async function addMessage(o: Owner, conversationId: string, m: { role: "user" | "assistant"; content: string; status?: "ok" | "failed"; model?: string | null; action?: MessageAction | null }) {
   const now = stamp();
   const { data, error } = await db()
     .from("agent_messages")
@@ -154,12 +156,51 @@ export async function addMessage(o: Owner, conversationId: string, m: { role: "u
   return data as MessageRow;
 }
 
+/** Updates the proposal status shown on an answer (after confirm/cancel). */
+export async function setProposalStatus(o: Owner, messageId: string, proposal: NonNullable<MessageAction["proposal"]>) {
+  const { data } = await db().from("agent_messages").select("action").eq("id", messageId).eq("workspace_id", o.workspaceId).eq("user_id", o.userId).maybeSingle();
+  if (!data) return;
+  await db()
+    .from("agent_messages")
+    .update({ action: { ...((data.action as MessageAction) || {}), proposal } })
+    .eq("id", messageId)
+    .eq("workspace_id", o.workspaceId)
+    .eq("user_id", o.userId);
+}
+
 // ---------- Folders ----------
-export type FolderRow = { id: string; name: string; created_at: string };
+export type FolderRow = { id: string; name: string; created_at: string; instructions?: string | null };
+const missingColumn = (e: { code?: string } | null) => e?.code === "42703" || e?.code === "PGRST204";
 export async function listFolders(o: Owner) {
-  const { data, error } = await db().from("agent_folders").select("id,name,created_at").eq("workspace_id", o.workspaceId).eq("user_id", o.userId).order("name").limit(200);
+  const query = (cols: string) => db().from("agent_folders").select(cols).eq("workspace_id", o.workspaceId).eq("user_id", o.userId).order("name").limit(200);
+  let { data, error } = await query("id,name,created_at,instructions");
+  // Before migration 202610170001 the instructions column does not exist yet.
+  if (missingColumn(error)) ({ data, error } = await query("id,name,created_at"));
   check(error);
-  return (data || []) as FolderRow[];
+  return (data || []) as unknown as FolderRow[];
+}
+
+/** Project instructions for the agent context; empty when not set or not provisioned. */
+export async function folderInstructions(o: Owner, folderId: string | null) {
+  if (!folderId) return null;
+  const { data, error } = await db().from("agent_folders").select("name,instructions").eq("id", folderId).eq("workspace_id", o.workspaceId).eq("user_id", o.userId).maybeSingle();
+  if (error || !data) return null;
+  return { name: String(data.name), instructions: String(data.instructions || "") };
+}
+
+export async function setFolderInstructions(o: Owner, folderId: string, instructions: string) {
+  await getFolder(o, folderId);
+  const { data, error } = await db()
+    .from("agent_folders")
+    .update({ instructions: instructions.trim().slice(0, 2000) || null, updated_at: new Date().toISOString() })
+    .eq("id", folderId)
+    .eq("workspace_id", o.workspaceId)
+    .eq("user_id", o.userId)
+    .select("id,name,created_at,instructions")
+    .single();
+  if (missingColumn(error)) throw new HttpError(503, "Projectinstructies worden nog ingericht. Probeer het later opnieuw.");
+  check(error, "De instructies konden niet worden opgeslagen.");
+  return data as FolderRow;
 }
 export async function getFolder(o: Owner, folderId: string) {
   const { data, error } = await db().from("agent_folders").select("id,name,created_at").eq("id", id(folderId, "project")).eq("workspace_id", o.workspaceId).eq("user_id", o.userId).maybeSingle();

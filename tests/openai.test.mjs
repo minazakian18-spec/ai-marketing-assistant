@@ -145,7 +145,8 @@ test("conservative defaults: short output limits and modest quotas", () => {
   assert.equal(l.monthlyTokens, 300_000);
   assert.equal(l.dailyRequestsPerUser, 40);
   assert.equal(l.globalMonthlyMicroUsd, 8_000_000);
-  assert.ok(Object.values(usage.OUTPUT_LIMIT).every((n) => n <= 1800));
+  // One campaign call replaces three separate generations (post, e-mail, copy).
+  assert.ok(Object.entries(usage.OUTPUT_LIMIT).every(([f, n]) => n <= (f === "content_campaign" ? 2600 : 1800)));
 });
 
 const agentRequest = (body, headers = {}) =>

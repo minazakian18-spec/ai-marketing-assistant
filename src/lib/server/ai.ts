@@ -1,6 +1,6 @@
 import "server-only";
 import { HttpError } from "./access";
-import { aiText, aiConfigured, type AiMessage, type AiTier } from "./openai";
+import { aiText, aiJson, aiConfigured, type AiMessage, type AiTier } from "./openai";
 import { buildBrandContext } from "../ai/brand-context";
 import type { Profile } from "../types";
 import { capabilities, type Channel } from "../inbox/core";
@@ -209,6 +209,87 @@ export async function improveBrandText(field: keyof typeof IMPROVE_TASK, text: s
     },
   ];
   return (await run(SYSTEM_BRAND, messages, "low")).slice(0, 2000);
+}
+
+// ---------- Multi-channel campaign (Content Studio, Mavix Agent) ----------
+const SYSTEM_CAMPAIGN = `You plan one small marketing campaign for a small business in Mavix Content Studio. The owner reviews, edits and approves every item; nothing is published or sent automatically, and you never generate images.
+
+Rules:
+- Use only facts from <business_context> and the owner's <goal>. Never invent discounts, prices, opening hours, dates of events, awards, product names or promotions. When the goal needs a fact that is missing (for example the price of a new menu), write a clear placeholder in square brackets in the text, like [prijs], and mention it in missing_facts.
+- Write in preferred_language from <business_context> (Dutch when missing).
+${BRAND_RULE}
+- All items tell the same story with a consistent message and call to action, adapted to each channel.
+- Only fill the channels listed in <channels>; set the others to null.
+- Instagram: caption with a hook in the first line, short paragraphs, a call to action; hashtags: 3 to 8 relevant hashtags in one line; visual_brief: what the photo should show (subject, setting, mood), so the owner can take or choose it.
+- E-mail: subject (max 60 characters), preview text (max 90), a body of 80 to 200 words with a clear call to action, cta: the button text.
+- Copy: a short promotional text for the website or a flyer (title and 40 to 120 words).
+- ctas: 2 to 4 short call-to-action options.
+- schedule: one suggested moment per filled channel as days from today (0 to 14) and a time HH:MM that fits the audience; this is a suggestion only.`;
+
+const CAMPAIGN_SCHEMA = (() => {
+  const nullable = (props: Record<string, unknown>) => ({ anyOf: [{ type: "object", properties: props, required: Object.keys(props), additionalProperties: false }, { type: "null" }] });
+  const s = { type: "string" };
+  return {
+    name: "campaign",
+    schema: {
+      type: "object",
+      properties: {
+        title: s,
+        instagram: nullable({ caption: s, hashtags: s, visual_brief: s }),
+        email: nullable({ subject: s, preview: s, body: s, cta: s }),
+        copy: nullable({ title: s, body: s }),
+        ctas: { type: "array", items: s },
+        schedule: { type: "array", items: { type: "object", properties: { channel: { type: "string", enum: ["instagram", "email", "copy"] }, day_offset: { type: "integer" }, time: s }, required: ["channel", "day_offset", "time"], additionalProperties: false } },
+        missing_facts: { type: "array", items: s },
+      },
+      required: ["title", "instagram", "email", "copy", "ctas", "schedule", "missing_facts"],
+      additionalProperties: false,
+    },
+  };
+})();
+
+export type CampaignDraft = {
+  title: string;
+  instagram: { caption: string; hashtags: string; visual_brief: string } | null;
+  email: { subject: string; preview: string; body: string; cta: string } | null;
+  copy: { title: string; body: string } | null;
+  ctas: string[];
+  schedule: { channel: "instagram" | "email" | "copy"; day_offset: number; time: string }[];
+  missing_facts: string[];
+};
+
+const cut = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+/** Drafts a coherent campaign for the requested channels. Nothing is saved here. */
+export async function generateCampaign(goal: string, channels: ("instagram" | "email" | "copy")[], profile: Record<string, unknown>, today: string): Promise<CampaignDraft> {
+  const raw = await aiJson<CampaignDraft>(
+    SYSTEM_CAMPAIGN,
+    [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "<business_context>\n" + data(businessContext(profile)) + "\n</business_context>" },
+          { type: "text", text: "<goal>\n" + data(goal.slice(0, 1000)) + "\n</goal>" },
+          { type: "text", text: "<channels>\n" + data(channels) + "\n</channels>\n<today>" + today + "</today>" },
+        ],
+      },
+    ],
+    CAMPAIGN_SCHEMA,
+  );
+  const want = new Set(channels);
+  // Keep only what was asked for, within sane lengths; never trust the shape blindly.
+  return {
+    title: cut(raw.title, 120) || "Campagne",
+    instagram: want.has("instagram") && raw.instagram ? { caption: cut(raw.instagram.caption, 2200), hashtags: cut(raw.instagram.hashtags, 400), visual_brief: cut(raw.instagram.visual_brief, 1000) } : null,
+    email: want.has("email") && raw.email ? { subject: cut(raw.email.subject, 150), preview: cut(raw.email.preview, 200), body: cut(raw.email.body, 6000), cta: cut(raw.email.cta, 60) } : null,
+    copy: want.has("copy") && raw.copy ? { title: cut(raw.copy.title, 120), body: cut(raw.copy.body, 3000) } : null,
+    ctas: (Array.isArray(raw.ctas) ? raw.ctas : []).map((c) => cut(c, 120)).filter(Boolean).slice(0, 4),
+    schedule: (Array.isArray(raw.schedule) ? raw.schedule : [])
+      .filter((s) => s && want.has(s.channel))
+      .map((s) => ({ channel: s.channel, day_offset: Math.max(0, Math.min(14, Math.round(Number(s.day_offset) || 0))), time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : "10:00" }))
+      .slice(0, 3),
+    missing_facts: (Array.isArray(raw.missing_facts) ? raw.missing_facts : []).map((m) => cut(m, 200)).filter(Boolean).slice(0, 6),
+  };
 }
 
 // ---------- SEO suggestions ----------

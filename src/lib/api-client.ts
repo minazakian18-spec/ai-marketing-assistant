@@ -56,6 +56,38 @@ export async function editContentText(action: ContentEditAction, text: string, c
 }
 
 /** Marketing copy for Content Studio (server-side AI, metered). */
+export type CampaignDraft = {
+  title: string;
+  instagram: { caption: string; hashtags: string; visual_brief: string } | null;
+  email: { subject: string; preview: string; body: string; cta: string } | null;
+  copy: { title: string; body: string } | null;
+  ctas: string[];
+  schedule: { channel: "instagram" | "email" | "copy"; day_offset: number; time: string }[];
+  missing_facts: string[];
+};
+
+/** A multi-channel campaign draft (nothing is saved). In test mode: a labelled example, no AI. */
+export async function generateCampaignDraft(goal: string, channels: ("instagram" | "email" | "copy")[], businessName = ""): Promise<{ draft: CampaignDraft; example: boolean }> {
+  if (isBrowserDemo()) {
+    const who = businessName || "[bedrijfsnaam]";
+    const has = (c: string) => channels.includes(c as "instagram");
+    return {
+      example: true,
+      draft: {
+        title: goal.slice(0, 60),
+        instagram: has("instagram") ? { caption: `${goal}\n\nKom langs bij ${who} en ontdek het zelf. [voeg een concreet detail toe]\n\nReserveer via de link in onze bio.`, hashtags: "#lokaal #nieuw #genieten", visual_brief: "Een close-up van het product in natuurlijk licht, met de zaak op de achtergrond." } : null,
+        email: has("email") ? { subject: goal.slice(0, 55), preview: `Nieuw bij ${who}`, body: `Beste [voornaam],\n\n${goal}\n\n[voeg details toe: wat, wanneer en waarom het de moeite waard is]\n\nWe zien je graag!\n\nGroet,\n${who}`, cta: "Reserveer nu" } : null,
+        copy: has("copy") ? { title: goal.slice(0, 60), body: `${goal}. Bij ${who} [beschrijf wat het bijzonder maakt]. Kom langs of reserveer online.` } : null,
+        ctas: ["Reserveer nu", "Bekijk het menu"],
+        schedule: channels.map((c, i) => ({ channel: c, day_offset: i * 2 + 1, time: c === "email" ? "09:30" : "17:00" })),
+        missing_facts: ["Testmodus: dit is een voorbeeld zonder AI. Met een echt account schrijft Mavix op basis van je Brand Hub."],
+      },
+    };
+  }
+  const { draft } = await postJson<{ draft: CampaignDraft }>("/api/generate/campaign", { goal, channels });
+  return { draft, example: false };
+}
+
 export async function generateCopyText(kind: string, prompt: string): Promise<string> {
   if (isBrowserDemo()) throw new Error("AI-teksten maken werkt alleen met een echt account. Je kunt de tekst wel zelf schrijven.");
   const { text } = await postJson<{ text: string }>("/api/generate/copy", { kind, prompt });

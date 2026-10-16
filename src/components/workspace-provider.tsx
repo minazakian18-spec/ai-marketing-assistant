@@ -104,8 +104,24 @@ export function WorkspaceProvider({
       .catch((e) => {
         if (active) setError(e.message);
       });
+    // A server-side change (a Mavi proposal the user confirmed) asks for a
+    // fresh copy, so the new drafts show up and the next save has the new version.
+    const reload = () => {
+      if (busy.current) return;
+      fetch("/api/workspace", { cache: "no-store" })
+        .then(async (r) => {
+          const result = await r.json();
+          if (!r.ok || !active || busy.current) return;
+          setData(result.data);
+          version.current = result.version;
+          role.current = result.role;
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("mavix:workspace-reload", reload);
     return () => {
       active = false;
+      window.removeEventListener("mavix:workspace-reload", reload);
     };
   }, [demo]);
   async function save(next: Workspace, message = "Wijzigingen opgeslagen") {

@@ -4,6 +4,7 @@ import type { Review, ReviewAutoReplySettings } from "./review-model";
 import type { LocalCalendarEvent } from "./calendar/local";
 import type { LibraryAsset } from "./library-model";
 import type { MarketingCopy } from "./studio";
+import type { Campaign, ContentVersion } from "./campaigns";
 import type { AudienceSegment, Product, BrandVoice } from "./brand-model";
 import type { BrandStrategy } from "./brand-strategy";
 export type Profile = {
@@ -54,6 +55,12 @@ export type Post = {
   date: string;
   createdAt: string;
   variant: number;
+  /** Content Studio campaign this post belongs to (src/lib/campaigns.ts). */
+  campaignId?: string;
+  /** Visual brief from a campaign: what the photo should show (no image is generated). */
+  visualBrief?: string;
+  /** Previous texts, newest first. */
+  history?: ContentVersion[];
 };
 export type ContactStatus = "Ingeschreven" | "Niet bevestigd" | "Uitgeschreven";
 export type Contact = {
@@ -118,4 +125,6 @@ export type Workspace = {
   calendar?: { events: LocalCalendarEvent[] };
   // Marketing copy made in Content Studio (src/lib/studio.ts).
   copies?: MarketingCopy[];
+  // Multi-channel campaigns; their items stay in posts / email / copies (src/lib/campaigns.ts).
+  campaigns?: Campaign[];
 };

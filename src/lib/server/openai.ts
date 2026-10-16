@@ -75,6 +75,42 @@ export async function aiText(instructions: string, messages: AiMessage[], tier: 
   }
 }
 
+/**
+ * One generation with a strict JSON schema (Structured Outputs). Same key
+ * handling, input cap, step accounting, token recording and error mapping as
+ * aiText. Returns the parsed object; a malformed answer is an error, never
+ * a guess.
+ */
+export async function aiJson<T>(instructions: string, messages: AiMessage[], schema: { name: string; schema: Record<string, unknown> }, tier: AiTier = "standard"): Promise<T> {
+  const model = modelFor(tier);
+  const chars = instructions.length + messages.reduce((s, m) => s + m.content.reduce((t, c) => t + c.text.length, 0), 0);
+  if (chars > currentInputLimit() * 3) throw new HttpError(413, "Deze opdracht is te lang voor Mavi. Maak hem korter.");
+  takeStep();
+  try {
+    const response = await openai().responses.create({
+      model,
+      instructions,
+      input: toInput(messages),
+      max_output_tokens: currentOutputLimit(2000),
+      reasoning: { effort: tier === "advanced" ? "low" : "none" },
+      text: { format: { type: "json_schema", name: schema.name, schema: schema.schema, strict: true } },
+      store: false,
+    });
+    const usage = response.usage;
+    if (usage) recordTokens(model, usage.input_tokens || 0, usage.output_tokens || 0);
+    const text = (response.output_text || "").trim();
+    if (response.status === "incomplete" || !text) throw new HttpError(502, "Mavi kreeg geen volledig antwoord. Probeer een kortere opdracht.");
+    console.info(JSON.stringify({ event: "ai_generated", model, input: usage?.input_tokens || 0, output: usage?.output_tokens || 0, format: schema.name }));
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new HttpError(502, "Mavi gaf een onbruikbaar antwoord. Probeer het opnieuw.");
+    }
+  } catch (e) {
+    throw aiError(e);
+  }
+}
+
 export type AiStepResult = {
   text: string;
   calls: ResponseFunctionToolCall[];

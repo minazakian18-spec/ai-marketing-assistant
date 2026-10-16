@@ -1,5 +1,6 @@
 import type { Post, Workspace } from "./types";
 import type { EmailCampaign } from "./email-model";
+import type { ContentVersion } from "./campaigns";
 
 // Content Studio: one overview over the content records the rest of Mavix
 // already uses. Instagram posts (workspace.posts) and e-mail campaigns
@@ -16,6 +17,10 @@ export type MarketingCopy = {
   status: "draft" | "ready";
   createdAt: string;
   updatedAt: string;
+  /** Content Studio campaign this text belongs to (src/lib/campaigns.ts). */
+  campaignId?: string;
+  /** Previous texts, newest first. */
+  history?: ContentVersion[];
 };
 export type CopyKind = "website" | "advertentie" | "flyer" | "productomschrijving" | "overig";
 export const COPY_KINDS: { id: CopyKind; label: string; hint: string }[] = [

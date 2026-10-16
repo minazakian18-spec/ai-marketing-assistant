@@ -8,18 +8,23 @@ import { businessContext } from "../ai";
 import { toCalendarItems } from "../../calendar-data";
 import { emptyWorkspace } from "../../storage";
 import type { Role } from "../../security";
+import { campaignSummary } from "../../campaigns";
+import { unreadByChannel } from "../inbox";
+import { listSites } from "../seo";
+import { campaignPayload, proposeAction, WRITE_ROLES, type CampaignPayload } from "./actions";
 import type { Workspace } from "../../types";
 
-// Mavix Agent tool registry (phase 1: read-only).
+// Mavix Agent tool registry.
 //
 // Every tool is a thin, server-side adapter over existing Mavix data or
 // services. The model never sees credentials or table names and never passes
 // a workspace id: the workspace and user come from the session (AgentCtx).
 // Arguments are validated twice: by OpenAI (strict JSON schema) and here (zod).
-// Phase 1 tools only READ. Nothing here writes to the workspace document,
-// publishes, sends or deletes; write tools arrive with phase 2.
+// Read tools only read. The one write tool (prepare_campaign_drafts) only
+// PROPOSES a change; it is carried out after the user confirms it in the app
+// (see ./actions.ts). No tool publishes, sends or deletes.
 
-export type AgentCtx = { workspaceId: string; userId: string; role: Role };
+export type AgentCtx = { workspaceId: string; userId: string; role: Role; conversationId?: string };
 type Loaded = { workspace?: Promise<Workspace>; connections?: Promise<{ provider: string; status: string; display_name: string | null }[]> };
 
 export type AgentTool<A = unknown> = {
@@ -43,6 +48,8 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 // always filtered on the session's workspace.
 export class Loader {
   private cache: Loaded = {};
+  /** Changes proposed in this turn; shown to the user for confirmation. */
+  proposed: { id: string; summary: string }[] = [];
   constructor(private ctx: AgentCtx) {}
   workspace() {
     return (this.cache.workspace ??= (async () => {
@@ -270,7 +277,97 @@ const reviews: AgentTool<ReviewArgs> = {
   },
 };
 
-export const AGENT_TOOLS: AgentTool[] = [brandContext, integrations, schedule, content, media, reviews] as AgentTool[];
+const campaigns: AgentTool<Record<string, never>> = {
+  name: "get_campaigns",
+  description: "Read the multi-channel campaigns in Content Studio (newest first): title, goal, origin, and how many of their items are draft, approved, scheduled or (simulated) published.",
+  parameters: noArgs,
+  args: z.object({}).strict(),
+  roles: ALL,
+  async run(_ctx, _args, load) {
+    const ws = await load.workspace();
+    const list = ws.campaigns || [];
+    return {
+      total: list.length,
+      campaigns: list.slice(0, 15).map((c) => {
+        const s = campaignSummary(ws, c);
+        return { title: cut(c.title, 120), goal: cut(c.goal, 240), created: c.createdAt.slice(0, 10), made_by: c.source === "agent" ? "Mavi" : "Content Studio", items: s.total, drafts: s.drafts, approved: s.approved, scheduled: s.scheduled, published_simulated: s.done };
+      }),
+    };
+  },
+};
+
+const MESSAGING = ["gmail", "instagram", "messenger", "whatsapp"];
+const inbox: AgentTool<Record<string, never>> = {
+  name: "get_inbox_overview",
+  description: "Read how many conversations in the Mavix Inbox have unread messages, per channel (Gmail, Instagram, Messenger, WhatsApp). Counts only; message contents are not available to you.",
+  parameters: noArgs,
+  args: z.object({}).strict(),
+  roles: ALL,
+  available: async (_ctx, load) => (await load.connections()).some((c) => MESSAGING.includes(c.provider) && c.status === "connected"),
+  async run(ctx) {
+    const counts = await unreadByChannel(ctx.workspaceId).catch(() => {
+      throw new HttpError(503, "De inbox kon niet worden geladen.");
+    });
+    return { unread_conversations: counts, total: Object.values(counts).reduce((a, b) => a + b, 0) };
+  },
+};
+
+const seo: AgentTool<Record<string, never>> = {
+  name: "get_seo_summary",
+  description: "Read the SEO Intelligence results for the business websites: latest scan date and status, scores (0-100 overall and per category) and the most important recommendations of the last completed scan.",
+  parameters: noArgs,
+  args: z.object({}).strict(),
+  roles: ALL,
+  async run(ctx) {
+    const sites = await listSites(ctx.workspaceId);
+    const out = [];
+    for (const s of sites.slice(0, 3)) {
+      const { data } = await adminClient().from("seo_scans").select("report,completed_at").eq("workspace_id", ctx.workspaceId).eq("site_id", s.id).eq("status", "done").order("created_at", { ascending: false }).limit(1);
+      const report = data?.[0]?.report as { scores?: unknown; recommendations?: { severity: string; problem: string; action: string; totalUrls: number }[] } | undefined;
+      // Only safe, user-facing fields: never verification tokens or raw pages.
+      out.push({
+        website: s.host,
+        verified: s.verified,
+        last_scan: s.latest ? { status: s.latest.status, date: String(s.latest.completed_at || s.latest.created_at || "").slice(0, 10) } : null,
+        scores: report?.scores ?? null,
+        top_recommendations: (report?.recommendations || []).slice(0, 6).map((r) => ({ severity: r.severity, problem: cut(r.problem, 200), action: cut(r.action, 240), pages: r.totalUrls })),
+      });
+    }
+    return { websites: out, note: out.length ? undefined : "No website added in SEO Intelligence yet." };
+  },
+};
+
+const s = { type: "string" };
+const nullable = (props: Record<string, unknown>) => ({ anyOf: [{ type: "object", properties: props, required: Object.keys(props), additionalProperties: false }, { type: "null" }] });
+const prepareCampaign: AgentTool<CampaignPayload> = {
+  name: "prepare_campaign_drafts",
+  description:
+    "Propose to save a campaign as DRAFTS in Content Studio: an Instagram post (caption, hashtags, visual brief), an e-mail and/or a marketing text, with call-to-action ideas and suggested days. Nothing is saved yet: the user sees a confirmation card and decides. Only call this when the user asks to save, prepare or put drafts in Mavix, after you wrote the texts. Use only facts from the Brand Hub; put [placeholders] for missing facts. Use null for channels the user does not want. day_offset is days from today (0-14), time HH:MM.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: s,
+      goal: s,
+      instagram: nullable({ caption: s, hashtags: s, visual_brief: s }),
+      email: nullable({ subject: s, preview: s, body: s, cta: s }),
+      copy: nullable({ title: s, body: s }),
+      ctas: { type: "array", items: s },
+      schedule: { type: "array", items: { type: "object", properties: { channel: { type: "string", enum: ["instagram", "email", "copy"] }, day_offset: { type: "integer" }, time: s }, required: ["channel", "day_offset", "time"], additionalProperties: false } },
+    },
+    required: ["title", "goal", "instagram", "email", "copy", "ctas", "schedule"],
+    additionalProperties: false,
+  },
+  args: campaignPayload as unknown as z.ZodType<CampaignPayload>,
+  roles: WRITE_ROLES,
+  async run(ctx, args, load) {
+    if (load.proposed.length) throw new HttpError(409, "Er staat al een voorstel klaar in dit antwoord.");
+    const p = await proposeAction(ctx, args);
+    load.proposed.push(p);
+    return { status: "waiting_for_user_confirmation", summary: p.summary, note: "Nothing has been saved yet. Tell the user to check the proposal and click 'Opslaan als concepten' below your answer." };
+  },
+};
+
+export const AGENT_TOOLS: AgentTool[] = [brandContext, integrations, schedule, content, media, reviews, campaigns, inbox, seo, prepareCampaign] as AgentTool[];
 
 /** The tools this caller may use right now (role and connected integrations). */
 export async function toolsFor(ctx: AgentCtx, load: Loader): Promise<AgentTool[]> {

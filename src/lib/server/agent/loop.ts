@@ -19,7 +19,7 @@ export const MAX_TOOL_CALLS = 6;
 export const TOOL_TIMEOUT_MS = 10_000;
 export const RESULT_CHARS = 6_000;
 
-export type LoopResult = { text: string; tools: string[] };
+export type LoopResult = { text: string; tools: string[]; proposed: { id: string; summary: string }[] };
 
 function withTimeout<T>(p: Promise<T>, ms: number) {
   let timer: ReturnType<typeof setTimeout>;
@@ -68,7 +68,7 @@ export async function runAgentLoop(ctx: AgentCtx, instructions: string, first: R
     const r = await aiStep(instructions, input, defs, final);
     if (!r.calls.length || final) {
       if (!r.text) throw new HttpError(502, "Mavi gaf geen antwoord terug. Probeer het opnieuw.");
-      return { text: r.text, tools: used };
+      return { text: r.text, tools: used, proposed: load.proposed };
     }
     input.push(...r.carry);
     for (const call of r.calls) {

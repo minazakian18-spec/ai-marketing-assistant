@@ -4,7 +4,8 @@ import { workspace, failure, limited, sameOrigin, HttpError } from "@/lib/server
 import { agentReply } from "@/lib/server/agent/agent";
 import { metered } from "@/lib/server/ai-usage";
 import { aiConfigured, modelFor } from "@/lib/server/openai";
-import { addMessage, createConversation, getConversation, listMessages, workspaceContext, type Owner } from "@/lib/server/agent-store";
+import { addMessage, createConversation, folderInstructions, getConversation, listMessages, workspaceContext, type MessageAction, type Owner } from "@/lib/server/agent-store";
+import { linkActions } from "@/lib/server/agent/actions";
 import { titleFrom } from "@/lib/agent/capabilities";
 
 const input = z.union([
@@ -51,11 +52,18 @@ export async function POST(request: Request) {
       .slice(0, -1) // the question itself is passed separately
       .slice(-8)
       .map((m) => ({ role: m.role === "user" ? ("user" as const) : ("agent" as const), text: m.content }));
-    const ctx = await workspaceContext(auth.workspaceId);
+    const [ctx, project] = await Promise.all([workspaceContext(auth.workspaceId), folderInstructions(owner, conversation!.folder_id)]);
 
     try {
-      const reply = await metered(auth, "agent", () => agentReply({ workspaceId: auth.workspaceId, userId: auth.user.id, role: auth.role }, ctx.profile, ctx.state, history, question), request.headers.get("idempotency-key"));
-      const saved = await addMessage(owner, conversation!.id, { role: "assistant", content: reply.text, model: modelFor("advanced"), action: reply.action || null });
+      const agentCtx = { workspaceId: auth.workspaceId, userId: auth.user.id, role: auth.role, conversationId: conversation!.id };
+      const reply = await metered(auth, "agent", () => agentReply(agentCtx, ctx.profile, ctx.state, history, question, project), request.headers.get("idempotency-key"));
+      const proposal = reply.proposed[0];
+      const action: MessageAction | null =
+        reply.action || reply.tools.length || proposal
+          ? { ...(reply.action || {}), tools: reply.tools.length ? [...new Set(reply.tools)] : undefined, proposal: proposal ? { ...proposal, status: "pending" } : undefined }
+          : null;
+      const saved = await addMessage(owner, conversation!.id, { role: "assistant", content: reply.text, model: modelFor("advanced"), action });
+      await linkActions(owner, reply.proposed.map((p) => p.id), saved.id);
       return NextResponse.json({ configured: true, conversation: await getConversation(owner, conversation!.id), userMessage, reply: saved }, { headers });
     } catch (e) {
       // The failure is kept in the conversation (user-safe text only) so the

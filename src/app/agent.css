@@ -434,6 +434,78 @@
 .ag-action:hover {
   background: var(--ds-accent-soft);
 }
+/* What Mavi looked up, and proposals waiting for the user's confirmation. */
+.ag-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0 0;
+}
+.ag-tools span {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ds-surface-muted, #f4f2f8);
+  font-size: var(--fs-micro, 12px);
+  color: var(--text-muted);
+}
+.ag-progress {
+  margin: 4px 0 0;
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+.ag-proposal {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--ds-accent-line);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-accent-soft);
+}
+.ag-proposal strong {
+  display: block;
+  color: var(--text-heading);
+}
+.ag-proposal p {
+  margin: 4px 0 0;
+}
+.ag-proposal-note {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+.ag-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.ag-proposal-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-weight: var(--fw-medium);
+  color: var(--text-heading);
+}
+.ag-proposal-status a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ag-instructions {
+  display: grid;
+  gap: 8px;
+}
+.ag-instructions textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--ds-radius-sm);
+  font: inherit;
+  resize: vertical;
+}
+.ag-instructions small {
+  justify-self: end;
+  color: var(--text-muted);
+}
 .ag-retry {
   display: inline-flex;
   align-items: center;

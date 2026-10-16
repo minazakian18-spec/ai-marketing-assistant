@@ -5,8 +5,8 @@
 //
 // kinds:  read   = reads workspace data (server-side, own workspace only)
 //         draft  = produces text the user copies or edits; changes nothing
-//         write  = changes data, publishes or sends (always needs explicit
-//                  confirmation in the UI; none are enabled yet)
+//         write  = changes data (always needs explicit confirmation in the UI;
+//                  only saving campaign drafts is enabled)
 
 export type CapabilityKind = "read" | "draft" | "write";
 export type Capability = {
@@ -30,9 +30,14 @@ export const CAPABILITIES: Capability[] = [
   { id: "read_reviews", kind: "read", status: "available", label: "Google-reviews", description: "Recent Google reviews, only when Google Business Profile is connected (list_reviews).", href: "/reviews?tab=inbox" },
   { id: "marketing_advice", kind: "draft", status: "available", label: "Marketingadvies en ideeën", description: "Marketing plans, campaign ideas, content calendars as proposals, and ideas to win more customers or reservations, based only on real workspace data." },
   { id: "draft_texts", kind: "draft", status: "available", label: "Teksten schrijven", description: "Draft Instagram captions, Reel concepts and scripts, newsletters, e-mails and review replies in the chat for the user to copy or refine in Content Studio.", href: "/studio" },
-  { id: "read_inbox", kind: "read", status: "unavailable", label: "Inbox lezen", description: "The agent cannot read customer conversations. Reply suggestions are available inside the Inbox.", href: "/inbox" },
+  { id: "read_campaigns", kind: "read", status: "available", label: "Campagnes", description: "Content Studio campaigns and the status of their items (get_campaigns).", href: "/studio" },
+  { id: "read_inbox_counts", kind: "read", status: "available", label: "Inbox-overzicht", description: "How many conversations have unread messages per channel, only when a messaging channel is connected (get_inbox_overview). Counts only.", href: "/inbox" },
+  { id: "read_seo", kind: "read", status: "available", label: "SEO", description: "SEO Intelligence scores and top recommendations of the last website scan (get_seo_summary).", href: "/seo" },
+  { id: "save_campaign_drafts", kind: "write", status: "available", label: "Campagne als concepten opslaan", description: "Propose saving a campaign (Instagram post, e-mail, marketing text) as drafts in Content Studio (prepare_campaign_drafts). Only owners and admins; the user must confirm with a button; nothing is scheduled.", href: "/studio" },
+  { id: "read_inbox", kind: "read", status: "unavailable", label: "Inbox-berichten lezen", description: "The agent cannot read the contents of customer conversations. Reply suggestions are available inside the Inbox.", href: "/inbox" },
   { id: "read_insights", kind: "read", status: "unavailable", label: "Statistieken", description: "Reach and engagement numbers (Instagram, Google) are not available in Mavix yet.", href: "/inzichten" },
-  { id: "save_drafts", kind: "write", status: "unavailable", label: "Concepten opslaan of plannen", description: "The agent cannot save drafts or schedule them in Content Studio, Social, E-mail or the calendar yet; the user does that in Content Studio.", href: "/studio" },
+  { id: "files", kind: "read", status: "unavailable", label: "Bestanden", description: "The agent cannot read uploaded files or attachments.", href: "/library" },
+  { id: "schedule_or_edit", kind: "write", status: "unavailable", label: "Inplannen of wijzigen", description: "The agent cannot schedule content or change or delete existing items; the user does that in Content Studio, Social or E-mail.", href: "/studio" },
   { id: "publish_or_send", kind: "write", status: "unavailable", label: "Publiceren of versturen", description: "The agent never publishes posts, sends e-mails, messages or review replies, or deletes anything." },
 ];
 
@@ -41,6 +46,7 @@ export const available = (kind?: CapabilityKind) => CAPABILITIES.filter((c) => c
 /** Suggestions on the empty state: each one is backed by an available capability. */
 export const AGENT_SUGGESTIONS: { prompt: string; capability: string }[] = [
   { prompt: "Maak een Instagram-campagne voor volgende week", capability: "draft_texts" },
+  { prompt: "Zet een campagne voor volgende week klaar als concepten", capability: "save_campaign_drafts" },
   { prompt: "Schrijf een nieuwsbrief voor mijn klanten", capability: "draft_texts" },
   { prompt: "Maak een marketingplanning voor de komende maand", capability: "marketing_advice" },
   { prompt: "Geef me ideeën om meer reserveringen te krijgen", capability: "marketing_advice" },

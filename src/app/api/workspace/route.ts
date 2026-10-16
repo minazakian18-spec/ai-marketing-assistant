@@ -6,6 +6,7 @@ import type {Contact} from '@/lib/types';
 import {brandProfileSchema,brandAssetsValid} from '@/lib/server/brand-validation';
 import {z} from 'zod';
 import {copyValid} from '@/lib/studio';
+import {campaignValid,campaignLinksValid} from '@/lib/campaigns';
 // Newsletter signups are merged into the stored contacts when the workspace is
 // loaded (syncNewsletterContacts); saves keep unsubscribes and suppressions in
 // step with the Contacts module.
@@ -15,6 +16,9 @@ export async function PUT(request:Request){try{sameOrigin(request);const {db,wor
  const profile=brandProfileSchema.parse(data.profile);
  // Content Studio marketing copy: own records in the same workspace blob.
  if(data.copies!==undefined&&(!Array.isArray(data.copies)||data.copies.length>1000||!data.copies.every(copyValid)))throw new HttpError(400,'Ongeldige marketingteksten.');
+ // Content Studio campaigns: own small records; items only link to them (campaignId).
+ if(data.campaigns!==undefined&&(!Array.isArray(data.campaigns)||data.campaigns.length>500||!data.campaigns.every(campaignValid)))throw new HttpError(400,'Ongeldige campagnes.');
+ if(!campaignLinksValid(data as unknown as Parameters<typeof campaignLinksValid>[0]))throw new HttpError(400,'Een concept verwijst naar een campagne die niet bestaat.');
  if(!brandAssetsValid(profile,previous.data?.profile||{}))throw new HttpError(400,'Ongeldige afbeelding. Gebruik een PNG-, JPG- of WebP-bestand binnen de uploadlimiet.');
  const before=(Array.isArray(previous.data?.contacts)?previous.data.contacts:[]) as Contact[],after=(Array.isArray(data.contacts)?data.contacts:[]) as Contact[];
  // Refuse re-subscribing suppressed addresses; record new unsubscribes first.

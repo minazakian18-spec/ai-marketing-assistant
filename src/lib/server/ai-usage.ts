@@ -21,6 +21,7 @@ export type AiFeature =
   | "content_email"
   | "content_edit"
   | "content_copy"
+  | "content_campaign"
   | "brand_preview"
   | "brand_improve"
   | "seo_suggest"
@@ -39,12 +40,15 @@ export const OUTPUT_LIMIT: Record<AiFeature, number> = {
   content_email: 1800,
   content_edit: 1400,
   content_copy: 1200,
+  // A full campaign: Instagram post, e-mail, copy, CTAs, brief and schedule in one answer.
+  content_campaign: 2600,
   brand_preview: 700,
   brand_improve: 600,
   seo_suggest: 700,
   review_reply: 600,
   research: 900,
-  agent: 900,
+  // Room for a full campaign proposal (prepare_campaign_drafts) in one step.
+  agent: 1800,
 };
 
 // OpenAI standard prices, USD per 1M tokens (pricing page, October 2026).

@@ -1,4 +1,5 @@
 import type { Profile } from "./types";
+import type { ContentVersion } from "./campaigns";
 import { recipients, segments } from "./contact-data.ts";
 import { localDate, localDateTime } from "./instagram-model.ts";
 export const emailKinds = [
@@ -34,6 +35,10 @@ export type EmailCampaign = {
   source: "manual" | "autopilot";
   variant: number;
   reason: string;
+  /** Content Studio campaign this e-mail belongs to (src/lib/campaigns.ts). */
+  campaignId?: string;
+  /** Previous texts, newest first. */
+  history?: ContentVersion[];
 };
 export const emailModes = [
   {

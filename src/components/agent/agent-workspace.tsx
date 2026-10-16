@@ -18,6 +18,7 @@ import {
   Pin,
   PinOff,
   RotateCcw,
+  ScrollText,
   Search,
   SquarePen,
   Trash2,
@@ -38,8 +39,31 @@ import { useAgent } from "./agent-provider";
 // on the server (/api/agent/*); this component only holds what is on screen.
 
 type Conversation = { id: string; title: string; folder_id: string | null; pinned: boolean; archived: boolean; message_count: number; last_message_at: string };
-type FolderRow = { id: string; name: string };
-type Message = { id: string; role: "user" | "assistant"; content: string; status: "ok" | "failed"; action: { href: string; label: string } | null; created_at: string; pending?: boolean };
+type FolderRow = { id: string; name: string; instructions?: string | null };
+type Proposal = { id: string; summary: string; status: string; href?: string };
+type MessageAction = { href?: string; label?: string; tools?: string[]; proposal?: Proposal };
+type Message = { id: string; role: "user" | "assistant"; content: string; status: "ok" | "failed"; action: MessageAction | null; created_at: string; pending?: boolean };
+
+// What Mavi looked up for an answer, in plain words.
+const TOOL_LABEL: Record<string, string> = {
+  get_brand_context: "Brand Hub",
+  get_integrations: "Koppelingen",
+  get_schedule: "Kalender",
+  list_content: "Content",
+  get_campaigns: "Campagnes",
+  search_media: "Bibliotheek",
+  list_reviews: "Reviews",
+  get_inbox_overview: "Inbox",
+  get_seo_summary: "SEO",
+  prepare_campaign_drafts: "Voorstel klaargezet",
+};
+const PROPOSAL_STATUS: Record<string, string> = {
+  done: "Opgeslagen als concepten",
+  cancelled: "Geannuleerd",
+  expired: "Verlopen",
+  failed: "Niet gelukt",
+  executing: "Bezig met opslaan…",
+};
 
 async function api<T>(url: string, init?: RequestInit & { json?: unknown }): Promise<{ ok: boolean; status: number; body: T & { error?: string } }> {
   const res = await fetch(url, {
@@ -85,6 +109,8 @@ export function AgentWorkspace() {
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
   const [confirm, setConfirm] = useState<{ kind: "conversation" | "folder"; id: string; name: string } | null>(null);
+  const [instructions, setInstructions] = useState<{ id: string; name: string; value: string } | null>(null);
+  const [deciding, setDeciding] = useState<string | null>(null);
 
   const thread = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
@@ -291,6 +317,30 @@ export function AgentWorkspace() {
     setFolders((f) => f.filter((x) => x.id !== id));
     setConversations((list) => list.map((c) => (c.folder_id === id ? { ...c, folder_id: null } : c)));
   }
+  async function saveInstructions(id: string, value: string) {
+    const r = await api<{ folder: FolderRow }>("/api/agent/folders/" + id, { method: "PATCH", json: { instructions: value } });
+    if (!r.ok) return setNotice(r.body.error || "De instructies konden niet worden opgeslagen.");
+    setFolders((f) => f.map((x) => (x.id === id ? r.body.folder : x)));
+    setNotice("Projectinstructies opgeslagen. Mavi gebruikt ze in de gesprekken van dit project.");
+  }
+  // Confirm or cancel a change Mavi proposed. Only this click changes the workspace.
+  async function decide(messageId: string, proposal: Proposal, decision: "confirm" | "cancel") {
+    if (deciding) return;
+    setDeciding(proposal.id);
+    const r = await api<{ action: { id: string; status: string; summary: string; result: { href?: string } | null }; message: Message | null }>("/api/agent/actions/" + proposal.id, {
+      method: "POST",
+      json: { decision },
+    });
+    setDeciding(null);
+    if (!r.ok) return setNotice(r.body.error || "Dit voorstel kon niet worden verwerkt. Probeer het opnieuw.");
+    const a = r.body.action;
+    setMessages((list) => [
+      ...list.map((m) => (m.id === messageId && m.action ? { ...m, action: { ...m.action, proposal: { ...proposal, status: a.status, href: a.result?.href } } } : m)),
+      ...(r.body.message ? [r.body.message] : []),
+    ]);
+    // Open Mavix screens load the workspace again, so the new drafts show up.
+    if (a.status === "done") window.dispatchEvent(new Event("mavix:workspace-reload"));
+  }
   async function commitRename() {
     if (!renaming) return;
     const value = renaming.value.trim();
@@ -469,6 +519,7 @@ export function AgentWorkspace() {
                               trigger={<MoreHorizontal size={15} />}
                               items={[
                                 { label: "Project hernoemen", icon: <Pencil size={14} />, onSelect: () => setRenaming({ kind: "folder", id: f.id, value: f.name }) },
+                                { label: f.instructions ? "Instructies bewerken" : "Instructies toevoegen", icon: <ScrollText size={14} />, onSelect: () => setInstructions({ id: f.id, name: f.name, value: f.instructions || "" }) },
                                 { label: "Project verwijderen", icon: <Trash2 size={14} />, danger: true, onSelect: () => setConfirm({ kind: "folder", id: f.id, name: f.name }) },
                               ]}
                             />
@@ -585,11 +636,47 @@ export function AgentWorkspace() {
                       <MaviAvatar size={28} live={false} />
                       <div className="ag-msg-body">
                         {m.status === "failed" ? <p role="alert">{m.content}</p> : <Markdown text={m.content} />}
-                        {m.action && m.status === "ok" && (
+                        {m.action?.proposal && m.status === "ok" && (
+                          <div className="ag-proposal" role="group" aria-label="Voorstel van Mavi">
+                            <strong>Voorstel: concepten opslaan</strong>
+                            <p>{m.action.proposal.summary}</p>
+                            {m.action.proposal.status === "pending" ? (
+                              <>
+                                <p className="ag-proposal-note">Er wordt niets ingepland, gepubliceerd of verstuurd. Je kunt alles daarna in Content Studio aanpassen.</p>
+                                <div className="ag-proposal-actions">
+                                  <button type="button" className="button primary" disabled={!!deciding} onClick={() => void decide(m.id, m.action!.proposal!, "confirm")}>
+                                    {deciding === m.action.proposal.id ? "Bezig…" : "Opslaan als concepten"}
+                                  </button>
+                                  <button type="button" className="button secondary" disabled={!!deciding} onClick={() => void decide(m.id, m.action!.proposal!, "cancel")}>
+                                    Annuleren
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <p className={"ag-proposal-status is-" + m.action.proposal.status} role="status">
+                                {PROPOSAL_STATUS[m.action.proposal.status] || m.action.proposal.status}
+                                {m.action.proposal.href && (
+                                  <Link href={m.action.proposal.href}>
+                                    Open in Content Studio <ArrowRight size={13} aria-hidden="true" />
+                                  </Link>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {m.action?.href && m.status === "ok" && (
                           <Link className="ag-action" href={m.action.href}>
                             {m.action.label}
                             <ArrowRight size={14} aria-hidden="true" />
                           </Link>
+                        )}
+                        {!!m.action?.tools?.length && m.status === "ok" && (
+                          <p className="ag-tools">
+                            <span className="sr-only">Opgezocht: </span>
+                            {m.action.tools.filter((t) => TOOL_LABEL[t]).map((t) => (
+                              <span key={t}>{TOOL_LABEL[t]}</span>
+                            ))}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -598,10 +685,15 @@ export function AgentWorkspace() {
                 {sending && (
                   <div className="ag-msg is-assistant" aria-label="Mavi schrijft een antwoord">
                     <MaviAvatar size={28} state="thinking" />
-                    <div className="ag-msg-body ag-typing" aria-hidden="true">
-                      <span />
-                      <span />
-                      <span />
+                    <div className="ag-msg-body">
+                      <div className="ag-typing" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                      <p className="ag-progress" role="status">
+                        Mavi zoekt de gegevens op die nodig zijn en schrijft een antwoord…
+                      </p>
                     </div>
                   </div>
                 )}
@@ -656,6 +748,30 @@ export function AgentWorkspace() {
         {confirm?.kind === "folder"
           ? `Het project “${confirm.name}” wordt verwijderd. De gesprekken erin blijven bewaard, zonder project.`
           : `“${confirm?.name}” en alle berichten erin worden definitief verwijderd. Dit kan niet ongedaan worden gemaakt.`}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={!!instructions}
+        onClose={() => setInstructions(null)}
+        title={"Instructies voor " + (instructions?.name || "project")}
+        confirmLabel="Opslaan"
+        onConfirm={() => {
+          if (!instructions) return;
+          void saveInstructions(instructions.id, instructions.value);
+          setInstructions(null);
+        }}
+      >
+        <label className="ag-instructions">
+          <span>Mavi volgt deze instructies in alle gesprekken van dit project, bijvoorbeeld de toon, het onderwerp of wat je wilt vermijden.</span>
+          <textarea
+            value={instructions?.value || ""}
+            maxLength={2000}
+            rows={6}
+            placeholder="Bijvoorbeeld: dit project gaat over ons zomermenu. Schrijf informeel en noem altijd het terras."
+            onChange={(e) => instructions && setInstructions({ ...instructions, value: e.target.value })}
+          />
+          <small>{(instructions?.value || "").length} / 2000</small>
+        </label>
       </ConfirmDialog>
     </div>
   );
