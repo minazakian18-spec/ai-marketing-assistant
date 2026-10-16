@@ -1,13 +1,15 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { BadgeCheck, CalendarClock, Download, FileText, Globe, Loader2, Plus, RefreshCw, Search, ShieldQuestion, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BadgeCheck, CalendarClock, Download, FileText, Globe, Loader2, Plus, RefreshCw, Search, ShieldQuestion, Trash2, X } from "lucide-react";
 import { isBrowserDemo } from "@/lib/demo";
 import { PageHeading } from "@/components/ui";
 import { CATEGORY_LABEL, CATEGORY_WEIGHT, CHECKS } from "@/lib/seo/checks";
 import type { Category, ScanReport } from "@/lib/seo/types";
+import { analysisCompleteness } from "@/lib/seo/completeness";
+import { compareChecks, scoreDelta } from "@/lib/seo/compare";
 import { CopyButton, Info, ScoreRing, ToneBadge, dateTime } from "./seo-parts";
-import { Recommendations } from "./seo-recommendations";
+import { Recommendations, type TaskStatus, type Tasks } from "./seo-recommendations";
 import { Performance } from "./seo-performance";
 import { SearchConsole } from "./seo-search-console";
 import { History, type ScanSummary } from "./seo-history";
@@ -35,7 +37,7 @@ type Scan = ScanSummary & { stage: string | null; progress: { pages?: number; li
 type Tab = "recs" | "pages" | "perf" | "gsc" | "history";
 
 const TABS: [Tab, string][] = [
-  ["recs", "Aanbevelingen"],
+  ["recs", "Actieplan"],
   ["pages", "Pagina's"],
   ["perf", "Prestaties"],
   ["gsc", "Zoekresultaten"],
@@ -90,6 +92,8 @@ export function SeoDashboard() {
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
   const [form, setForm] = useState({ url: "", keyword: "" });
+  const [tasks, setTasks] = useState<Tasks | null>(null);
+  const [previous, setPrevious] = useState<ScanReport | null>(null);
 
   const site = overview?.sites.find((s) => s.id === siteId) || null;
   const canManage = overview?.role === "OWNER" || overview?.role === "ADMIN";
@@ -135,10 +139,14 @@ export function SeoDashboard() {
     loadOverview().catch((e) => setError(e.message));
   }, [loadOverview]);
 
-  // When the website changes: its analyses and the latest completed report.
+  // When the website changes: its analyses, the latest completed report and the action plan statuses.
   useEffect(() => {
     if (!siteId) return;
     setScan(null);
+    setTasks(null);
+    api<Tasks>(`/api/seo/sites/${siteId}/tasks`)
+      .then(setTasks)
+      .catch(() => setTasks({ available: false, tasks: {} }));
     loadScans(siteId)
       .then((list) => {
         const current = list.find((s) => s.status === "queued" || s.status === "running") || list.find((s) => s.status === "completed") || list[0];
@@ -246,6 +254,35 @@ export function SeoDashboard() {
   }
 
   const report = scan?.status === "completed" ? scan.report || null : null;
+
+  // The completed analysis before the one on screen, to show what changed.
+  const previousId = useMemo(() => {
+    if (!scan || scan.status !== "completed") return null;
+    const done = scans.filter((s) => s.status === "completed" && s.completed_at && scan.completed_at && s.completed_at < scan.completed_at);
+    return done.sort((a, b) => (b.completed_at || "").localeCompare(a.completed_at || ""))[0]?.id || null;
+  }, [scan, scans]);
+  useEffect(() => {
+    setPrevious(null);
+    if (!previousId) return;
+    api<{ scan: Scan }>(`/api/seo/scans/${previousId}`)
+      .then((d) => setPrevious(d.scan.report || null))
+      .catch(() => setPrevious(null));
+  }, [previousId]);
+  const completeness = useMemo(() => (report ? analysisCompleteness(report) : null), [report]);
+  const changes = useMemo(() => (report && previous ? compareChecks(report.checks, previous.checks) : null), [report, previous]);
+  const delta = report ? scoreDelta(report.scores, previous?.scores) : null;
+
+  async function setTaskStatus(checkId: string, status: TaskStatus) {
+    if (!site) return;
+    const before = tasks;
+    setTasks((t) => (t ? { ...t, tasks: { ...t.tasks, [checkId]: { status, updatedAt: new Date().toISOString() } } } : t));
+    try {
+      await api(`/api/seo/sites/${site.id}/tasks`, { method: "PUT", body: JSON.stringify({ checkId, status }) });
+    } catch (e) {
+      setTasks(before);
+      setError(e instanceof Error ? e.message : "De status kon niet worden opgeslagen.");
+    }
+  }
   const progressPct = useMemo(() => {
     if (!running || !scan) return 0;
     const i = Math.max(0, STAGES.indexOf(scan.stage || "queued"));
@@ -437,12 +474,38 @@ export function SeoDashboard() {
                   <ScoreRing value={report.scores.overall} size={132} />
                   <div className="seo-overall-text">
                     <h2>
-                      Mavix SEO-score <ToneBadge score={report.scores.overall} />
+                      {completeness?.complete ? "Mavix SEO-score" : "Voorlopige Mavix SEO-score"} <ToneBadge score={report.scores.overall} />
+                      {delta !== null && delta !== 0 && (
+                        <span className={"seo-delta " + (delta > 0 ? "is-up" : "is-down")} title="Verschil met de vorige analyse">
+                          {delta > 0 ? <ArrowUpRight size={13} aria-hidden="true" /> : <ArrowDownRight size={13} aria-hidden="true" />}
+                          {delta > 0 ? "+" : ""}
+                          {delta} sinds vorige analyse
+                        </span>
+                      )}
                     </h2>
                     <p>
-                      Gebaseerd op {report.checks.filter((c) => c.ratio !== null).length} meetbare controles van {report.site.crawl.crawled}{" "}
-                      {report.site.crawl.crawled === 1 ? "pagina" : "pagina's"}. Dit is een score van Mavix, geen officiële Google-score.
+                      Gebaseerd op {report.checks.filter((c) => c.ratio !== null).length} gemeten controles op {report.site.crawl.crawled}{" "}
+                      {report.site.crawl.crawled === 1 ? "pagina" : "pagina's"}. Dit is een score van Mavix, geen officiële Google-score; Google publiceert geen SEO-score.
                     </p>
+                    {completeness && (
+                      <div className={"seo-coverage" + (completeness.complete ? " is-complete" : "")}>
+                        <div className="seo-coverage-head">
+                          <span>{completeness.complete ? "Analyse volledig" : "Analyse niet volledig"}</span>
+                          <strong>{completeness.coverage}% gemeten</strong>
+                        </div>
+                        <div className="seo-bar is-thin" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={completeness.coverage} aria-label="Hoeveel van de analyse is gemeten">
+                          <span style={{ width: completeness.coverage + "%" }} />
+                        </div>
+                        {!completeness.complete && (
+                          <ul>
+                            {completeness.reasons.map((r) => (
+                              <li key={r}>{r}</li>
+                            ))}
+                            <li>Wat niet is gemeten, telt niet mee: de score kan veranderen zodra alles gemeten is.</li>
+                          </ul>
+                        )}
+                      </div>
+                    )}
                     <p className="seo-meta">
                       Geanalyseerd op {dateTime(scan.completed_at)}
                       {report.site.crawl.stopped === "limit" && ` · limiet van ${report.site.crawl.limit} pagina's bereikt`}
@@ -469,13 +532,22 @@ export function SeoDashboard() {
                         <span className="seo-cat-label">
                           {CATEGORY_LABEL[c]} <Info label={"Uitleg " + CATEGORY_LABEL[c]}>{CAT_HELP[c]}</Info>
                         </span>
-                        <ToneBadge score={report.scores.categories[c]} />
+                        {completeness?.categories[c] === "missing" ? (
+                          <span className="seo-tone is-none">Niet gemeten</span>
+                        ) : (
+                          <>
+                            <ToneBadge score={report.scores.categories[c]} />
+                            {completeness?.categories[c] === "partial" && <small className="seo-cat-partial">Deels gemeten</small>}
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
                 {howOpen && <HowCalculated report={report} />}
               </section>
+
+              <TopActions report={report} tasks={tasks} onOpen={() => setTab("recs")} />
 
               <div className="seo-tabs" role="tablist" aria-label="Onderdelen">
                 {TABS.map(([t, label]) => (
@@ -486,10 +558,24 @@ export function SeoDashboard() {
                 ))}
               </div>
               <section className="ui-card seo-panel" role="tabpanel" key={tab}>
-                {tab === "recs" && <Recommendations scanId={scan.id} items={report.recommendations} />}
-                {tab === "pages" && <Pages pages={report.pages} />}
+                {tab === "recs" && (
+                  <Recommendations
+                    scanId={scan.id}
+                    items={report.recommendations}
+                    checks={report.checks}
+                    pages={report.pages}
+                    homeUrl={report.site.finalUrl || report.site.startUrl}
+                    keyword={report.site.keyword}
+                    changes={changes}
+                    tasks={tasks}
+                    canRescan={!running}
+                    onStatus={(id, s) => void setTaskStatus(id, s)}
+                    onRescan={() => void start(site.id)}
+                  />
+                )}
+                {tab === "pages" && <Pages pages={report.pages} homeUrl={report.site.finalUrl || report.site.startUrl} />}
                 {tab === "perf" && <Performance psi={report.psi} pagespeedKey={overview.pagespeedKey} />}
-                {tab === "gsc" && <SearchConsole siteId={site.id} canManage={canManage} />}
+                {tab === "gsc" && <SearchConsole siteId={site.id} canManage={canManage} report={report} />}
                 {tab === "history" && <History scans={scans} currentId={scan.id} onOpen={(id) => void openScan(id)} />}
               </section>
             </>
@@ -532,7 +618,12 @@ export function SeoDashboard() {
                 <X size={16} />
               </button>
             </header>
-            <p>Na verificatie bekijkt Mavix tot 30 pagina&apos;s per analyse en kun je automatische analyses inplannen. Kies één manier:</p>
+            <p>Met verificatie laat je zien dat je deze website beheert. Dat levert op:</p>
+            <ul className="seo-unlocks">
+              <li>Tot 30 pagina&apos;s per analyse in plaats van 10.</li>
+              <li>Automatische analyses elke week of maand.</li>
+            </ul>
+            <p>Kies één manier. Mavix controleert het daarna zelf door je homepage of het bestand op te halen; je kunt de code daarna laten staan.</p>
             <h3>1. Code in de &lt;head&gt; van je homepage</h3>
             <pre className="seo-code">{`<meta name="mavix-site-verification" content="${site.verificationToken}">`}</pre>
             <CopyButton text={`<meta name="mavix-site-verification" content="${site.verificationToken}">`} small />
@@ -557,6 +648,37 @@ export function SeoDashboard() {
   );
 }
 
+// The few things to do first: open critical and high recommendations.
+function TopActions({ report, tasks, onOpen }: { report: ScanReport; tasks: Tasks | null; onOpen: () => void }) {
+  const open = report.recommendations.filter((r) => (r.severity === "critical" || r.severity === "high") && !["resolved", "ignored"].includes(tasks?.tasks[r.id]?.status || "todo"));
+  if (!report.recommendations.length) return null;
+  return (
+    <section className="ui-card seo-top" aria-labelledby="seo-top-title">
+      <div className="seo-top-head">
+        <h2 id="seo-top-title">{open.length ? "Pak dit eerst aan" : "Geen dringende punten"}</h2>
+        <button type="button" className="seo-link-button" onClick={onOpen}>
+          Naar het actieplan ({report.recommendations.length})
+        </button>
+      </div>
+      {open.length ? (
+        <ol className="seo-top-list">
+          {open.slice(0, 3).map((r) => (
+            <li key={r.id}>
+              <AlertTriangle size={15} aria-hidden="true" className={"is-" + r.severity} />
+              <span>
+                <strong>{r.problem}</strong>
+                <small>{r.action}</small>
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="seo-note">Er staan geen kritieke of belangrijke punten open. De overige verbeteringen vind je in het actieplan.</p>
+      )}
+    </section>
+  );
+}
+
 function Header() {
   return <PageHeading eyebrow="Marketing" title="SEO Intelligence" description="Ontdek hoe goed je website vindbaar is en wat je kunt verbeteren." />;
 }
@@ -567,7 +689,12 @@ function HowCalculated({ report }: { report: ScanReport }) {
       <p>
         Elke controle geeft een percentage (bijvoorbeeld &quot;8 van 10 pagina&apos;s hebben een titel&quot; = 80%). Een onderdeelscore is het gewogen gemiddelde van de controles in dat
         onderdeel. De totaalscore weegt de onderdelen: {CATS.map((c) => `${CATEGORY_LABEL[c].toLowerCase()} ${CATEGORY_WEIGHT[c]}%`).join(", ")}. Wat niet gemeten kon worden (bijvoorbeeld
-        prestaties als PageSpeed Insights niet antwoordde) telt niet mee; de andere onderdelen wegen dan naar verhouding zwaarder.
+        prestaties als PageSpeed Insights niet antwoordde) telt niet mee; de andere onderdelen wegen dan naar verhouding zwaarder. Daarom heet de score dan &quot;voorlopig&quot;
+        en zie je hoeveel procent gemeten is.
+      </p>
+      <p className="seo-note">
+        Inhoudscontroles (titels, beschrijvingen, koppen, tekst) kijken naar de homepage en gewone pagina&apos;s die in Google mogen verschijnen. Archief-, juridische, account- en
+        voorbeeldpagina&apos;s tellen daar niet mee. &quot;n.v.t.&quot; betekent dat een controle niet van toepassing was of niet gemeten kon worden.
       </p>
       <div className="seo-how-grid">
         {CATS.map((c) => (

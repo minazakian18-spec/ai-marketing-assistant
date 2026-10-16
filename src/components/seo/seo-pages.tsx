@@ -2,24 +2,33 @@
 import { Fragment, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { StoredPage } from "@/lib/seo/types";
+import { KIND_LABEL, classifyPage, intentionalNoindex, type PageKind } from "@/lib/seo/classify";
 import { pathOf } from "./seo-parts";
 
-// Every page Mavix analysed, with the measured facts.
+// Every page Mavix analysed, with the measured facts and its kind (home,
+// ordinary page, archive, legal, sample...). The default view shows the pages
+// that matter for search; all results stay available under "Alle pagina's".
 
 const ok = (p: StoredPage) => p.status >= 200 && p.status < 300;
-function flags(p: StoredPage) {
+function flags(p: StoredPage, homeUrl: string) {
   const f: string[] = [];
   if (!ok(p)) f.push("Foutcode " + p.status);
   if (ok(p) && !p.title) f.push("Geen titel");
   if (ok(p) && !p.metaDescription) f.push("Geen beschrijving");
-  if (ok(p) && p.h1.length !== 1) f.push(p.h1.length ? `${p.h1.length} H1's` : "Geen H1");
-  if (p.noindex) f.push("noindex");
+  if (ok(p) && !p.h1.length) f.push("Geen H1");
+  if (p.noindex) f.push(intentionalNoindex(p, homeUrl) ? "noindex (waarschijnlijk bewust)" : "noindex");
   if (p.imagesMissingAlt) f.push(`${p.imagesMissingAlt} zonder alt`);
   return f;
 }
 
-export function Pages({ pages }: { pages: StoredPage[] }) {
+const IMPORTANT: PageKind[] = ["home", "page"];
+
+export function Pages({ pages, homeUrl }: { pages: StoredPage[]; homeUrl: string }) {
   const [open, setOpen] = useState<string | null>(null);
+  const kinds = new Map(pages.map((p) => [p.url, classifyPage(p, homeUrl)]));
+  const important = pages.filter((p) => IMPORTANT.includes(kinds.get(p.url)!) && !p.noindex);
+  const [scope, setScope] = useState<"important" | "all">(important.length ? "important" : "all");
+  const list = scope === "important" ? important : pages;
   if (!pages.length)
     return (
       <div className="seo-empty">
@@ -28,11 +37,24 @@ export function Pages({ pages }: { pages: StoredPage[] }) {
       </div>
     );
   return (
+    <div className="seo-pages-wrap">
+      <div className="seo-pages-head">
+        <div className="seo-seg" role="group" aria-label="Welke pagina's">
+          <button type="button" aria-pressed={scope === "important"} onClick={() => setScope("important")} disabled={!important.length}>
+            Belangrijke pagina&apos;s <span>{important.length}</span>
+          </button>
+          <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")}>
+            Alle pagina&apos;s <span>{pages.length}</span>
+          </button>
+        </div>
+        <p className="seo-note">Archief-, juridische, account- en voorbeeldpagina&apos;s staan onder &quot;Alle pagina&apos;s&quot;. Ze tellen niet mee in de inhoudscontroles.</p>
+      </div>
     <div className="seo-table-wrap">
       <table className="seo-table seo-pages">
         <thead>
           <tr>
             <th scope="col">Pagina</th>
+            <th scope="col">Soort</th>
             <th scope="col">Status</th>
             <th scope="col">Titel</th>
             <th scope="col">Woorden</th>
@@ -40,8 +62,9 @@ export function Pages({ pages }: { pages: StoredPage[] }) {
           </tr>
         </thead>
         <tbody>
-          {pages.map((p) => {
-            const f = flags(p);
+          {list.map((p) => {
+            const f = flags(p, homeUrl);
+            const kind = kinds.get(p.url)!;
             const expanded = open === p.url;
             return (
               <Fragment key={p.url}>
@@ -52,6 +75,9 @@ export function Pages({ pages }: { pages: StoredPage[] }) {
                     </button>
                   </th>
                   <td>
+                    <span className={"seo-kind" + (kind === "home" || kind === "page" ? " is-main" : "")}>{KIND_LABEL[kind]}</span>
+                  </td>
+                  <td>
                     <span className={"seo-status" + (ok(p) ? "" : " is-bad")}>{p.status}</span>
                   </td>
                   <td className="seo-cell-text">{p.title || "—"}</td>
@@ -60,7 +86,7 @@ export function Pages({ pages }: { pages: StoredPage[] }) {
                 </tr>
                 {expanded && (
                   <tr className="seo-page-detail">
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       <dl>
                         <dt>URL</dt>
                         <dd>
@@ -107,6 +133,7 @@ export function Pages({ pages }: { pages: StoredPage[] }) {
           })}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }

@@ -38,6 +38,38 @@ function field(exp: Json): NonNullable<Extract<PsiResult, { ok: true }>["field"]
   return out;
 }
 
+type Failure = Extract<PsiResult, { ok: false }>;
+const LABEL = { mobile: "mobiel", desktop: "desktop" } as const;
+
+/**
+ * Turns a failed PageSpeed Insights response into an honest, specific
+ * explanation. `keySet` tells whether Mavix sent its own API key; without one
+ * Google's shared anonymous quota applies and is usually exhausted.
+ */
+export function psiFailure(status: number, body: unknown, strategy: "mobile" | "desktop", keySet: boolean): Failure {
+  const err = obj(obj(body).error);
+  const message = str(err.message, 400);
+  const reason = str(obj((Array.isArray(err.errors) ? err.errors[0] : {}) as Json).reason, 80);
+  const s = LABEL[strategy];
+  if (status === 429 || reason === "rateLimitExceeded" || /quota/i.test(message)) {
+    const daily = /per day/i.test(message);
+    return {
+      ok: false,
+      strategy,
+      code: "quota",
+      error: keySet
+        ? `De ${daily ? "dagelijkse" : "tijdelijke"} limiet van Google PageSpeed Insights is bereikt (${s}). ${daily ? "Probeer het morgen opnieuw of verhoog de limiet in Google Cloud." : "Probeer het over een paar minuten opnieuw."}`
+        : `Google PageSpeed Insights gaf geen meting (${s}): de gedeelde gratis limiet van Google is op. Mavix heeft hiervoor een eigen API-sleutel nodig (PAGESPEED_API_KEY).`,
+    };
+  }
+  if (status === 403 || /API key not valid|has not been used|is disabled|API_KEY_INVALID|PERMISSION_DENIED/i.test(message + reason))
+    return { ok: false, strategy, code: "config", error: `PageSpeed Insights weigerde de meting (${s}): de API-sleutel is ongeldig of de PageSpeed Insights API staat niet aan in Google Cloud.` };
+  if (status === 400 || /lighthouse|FAILED_DOCUMENT_REQUEST|ERRORED_DOCUMENT_REQUEST|NO_FCP|DNS_FAILURE/i.test(message))
+    return { ok: false, strategy, code: "page", error: `Google kon de pagina niet laden voor de snelheidsmeting (${s}). Controleer of de website openbaar bereikbaar is en niet te traag laadt.` };
+  if (status >= 500) return { ok: false, strategy, code: "unavailable", error: `PageSpeed Insights was tijdelijk niet beschikbaar (${s}). Probeer het later opnieuw.` };
+  return { ok: false, strategy, code: "unavailable", error: `PageSpeed Insights kon deze pagina niet meten (${s}).` };
+}
+
 export function parsePsi(json: unknown, strategy: "mobile" | "desktop"): PsiResult {
   const root = obj(json);
   const lr = obj(root.lighthouseResult);

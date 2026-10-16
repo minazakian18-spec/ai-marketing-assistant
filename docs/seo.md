@@ -50,6 +50,41 @@ weighted average of measured categories: technical 30, content 25, performance
 score; bands 90/50 like Lighthouse. The dashboard shows every check, its weight
 and result ("Hoe berekenen we dit?").
 
+### Completeness (`src/lib/seo/completeness.ts`)
+
+Because unmeasured categories are left out, a site without a PageSpeed result
+could show e.g. 91. The dashboard and the printable report therefore show how
+much of the score weight was measured ("73% gemeten") and the reasons (the real
+PageSpeed error), and call the score "voorlopig" until every category is
+measured. Mobile font size and the Lighthouse accessibility score also come
+from PageSpeed, so those categories count as "partial" without it. Derived from
+the stored report, so it also works for historical scans.
+
+### Page classification (`src/lib/seo/classify.ts`)
+
+Evidence-based kinds: home, page, archive (author/category/tag/date/pagination
+/search/feed), sample (WordPress "Hello world!", "Voorbeeldpagina", /test),
+legal (privacy, cookies, terms), utility (login, account, cart, checkout),
+error. Content checks (titles, descriptions, H1, word count, uniqueness, focus
+keyword, canonical, viewport, lang) use the home page and ordinary indexable
+pages; a noindex on archive/legal/utility/sample pages counts as deliberate and
+is never reported as a problem. All pages stay visible under "Alle pagina's".
+Check changes in this version: "H1" passes with one or more H1s (several H1s
+are fine for Google); canonical and the 250-word rule are presented as
+recommendations; new low-weight check `sample-content` (indexable default or
+test pages).
+
+### Action plan
+
+Recommendations are the action plan: highest severity first, with a team status
+per item (te doen, bezig, opgelost, genegeerd) stored per website in
+`seo_task_states` (migration `202610160001_seo_tasks.sql`; `GET/PUT
+/api/seo/sites/{id}/tasks`, any member of the workspace). A status is the team's
+note; whether a problem is really gone is shown separately by comparing the
+latest analysis with the previous one (`src/lib/seo/compare.ts`: fixed, new,
+improved, worse; unmeasured values are never "fixed"). Without the migration the
+plan works and the status picker is hidden.
+
 ## Google PageSpeed Insights
 
 Mobile and desktop per scan, in parallel with the crawl (Google fetches the
@@ -59,16 +94,27 @@ few page visits, the origin, and top opportunities. Failures are stored as
 failures; nothing is estimated.
 
 `PAGESPEED_API_KEY` (server-only): without a key Google's shared anonymous quota
-is normally exhausted (HTTP 429, seen during testing), so set a key: Google
-Cloud → APIs & Services → enable "PageSpeed Insights API" → Credentials →
-API key (restrict it to that API).
+is normally exhausted. Confirmed on 16 Oct 2026: an anonymous request answers
+429 "Quota exceeded … Queries per day". This is why the dashboard showed
+"Niet gemeten" for performance. Set a key: Google Cloud → APIs & Services →
+enable "PageSpeed Insights API" → Credentials → API key (restrict it to that
+API) → Hostinger environment variable `PAGESPEED_API_KEY` → redeploy. The free
+quota with a key is about 25,000 requests per day (Mavix uses 2 per analysis).
+
+Errors are classified (`psiFailure` in `src/lib/seo/psi.ts`): quota, config
+(invalid key / API not enabled), page (Google could not load the page),
+unavailable/timeout. Only temporary errors (5xx, timeout) are retried once after
+3 s; quota and configuration errors are never retried. Nothing is estimated.
 
 ## Recommendations
 
 `src/lib/seo/recommendations.ts`: one per failed check with problem, why it
 matters, severity (critical/high/medium/low), affected URLs, action and steps.
-Ordered by severity. AI alternatives (Claude, `ANTHROPIC_API_KEY`) for titles,
-meta descriptions and heading structure via `POST /api/seo/scans/{id}/suggest`;
+Ordered by severity. AI alternatives (OpenAI via `src/lib/server/openai.ts`,
+metered as `seo_suggest`, Brand Hub context) for titles, meta descriptions and
+heading structure via `POST /api/seo/scans/{id}/suggest`; the dashboard shows
+the character count against the guideline and whether the focus keyword is in
+each suggestion;
 the page facts come from the stored scan, website text is treated as untrusted
 data, and nothing is changed on the website. Copy buttons for suggestions and
 recommendations; CSV export and a printable report (`/seo/rapport/{id}`).

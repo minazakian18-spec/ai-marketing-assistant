@@ -20,7 +20,13 @@ export type PsiResult =
       opportunities: { id: string; title: string; display: string }[];
       audits: { viewport: number | null; fontSize: number | null };
     }
-  | { ok: false; strategy: "mobile" | "desktop"; error: string };
+  | {
+      ok: false;
+      strategy: "mobile" | "desktop";
+      error: string;
+      /** Why it failed (newer scans): quota, configuration, the page itself, or Google being unavailable. */
+      code?: "quota" | "config" | "page" | "timeout" | "unavailable";
+    };
 
 export type StoredPage = Omit<PageFacts, "internalLinks" | "externalLinks"> & { internalLinkCount: number; externalLinkCount: number };
 

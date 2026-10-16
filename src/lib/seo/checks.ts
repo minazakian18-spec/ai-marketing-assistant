@@ -1,4 +1,5 @@
 import { keywordRelevance } from "./parse.ts";
+import { classifyPage, intentionalNoindex, isPrimary } from "./classify.ts";
 import type { Category, CheckResult, PsiResult, Scores, SiteFacts, StoredPage } from "./types";
 
 // Measurable checks and the Mavix scores built from them.
@@ -32,8 +33,15 @@ type Def = { id: string; category: Category; label: string; weight: number; run:
 
 const ok = (p: StoredPage) => p.status >= 200 && p.status < 300 && /html/i.test(p.contentType || "text/html");
 const htmlPages = (c: Ctx) => c.pages.filter(ok);
+// Content checks look at the pages that carry the business in search (home and
+// ordinary indexable pages); archives, legal, account and sample pages are
+// reported separately. Falls back to all HTML pages when none qualify.
+const primaryPages = (c: Ctx) => {
+  const primary = htmlPages(c).filter((p) => isPrimary(p, c.site.finalUrl || c.site.startUrl));
+  return primary.length ? primary : htmlPages(c);
+};
 /** Share of pages for which `pass` holds, with the failing URLs. */
-function share(c: Ctx, pass: (p: StoredPage) => boolean, describe: (n: number, of: number) => string, pages = htmlPages(c)) {
+function share(c: Ctx, pass: (p: StoredPage) => boolean, describe: (n: number, of: number) => string, pages = primaryPages(c)) {
   if (!pages.length) return { ratio: null, detail: "Geen pagina's om te controleren." };
   const failing = pages.filter((p) => !pass(p)).map((p) => p.url);
   return { ratio: (pages.length - failing.length) / pages.length, detail: describe(pages.length - failing.length, pages.length), failing };
@@ -61,11 +69,23 @@ export const CHECKS: Def[] = [
   { id: "robots", category: "technical", label: "robots.txt aanwezig", weight: 1, run: (c) => (c.site.robots.status === null ? NA("robots.txt kon niet worden opgehaald.") : { ratio: c.site.robots.found ? 1 : 0, detail: c.site.robots.found ? "robots.txt gevonden." : `Geen robots.txt (status ${c.site.robots.status}).` }) },
   { id: "robots-blocks", category: "technical", label: "robots.txt blokkeert de site niet", weight: 3, run: (c) => (c.site.robots.blocksStart ? { ratio: 0, detail: "robots.txt verbiedt crawlers de startpagina." } : c.site.robots.status === null ? NA("robots.txt kon niet worden opgehaald.") : { ratio: 1, detail: "De startpagina mag gecrawld worden." }) },
   { id: "sitemap", category: "technical", label: "XML-sitemap gevonden", weight: 2, run: (c) => !measured(c) ? NA("Niet gecontroleerd: de website was niet bereikbaar.") : ({ ratio: c.site.sitemap.found ? 1 : 0, detail: c.site.sitemap.found ? `Sitemap met ${c.site.sitemap.urls} URL's.` : "Geen XML-sitemap gevonden (robots.txt en /sitemap.xml)." }) },
-  { id: "indexable", category: "technical", label: "Indexeerbare pagina's", weight: 3, run: (c) => share(c, (p) => !p.noindex, (n, of) => `${n} van ${of} pagina's mogen in Google verschijnen.`) },
+  {
+    id: "indexable",
+    category: "technical",
+    label: "Belangrijke pagina's indexeerbaar",
+    weight: 3,
+    // A noindex on archives, legal, account or sample pages is a valid choice and not counted.
+    run: (c) => {
+      const home = c.site.finalUrl || c.site.startUrl;
+      const deliberate = htmlPages(c).filter((p) => intentionalNoindex(p, home)).length;
+      const r = share(c, (p) => !p.noindex, (n, of) => `${n} van ${of} belangrijke pagina's mogen in Google verschijnen.` + (deliberate ? ` ${deliberate} archief- of hulppagina('s) met noindex tellen niet mee (dat is meestal bewust).` : ""), htmlPages(c).filter((p) => !intentionalNoindex(p, home)));
+      return r;
+    },
+  },
   {
     id: "canonical",
     category: "technical",
-    label: "Canonical-URL ingesteld",
+    label: "Canonical-URL ingesteld (aanbevolen)",
     weight: 2,
     run: (c) => share(c, (p) => !!p.canonical, (n, of) => `${n} van ${of} pagina's hebben een canonical-URL.`),
   },
@@ -104,7 +124,7 @@ export const CHECKS: Def[] = [
     label: "Unieke titels",
     weight: 2,
     run: (c) => {
-      const pages = htmlPages(c);
+      const pages = primaryPages(c);
       if (pages.length < 2) return { ratio: null, detail: "Te weinig pagina's om te vergelijken." };
       const dup = duplicates(pages.map((p) => [p.title, p.url]));
       return { ratio: 1 - dup.length / pages.length, detail: dup.length ? `${dup.length} pagina's delen een titel.` : "Alle titels zijn uniek.", failing: dup };
@@ -116,7 +136,7 @@ export const CHECKS: Def[] = [
     category: "content",
     label: "Beschrijving 70-160 tekens",
     weight: 1,
-    run: (c) => share(c, (p) => p.metaDescription.length >= 70 && p.metaDescription.length <= 160, (n, of) => `${n} van ${of} beschrijvingen hebben een goede lengte.`, htmlPages(c).filter((p) => p.metaDescription)),
+    run: (c) => share(c, (p) => p.metaDescription.length >= 70 && p.metaDescription.length <= 160, (n, of) => `${n} van ${of} beschrijvingen hebben een goede lengte.`, primaryPages(c).filter((p) => p.metaDescription)),
   },
   {
     id: "description-unique",
@@ -124,28 +144,42 @@ export const CHECKS: Def[] = [
     label: "Unieke metabeschrijvingen",
     weight: 1,
     run: (c) => {
-      const pages = htmlPages(c).filter((p) => p.metaDescription);
+      const pages = primaryPages(c).filter((p) => p.metaDescription);
       if (pages.length < 2) return { ratio: null, detail: "Te weinig beschrijvingen om te vergelijken." };
       const dup = duplicates(pages.map((p) => [p.metaDescription, p.url]));
       return { ratio: 1 - dup.length / pages.length, detail: dup.length ? `${dup.length} pagina's delen een beschrijving.` : "Alle beschrijvingen zijn uniek.", failing: dup };
     },
   },
-  { id: "h1", category: "content", label: "Precies één H1-kop", weight: 2, run: (c) => share(c, (p) => p.h1.length === 1, (n, of) => `${n} van ${of} pagina's hebben precies één H1.`) },
+  { id: "h1", category: "content", label: "Hoofdkop (H1) aanwezig", weight: 2, run: (c) => share(c, (p) => p.h1.length >= 1, (n, of) => `${n} van ${of} pagina's hebben een hoofdkop (H1).`) },
   { id: "heading-order", category: "content", label: "Logische kopstructuur", weight: 1, run: (c) => share(c, (p) => p.headingSkips === 0, (n, of) => `${n} van ${of} pagina's slaan geen kopniveau over.`) },
-  { id: "word-count", category: "content", label: "Voldoende tekst (250+ woorden)", weight: 1, run: (c) => share(c, (p) => p.wordCount >= 250, (n, of) => `${n} van ${of} pagina's hebben minstens 250 woorden.`) },
+  { id: "word-count", category: "content", label: "Voldoende tekst (richtlijn 250+ woorden)", weight: 1, run: (c) => share(c, (p) => p.wordCount >= 250, (n, of) => `${n} van ${of} pagina's hebben minstens 250 woorden.`) },
   {
     id: "keyword",
     category: "content",
     label: "Zoekwoord op de homepage",
     weight: 2,
     run: (c) => {
-      const home = htmlPages(c)[0];
+      const home = primaryPages(c)[0];
       if (!c.site.keyword) return { ratio: null, detail: "Geen zoekwoord ingesteld." };
       if (!home) return { ratio: null, detail: "Homepage niet gecontroleerd." };
       const k = keywordRelevance(home, c.site.keyword);
       const parts = [k.inTitle, k.inH1, k.inDescription, k.inText];
       const found = parts.filter(Boolean).length;
       return { ratio: found / parts.length, detail: `"${c.site.keyword}" staat in ${found} van 4 plekken (titel, H1, beschrijving, tekst).`, failing: found < 4 ? [home.url] : [] };
+    },
+  },
+
+  {
+    id: "sample-content",
+    category: "content",
+    label: "Geen standaard- of testpagina's in Google",
+    weight: 1,
+    run: (c) => {
+      const pages = htmlPages(c);
+      if (!pages.length) return { ratio: null, detail: "Geen pagina's." };
+      const home = c.site.finalUrl || c.site.startUrl;
+      const visible = pages.filter((p) => classifyPage(p, home) === "sample" && !p.noindex).map((p) => p.url);
+      return { ratio: visible.length ? 0 : 1, detail: visible.length ? `${visible.length} pagina('s) lijken standaard- of testinhoud van de websitebouwer.` : "Geen standaard- of testpagina's gevonden.", failing: visible };
     },
   },
 

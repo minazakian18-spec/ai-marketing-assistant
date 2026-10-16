@@ -5,7 +5,7 @@ import { HttpError } from "./access";
 import { assertPublicUrl, safeFetch } from "./safe-fetch";
 import { parsePage, parseSitemap, sameSite, type PageFacts } from "../seo/parse";
 import { crawlDelayMs, parseRobots, robotsAllowed, type Robots } from "../seo/robots";
-import { parsePsi } from "../seo/psi";
+import { parsePsi, psiFailure } from "../seo/psi";
 import { computeScores, runChecks } from "../seo/checks";
 import { buildRecommendations } from "../seo/recommendations";
 import type { PsiResult, ScanReport, SiteFacts, StoredPage } from "../seo/types";
@@ -253,23 +253,28 @@ const keyOf = (u: string) => {
 const BROKEN = (s: number | string) => s === "dns" || (typeof s === "number" && (s === 404 || s === 410 || s >= 500));
 const UNCERTAIN = (s: number | string) => typeof s === "string" ? s !== "dns" : [401, 403, 405, 429].includes(s) || s === 0;
 
-async function fetchPsi(url: string, strategy: "mobile" | "desktop"): Promise<PsiResult> {
+// One retry, only for temporary failures (5xx, timeout, network). Quota and
+// configuration errors are never retried: that would only burn more quota.
+export async function fetchPsi(url: string, strategy: "mobile" | "desktop"): Promise<PsiResult> {
   const q = new URLSearchParams({ url, strategy, locale: "nl" });
   for (const c of ["performance", "accessibility", "best-practices", "seo"]) q.append("category", c);
-  if (process.env.PAGESPEED_API_KEY) q.set("key", process.env.PAGESPEED_API_KEY);
-  try {
-    const r = await fetch("https://www.googleapis.com/pagespeedonline/v5/runPagespeed?" + q, { cache: "no-store", signal: AbortSignal.timeout(70_000) });
-    const json = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const reason = r.status === 429 ? "De dagelijkse limiet van PageSpeed Insights is bereikt." : "PageSpeed Insights kon deze pagina niet meten.";
-      log("seo_psi_failed", { strategy, status: r.status });
-      return { ok: false, strategy, error: reason };
+  const keySet = !!process.env.PAGESPEED_API_KEY;
+  if (keySet) q.set("key", process.env.PAGESPEED_API_KEY!);
+  let last: PsiResult = { ok: false, strategy, code: "timeout", error: `PageSpeed Insights reageerde niet op tijd (${strategy === "mobile" ? "mobiel" : "desktop"}).` };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch("https://www.googleapis.com/pagespeedonline/v5/runPagespeed?" + q, { cache: "no-store", signal: AbortSignal.timeout(70_000) });
+      const json = await r.json().catch(() => ({}));
+      if (r.ok) return parsePsi(json, strategy);
+      last = psiFailure(r.status, json, strategy, keySet);
+      log("seo_psi_failed", { strategy, status: r.status, code: last.ok ? "" : last.code || "", key: keySet ? 1 : 0, attempt });
+      if (r.status < 500) return last;
+    } catch {
+      log("seo_psi_failed", { strategy, status: 0, code: "timeout", key: keySet ? 1 : 0, attempt });
     }
-    return parsePsi(json, strategy);
-  } catch {
-    log("seo_psi_failed", { strategy, status: 0 });
-    return { ok: false, strategy, error: "PageSpeed Insights reageerde niet op tijd." };
+    if (attempt === 0) await new Promise((res) => setTimeout(res, 3000));
   }
+  return last;
 }
 
 const toStored = (p: PageFacts): StoredPage => {
@@ -519,6 +524,32 @@ export async function runScan(scanId: string) {
     console.error(JSON.stringify({ event: "seo_scan_failed", code: (e as Error).message?.slice(0, 40) || "error" }));
     await db().from("seo_scans").update({ status: "failed", stage: "failed", error: "De analyse kon niet worden afgerond. Probeer het later opnieuw.", completed_at: new Date().toISOString() }).eq("id", scanId);
   }
+}
+
+// ---------------------------------------------------------------- Action plan
+
+export const TASK_STATUSES = ["todo", "in_progress", "resolved", "ignored"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+const tasksNotReady = (e: { code?: string } | null) => !!e && ["42P01", "PGRST205", "42703"].includes(e.code || "");
+
+/** Team statuses for a website's recommendations (migration 202610160001). */
+export async function listTasks(workspaceId: string, siteId: string) {
+  await siteRow(workspaceId, siteId);
+  const { data, error } = await db().from("seo_task_states").select("check_id,status,updated_at").eq("workspace_id", workspaceId).eq("site_id", siteId);
+  if (tasksNotReady(error)) return { available: false as const, tasks: {} as Record<string, { status: TaskStatus; updatedAt: string }> };
+  if (error) throw new HttpError(503, "De actiepunten konden niet worden geladen.");
+  const tasks: Record<string, { status: TaskStatus; updatedAt: string }> = {};
+  for (const r of data || []) tasks[r.check_id as string] = { status: r.status as TaskStatus, updatedAt: r.updated_at as string };
+  return { available: true as const, tasks };
+}
+
+export async function setTask(workspaceId: string, siteId: string, checkId: string, status: TaskStatus, userId: string) {
+  await siteRow(workspaceId, siteId);
+  const row = { site_id: siteId, workspace_id: workspaceId, check_id: checkId, status, updated_by: userId, updated_at: new Date().toISOString() };
+  const { error } = await db().from("seo_task_states").upsert(row, { onConflict: "site_id,check_id" });
+  if (tasksNotReady(error)) throw new HttpError(503, "Actiepunten bijhouden wordt nog ingericht. Probeer het later opnieuw.");
+  if (error) throw new HttpError(503, "De status kon niet worden opgeslagen.");
+  return { checkId, status, updatedAt: row.updated_at };
 }
 
 /** Scheduled scans that are due (verified sites only). */

@@ -4,9 +4,36 @@ import { ExternalLink, Lock } from "lucide-react";
 import { BrandIcon } from "@/components/brand-icon";
 import { LineChart } from "./line-chart";
 import { Info, pathOf, shortDate } from "./seo-parts";
+import type { ScanReport } from "@/lib/seo/types";
 
 // Private Google Search Console data for one website. Separate from the
 // public audit: only for properties the connected Google account may read.
+// Real Google numbers; the link to the Mavix analysis (issues per page) is
+// shown next to them, never mixed into them.
+
+const norm = (u: string) => {
+  try {
+    const x = new URL(u);
+    return x.hostname.replace(/^www\./, "") + (x.pathname.replace(/\/+$/, "") || "/");
+  } catch {
+    return u;
+  }
+};
+
+/** Clicks in the second half of the period versus the first half (null when too little data). */
+function trend(daily: { clicks: number }[]) {
+  if (daily.length < 6) return null;
+  const half = Math.floor(daily.length / 2);
+  const a = daily.slice(0, half).reduce((s, d) => s + d.clicks, 0);
+  const b = daily.slice(daily.length - half).reduce((s, d) => s + d.clicks, 0);
+  if (a + b < 10) return null;
+  if (!a) return { text: "Je krijgt sinds kort klikken vanuit Google.", up: true };
+  const pct = Math.round(((b - a) / a) * 100);
+  if (Math.abs(pct) < 10) return { text: "Het aantal klikken is in deze periode ongeveer gelijk gebleven.", up: null };
+  return { text: `Klikken in de tweede helft van deze periode: ${pct > 0 ? "+" : ""}${pct}% ten opzichte van de eerste helft.`, up: pct > 0 };
+}
+// A query that is shown often but rarely clicked: a better title or description may help.
+const opportunity = (r: Metrics) => r.impressions >= 50 && r.ctr < 2 && r.position > 0 && r.position <= 20;
 
 type Metrics = { clicks: number; impressions: number; ctr: number; position: number };
 type Data =
@@ -26,7 +53,7 @@ type Data =
 const nl = (n: number) => n.toLocaleString("nl-NL");
 const SERIES_BLUE = "#2a78d6";
 
-export function SearchConsole({ siteId, canManage }: { siteId: string; canManage: boolean }) {
+export function SearchConsole({ siteId, canManage, report }: { siteId: string; canManage: boolean; report?: ScanReport | null }) {
   const [days, setDays] = useState("28");
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
@@ -150,6 +177,11 @@ export function SearchConsole({ siteId, canManage }: { siteId: string; canManage
     );
 
   const points = data.daily.map((d) => ({ x: d.date, label: shortDate(d.date), values: { clicks: d.clicks, impressions: d.impressions } }));
+  const t = trend(data.daily);
+  // Issues per crawled page, from the latest Mavix analysis.
+  const issues = new Map<string, number>();
+  for (const p of report?.pages || []) issues.set(norm(p.url), 0);
+  for (const r of report?.recommendations || []) for (const u of r.urls) if (issues.has(norm(u))) issues.set(norm(u), (issues.get(norm(u)) || 0) + 1);
   return (
     <div className="seo-gsc">
       <div className="seo-gsc-head">
@@ -191,6 +223,7 @@ export function SearchConsole({ siteId, canManage }: { siteId: string; canManage
           <strong>{data.totals.position ? data.totals.position.toLocaleString("nl-NL") : "—"}</strong>
         </div>
       </div>
+      {t && <p className={"seo-trend" + (t.up === true ? " is-up" : t.up === false ? " is-down" : "")}>{t.text}</p>}
       {points.length > 0 ? (
         <div className="seo-chart-pair">
           <LineChart title="Klikken per dag" points={points} series={[{ key: "clicks", label: "Klikken", color: SERIES_BLUE }]} format={nl} height={190} />
@@ -203,10 +236,12 @@ export function SearchConsole({ siteId, canManage }: { siteId: string; canManage
         <section className="seo-block">
           <h3>Zoekwoorden</h3>
           <TopTable rows={data.queries} label="Zoekwoord" />
+          {data.queries.some(opportunity) && <p className="seo-note">&quot;Kans&quot;: vaak getoond maar weinig aangeklikt. Een duidelijkere titel of beschrijving kan meer klikken opleveren.</p>}
         </section>
         <section className="seo-block">
           <h3>Pagina&apos;s</h3>
-          <TopTable rows={data.pages} label="Pagina" path />
+          <TopTable rows={data.pages} label="Pagina" path issues={report ? issues : undefined} />
+          {report && <p className="seo-note">&quot;Analyse&quot; komt uit de laatste Mavix-analyse, niet van Google.</p>}
         </section>
       </div>
       {intro}
@@ -214,7 +249,7 @@ export function SearchConsole({ siteId, canManage }: { siteId: string; canManage
   );
 }
 
-function TopTable({ rows, label, path = false }: { rows: (Metrics & { key: string })[]; label: string; path?: boolean }) {
+function TopTable({ rows, label, path = false, issues }: { rows: (Metrics & { key: string })[]; label: string; path?: boolean; issues?: Map<string, number> }) {
   if (!rows.length) return <p className="seo-note">Geen gegevens.</p>;
   return (
     <div className="seo-table-wrap">
@@ -226,6 +261,7 @@ function TopTable({ rows, label, path = false }: { rows: (Metrics & { key: strin
             <th scope="col">Vertoningen</th>
             <th scope="col">CTR</th>
             <th scope="col">Positie</th>
+            {issues && <th scope="col">Analyse</th>}
           </tr>
         </thead>
         <tbody>
@@ -233,11 +269,23 @@ function TopTable({ rows, label, path = false }: { rows: (Metrics & { key: strin
             <tr key={r.key}>
               <th scope="row" className="seo-cell-text">
                 {path ? pathOf(r.key) : r.key}
+                {!path && opportunity(r) && <span className="seo-kind is-chance">Kans</span>}
               </th>
               <td>{nl(r.clicks)}</td>
               <td>{nl(r.impressions)}</td>
               <td>{r.ctr.toLocaleString("nl-NL")}%</td>
               <td>{r.position.toLocaleString("nl-NL")}</td>
+              {issues && (
+                <td>
+                  {!issues.has(norm(r.key)) ? (
+                    <span className="seo-note">Niet geanalyseerd</span>
+                  ) : issues.get(norm(r.key)) ? (
+                    <span className="seo-flags">{issues.get(norm(r.key))} aandachtspunt{issues.get(norm(r.key)) === 1 ? "" : "en"}</span>
+                  ) : (
+                    <span className="seo-tone is-good">In orde</span>
+                  )}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

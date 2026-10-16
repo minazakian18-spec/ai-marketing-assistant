@@ -3,6 +3,7 @@ import { use, useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { CATEGORY_LABEL, CATEGORY_WEIGHT } from "@/lib/seo/checks";
 import type { Category, ScanReport } from "@/lib/seo/types";
+import { analysisCompleteness } from "@/lib/seo/completeness";
 import { TONE_LABEL, dateTime, pathOf, tone } from "@/components/seo/seo-parts";
 import "../../../../seo.css";
 
@@ -40,6 +41,7 @@ export default function SeoReport({ params }: { params: Promise<{ id: string }> 
   if (!report) return <div className="seo seo-report"><div className="seo-skeleton seo-skeleton-hero" aria-busy="true" aria-label="Laden" /></div>;
 
   const psi = report.psi?.mobile.ok ? report.psi.mobile : null;
+  const completeness = analysisCompleteness(report);
   return (
     <div className="seo seo-report">
       <div className="seo-report-actions">
@@ -54,6 +56,11 @@ export default function SeoReport({ params }: { params: Promise<{ id: string }> 
           Geanalyseerd op {dateTime(completed)} · {report.site.crawl.crawled} pagina&apos;s · Mavix SEO-score {report.scores.overall ?? "—"} ({TONE_LABEL[tone(report.scores.overall)].toLowerCase()})
         </p>
         <p className="seo-note">De Mavix SEO-score is een eigen score op basis van meetbare controles, geen officiële Google-score. Prestaties komen van Google PageSpeed Insights.</p>
+        {!completeness.complete && (
+          <p className="seo-note">
+            <strong>Voorlopige score: {completeness.coverage}% van de analyse is gemeten.</strong> {completeness.reasons.join(" ")} Wat niet gemeten is, telt niet mee.
+          </p>
+        )}
       </section>
       <section className="ui-card">
         <h2 style={{ margin: "0 0 10px", fontSize: 17 }}>Scores</h2>

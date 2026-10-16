@@ -51,10 +51,18 @@ export function Performance({ psi, pagespeedKey }: { psi: { mobile: PsiResult; d
       </div>
       {!r.ok ? (
         <div className="seo-empty">
-          <strong>Geen meting beschikbaar</strong>
-          <p>
-            {r.error}
-            {!pagespeedKey && " Zonder eigen API-sleutel deelt Mavix een beperkte gratis limiet van Google."}
+          <strong>Snelheid niet gemeten</strong>
+          <p>{r.error}</p>
+          <p className="seo-note">
+            {r.code === "quota" || (!r.code && !pagespeedKey)
+              ? pagespeedKey
+                ? "Er is niets geschat: de score telt prestaties niet mee. Start later een nieuwe analyse om de snelheid alsnog te meten."
+                : "Er is niets geschat: de score telt prestaties niet mee tot Mavix een eigen PageSpeed-sleutel heeft. Dit is een instelling van Mavix, niet van je website."
+              : r.code === "page"
+                ? "Er is niets geschat. Open je website in een privévenster; laadt die normaal, start dan een nieuwe analyse."
+                : r.code === "config"
+                  ? "Er is niets geschat. Dit is een instelling van Mavix; neem contact op met Mavix."
+                  : "Er is niets geschat. Start later een nieuwe analyse."}
           </p>
         </div>
       ) : (
