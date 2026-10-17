@@ -5,8 +5,9 @@ const columns = [
   {
     title: "Product",
     links: [
-      ["/#product", "Overzicht"],
-      ["/#oplossingen", "Oplossingen"],
+      ["/#product", "Producten"],
+      ["/#hoe-het-werkt", "Hoe het werkt"],
+      ["/#functies", "Functies"],
       ["/#integraties", "Integraties"],
       ["/pricing", "Prijzen"],
     ],
@@ -22,7 +23,8 @@ const columns = [
   {
     title: "Support",
     links: [
-      ["/pricing#faq", "Veelgestelde vragen"],
+      ["/#faq", "Veelgestelde vragen"],
+      ["/pricing#faq", "Vragen over abonnementen"],
       ["/pricing", "Facturatie & prijzen"],
     ],
   },

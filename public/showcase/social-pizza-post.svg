@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Voorbeeldpost: links een plan voor één stukje pizza, rechts de werkelijkheid met een hele pizza">
+  <defs>
+    <radialGradient id="crust" cx=".5" cy=".5" r=".5"><stop offset=".78" stop-color="#f4c26b"/><stop offset=".9" stop-color="#d98c3a"/><stop offset="1" stop-color="#b8692a"/></radialGradient>
+    <radialGradient id="sauce" cx=".5" cy=".45" r=".55"><stop offset="0" stop-color="#ffe4a3"/><stop offset=".75" stop-color="#ffd27a"/><stop offset="1" stop-color="#f0a64a"/></radialGradient>
+    <g id="pep"><circle r="9" fill="#c0392b"/><circle r="9" fill="none" stroke="#9b2c22" stroke-width="1.5"/><circle cx="-3" cy="-2" r="1.6" fill="#e9705f"/><circle cx="3" cy="3" r="1.2" fill="#e9705f"/></g>
+    <g id="basil"><path d="M0 0c6-8 16-8 18 0-6 6-14 6-18 0z" fill="#2f7d32"/><path d="M1 0h15" stroke="#5aa25c" stroke-width="1"/></g>
+  </defs>
+  <rect width="400" height="400" fill="#fff8ee"/>
+  <rect x="200" width="200" height="400" fill="#2b1d3a"/>
+  <!-- panel labels -->
+  <text x="100" y="52" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="22" fill="#2b1d3a">HET PLAN</text>
+  <text x="100" y="74" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#6b5b7a">"Ik neem één stukje."</text>
+  <text x="300" y="52" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="16" fill="#ffd27a">DE WERKELIJKHEID</text>
+  <text x="300" y="74" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#d8cce6">Ook ik, 4 minuten later:</text>
+  <!-- left: plate with one slice -->
+  <ellipse cx="100" cy="250" rx="78" ry="26" fill="#e9dfd2"/>
+  <ellipse cx="100" cy="244" rx="78" ry="26" fill="#fff"/>
+  <ellipse cx="100" cy="244" rx="58" ry="17" fill="none" stroke="#efe6da" stroke-width="2"/>
+  <path d="M70 236 132 226 104 262z" fill="url(#sauce)" stroke="#d98c3a" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M68 236c18-6 44-11 66-10" stroke="#c97a30" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <use href="#pep" x="106" y="238"/>
+  <use href="#basil" x="92" y="248"/>
+  <text x="100" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#8a7b96">zelfbeheersing: 100%</text>
+  <!-- right: whole pizza -->
+  <circle cx="300" cy="232" r="84" fill="url(#crust)"/>
+  <circle cx="300" cy="232" r="70" fill="url(#sauce)"/>
+  <g>
+    <use href="#pep" x="272" y="204"/><use href="#pep" x="322" y="198"/><use href="#pep" x="300" y="236"/>
+    <use href="#pep" x="262" y="252"/><use href="#pep" x="334" y="250"/><use href="#pep" x="300" y="278"/><use href="#pep" x="290" y="176"/>
+    <use href="#basil" x="306" y="214"/><use href="#basil" x="268" y="226"/><use href="#basil" x="318" y="266"/>
+  </g>
+  <path d="M300 148v168M216 232h168M241 173l118 118M359 173 241 291" stroke="#e8a24f" stroke-width="1.5" opacity=".7"/>
+  <text x="300" y="350" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#d8cce6">zelfbeheersing: even pauze</text>
+  <rect x="0" y="372" width="400" height="28" fill="#c0392b"/>
+  <text x="200" y="391" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="12" letter-spacing="1.5" fill="#fff">PIZZAMAANDAG · 2E PIZZA HALVE PRIJS</text>
+</svg>

@@ -5,8 +5,8 @@ import { Reveal } from "./reveal";
 // without a personal review. Shown on the homepage so visitors know what
 // happens after they apply.
 const STEPS = [
-  ["Aanvraag", "Je vraagt een demo of account aan. Dat kost twee minuten."],
-  ["Persoonlijke beoordeling", "We bekijken je aanvraag en nemen contact met je op."],
+  ["Aanvraag", "Je vraagt een demo of account aan. Dat duurt een paar minuten."],
+  ["Persoonlijke beoordeling", "We bekijken je aanvraag persoonlijk en nemen contact met je op."],
   ["Demo of kennismaking", "We laten zien hoe Mavix werkt voor jouw zaak."],
   ["Goedkeuring en start", "Je werkruimte gaat open. Je vult je Brand Hub in en koppelt je kanalen, stap voor stap."],
 ] as const;

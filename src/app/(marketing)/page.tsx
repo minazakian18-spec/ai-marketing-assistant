@@ -9,7 +9,11 @@ import { IntegrationsStrip } from "@/components/marketing/integrations-strip";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { OnboardingSteps } from "@/components/marketing/onboarding-steps";
 import { Faq } from "@/components/marketing/faq";
+import { WorkspaceShowcase } from "@/components/marketing/workspace-showcase";
+import { BrandHubFeature } from "@/components/marketing/brand-hub-feature";
+import { FeaturesShowcase } from "@/components/marketing/features-showcase";
 import { pageMetadata, structuredData } from "@/lib/site";
+import "../home-showcase.css";
 
 export const metadata: Metadata = pageMetadata({
   title: "Mavix — AI-marketingsoftware voor reviews, Instagram en e-mail",
@@ -29,11 +33,14 @@ export default function MarketingHome() {
       />
       <Hero />
       <PartnersStrip />
+      <Audiences />
       <CoreProducts />
       <HowItWorks />
-      <Audiences />
-      <PricingNewTrending />
+      <WorkspaceShowcase />
+      <BrandHubFeature />
+      <FeaturesShowcase />
       <IntegrationsStrip />
+      <PricingNewTrending />
       <OnboardingSteps />
       <Faq />
       <FinalCta />

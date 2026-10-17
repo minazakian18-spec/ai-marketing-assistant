@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Bakkerij De Korenaar">
+  <rect width="120" height="120" rx="60" fill="#f3e3c3"/>
+  <circle cx="60" cy="60" r="50" fill="none" stroke="#7a4a1e" stroke-width="1.5"/>
+  <path d="M60 28v44" stroke="#7a4a1e" stroke-width="2.5" stroke-linecap="round"/>
+  <g fill="#c8892f">
+    <ellipse cx="53" cy="38" rx="4.5" ry="8" transform="rotate(-25 53 38)"/><ellipse cx="67" cy="38" rx="4.5" ry="8" transform="rotate(25 67 38)"/>
+    <ellipse cx="52" cy="50" rx="4.5" ry="8" transform="rotate(-25 52 50)"/><ellipse cx="68" cy="50" rx="4.5" ry="8" transform="rotate(25 68 50)"/>
+    <ellipse cx="52" cy="62" rx="4.5" ry="8" transform="rotate(-25 52 62)"/><ellipse cx="68" cy="62" rx="4.5" ry="8" transform="rotate(25 68 62)"/>
+    <ellipse cx="60" cy="27" rx="4" ry="7"/>
+  </g>
+  <text x="60" y="88" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#7a4a1e">De Korenaar</text>
+  <text x="60" y="99" text-anchor="middle" font-family="Arial, sans-serif" font-size="6" letter-spacing="2" fill="#7a4a1e">BAKKERIJ · KOFFIE</text>
+</svg>

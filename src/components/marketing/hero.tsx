@@ -6,7 +6,7 @@ import { PromoLine } from "./promo-line";
 
 export function Hero() {
   return (
-    <section className="mkt-hero mkt-hero-dark" id="product">
+    <section className="mkt-hero mkt-hero-dark" id="overzicht">
       <div className="mkt-container mkt-hero-inner">
         <Reveal>
           <PromoLine />
@@ -20,14 +20,17 @@ export function Hero() {
         </Reveal>
         <Reveal delay={120}>
           <p className="mkt-lede mkt-hero-lede">
-            Mavix is AI-marketingsoftware voor ondernemers: beantwoord reviews,
-            maak social content en verstuur e-mailcampagnes vanuit één plek.
+            Mavix is AI-marketingsoftware voor lokale ondernemers. Beantwoord reviews,
+            maak social content en verstuur e-mailcampagnes vanuit één plek, terwijl jij de regie houdt.
           </p>
         </Reveal>
         <Reveal delay={180}>
           <div className="mkt-hero-actions">
             <Link href="/demo" className="mkt-btn mkt-hero-cta">
-              Demo aanvragen
+              Plan een demo
+            </Link>
+            <Link href="/#product" className="mkt-btn mkt-hero-cta-ghost">
+              Ontdek Mavix
             </Link>
           </div>
           <p className="mkt-hero-confidence">

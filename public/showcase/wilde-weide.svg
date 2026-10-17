@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Bloemenatelier Wilde Weide">
+  <rect width="120" height="120" rx="60" fill="#fdf2f4"/>
+  <path d="M60 78V48M60 66c-8-2-12-8-12-14 6 0 11 4 12 10m0-4c6-1 11-6 11-12-6 0-10 4-11 10" fill="none" stroke="#3f6212" stroke-width="2.2" stroke-linecap="round"/>
+  <g fill="#e11d74"><circle cx="60" cy="34" r="6"/><circle cx="52" cy="39" r="6"/><circle cx="68" cy="39" r="6"/><circle cx="55" cy="47" r="6"/><circle cx="65" cy="47" r="6"/></g>
+  <circle cx="60" cy="41" r="4" fill="#fbbf24"/>
+  <text x="60" y="92" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#831843">Wilde Weide</text>
+  <text x="60" y="103" text-anchor="middle" font-family="Arial, sans-serif" font-size="6" letter-spacing="2" fill="#3f6212">BLOEMENATELIER</text>
+</svg>

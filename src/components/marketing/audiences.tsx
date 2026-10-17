@@ -5,17 +5,17 @@ const audiences = [
   {
     icon: UtensilsCrossed,
     title: "Horeca en restaurants",
-    text: "Beantwoord Google-reviews van gasten, deel je menu en acties op Instagram en houd vaste gasten op de hoogte met een nieuwsbrief.",
+    text: "Reageer persoonlijk op elke review, deel je menu en acties op Instagram en houd vaste gasten op de hoogte met een nieuwsbrief.",
   },
   {
     icon: Store,
     title: "Winkels en webshops",
-    text: "Plan productposts, stuur e-mailcampagnes voor nieuwe collecties en reageer snel op vragen en reviews van klanten.",
+    text: "Plan productposts, kondig nieuwe collecties aan per e-mail en beantwoord vragen en reviews van klanten zonder vertraging.",
   },
   {
     icon: Scissors,
     title: "Salons, praktijken en dienstverleners",
-    text: "Laat zien wat je doet, herinner klanten aan je aanbod en bouw een goede online reputatie op met persoonlijke reacties.",
+    text: "Laat zien wat je doet, herinner klanten aan je aanbod en bouw met persoonlijke reacties aan een sterke online reputatie.",
   },
 ];
 
@@ -26,9 +26,9 @@ export function Audiences() {
       <div className="mkt-container">
         <Reveal className="mkt-section-head">
           <h2 className="mkt-h2" id="voor-wie-title">
-            AI-marketing voor kleine en middelgrote bedrijven.
+            Gemaakt voor lokale ondernemers.
           </h2>
-          <p className="mkt-lede">Gemaakt voor ondernemers zonder eigen marketingafdeling.</p>
+          <p className="mkt-lede">Je hebt geen marketingafdeling nodig om professioneel zichtbaar te zijn. Mavix doet het voorbereidende werk; jij kent je klanten en houdt de regie.</p>
         </Reveal>
         <div className="mkt-steps-grid">
           {audiences.map((a, i) => (

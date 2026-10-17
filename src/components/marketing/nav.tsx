@@ -7,8 +7,13 @@ import { Brand } from "@/components/brand";
 import { Mavi } from "@/components/mavi";
 import { AgentDrawer } from "./agent-drawer";
 
+// Every item has a real destination: homepage sections (stable ids, offset
+// for the sticky header in CSS) or the pricing page.
 const menuLinks = [
   { href: "/#product", label: "Product" },
+  { href: "/#hoe-het-werkt", label: "Hoe het werkt" },
+  { href: "/#functies", label: "Functies" },
+  { href: "/#integraties", label: "Integraties" },
   { href: "/pricing", label: "Prijzen" },
 ];
 
@@ -26,6 +31,14 @@ export function MarketingNav() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Mobile menu: Escape closes it.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const className =
     "mkt-nav" +
@@ -51,6 +64,9 @@ export function MarketingNav() {
             <Link href="/login" className="mkt-nav-login-link">
               Inloggen
             </Link>
+            <Link href="/demo" className="mkt-nav-demo">
+              Demo aanvragen
+            </Link>
             <button
               type="button"
               className="mkt-agent-btn"
@@ -69,6 +85,7 @@ export function MarketingNav() {
               className="mkt-nav-toggle"
               aria-label={open ? "Menu sluiten" : "Menu openen"}
               aria-expanded={open}
+              aria-controls="mkt-mobile-menu"
               onClick={() => setOpen(!open)}
             >
               {open ? <X size={20} /> : <Menu size={20} />}
@@ -76,7 +93,7 @@ export function MarketingNav() {
           </div>
         </div>
         {open && (
-          <nav className="mkt-mobile-menu" aria-label="Navigatie">
+          <nav className="mkt-mobile-menu" id="mkt-mobile-menu" aria-label="Mobiele navigatie">
             {menuLinks.map((l) => (
               <Link key={l.href} href={l.href} onClick={() => setOpen(false)}>
                 {l.label}

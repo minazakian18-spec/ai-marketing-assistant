@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Trattoria Nonna Lucia">
+  <rect width="120" height="120" rx="60" fill="#fbf3e4"/>
+  <circle cx="60" cy="60" r="52" fill="none" stroke="#a4161a" stroke-width="3" stroke-dasharray="6 4"/>
+  <path d="M42 58c0-12 8-20 18-20s18 8 18 20" fill="#a4161a"/>
+  <path d="M38 58h44v4a22 22 0 0 1-44 0z" fill="#2d6a4f"/>
+  <path d="M48 46c4-5 8-6 12-6m4 2c3 1 6 3 8 6" stroke="#fbf3e4" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M56 32c2-6 6-8 10-6-2 4-6 6-10 6z" fill="#2d6a4f"/>
+  <text x="60" y="94" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="13" fill="#a4161a">Nonna Lucia</text>
+  <text x="60" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="6.5" letter-spacing="2" fill="#2d6a4f">TRATTORIA</text>
+</svg>
