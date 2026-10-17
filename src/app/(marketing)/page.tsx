@@ -12,6 +12,7 @@ import { Faq } from "@/components/marketing/faq";
 import { WorkspaceShowcase } from "@/components/marketing/workspace-showcase";
 import { BrandHubFeature } from "@/components/marketing/brand-hub-feature";
 import { FeaturesShowcase } from "@/components/marketing/features-showcase";
+import { HashScroll } from "@/components/marketing/hash-scroll";
 import { pageMetadata, structuredData } from "@/lib/site";
 import "../home-showcase.css";
 
@@ -31,6 +32,7 @@ export default function MarketingHome() {
         // Static, server-generated JSON (no user input); "<" is escaped.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, "\\u003c") }}
       />
+      <HashScroll />
       <Hero />
       <PartnersStrip />
       <Audiences />
