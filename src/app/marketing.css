@@ -2284,3 +2284,4 @@
 .mkt-onboarding p { margin: 0; font-size: 14.5px; line-height: 1.55; color: #4a4560; }
 .mkt-onboarding-note { margin: 18px 0 0; text-align: center; font-size: 14.5px; color: #4a4560; }
 .mkt-onboarding-note a { font-weight: 600; }
+.mkt-pnt-compare { display: inline-block; margin-top: 12px; margin-left: 4px; font-size: 14px; font-weight: 600; color: #fff; text-decoration: underline; text-underline-offset: 3px; }

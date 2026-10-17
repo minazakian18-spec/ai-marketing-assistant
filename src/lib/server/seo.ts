@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { adminClient } from "./supabase";
 import { HttpError } from "./access";
+import { workspacePlan } from "./plan";
 import { assertPublicUrl, safeFetch } from "./safe-fetch";
 import { parsePage, parseSitemap, sameSite, type PageFacts } from "../seo/parse";
 import { crawlDelayMs, parseRobots, robotsAllowed, type Robots } from "../seo/robots";
@@ -220,6 +221,12 @@ export async function startScan(workspaceId: string, siteId: string, userId: str
   const { count, error: countError } = await db().from("seo_scans").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).gt("created_at", since);
   if (countError) throw new HttpError(503, "SEO Intelligence is nog niet beschikbaar.");
   if ((count || 0) >= DAILY_SCANS) throw new HttpError(429, `Je hebt het maximum van ${DAILY_SCANS} analyses per dag bereikt. Probeer het morgen opnieuw.`);
+  // Website scans per subscription period (manual and scheduled together).
+  const wp = await workspacePlan(workspaceId);
+  const { count: periodCount, error: periodError } = await db().from("seo_scans").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).gte("created_at", wp.period.start.toISOString()).neq("status", "failed");
+  if (periodError) throw new HttpError(503, "SEO Intelligence is nog niet beschikbaar.");
+  if (wp.state !== "beta" && (periodCount || 0) >= wp.plan.seoScansPerMonth)
+    throw new HttpError(402, `Je hebt alle ${wp.plan.seoScansPerMonth} websitescans van deze periode gebruikt (${wp.plan.name}). Nieuwe scans zijn weer mogelijk vanaf ${wp.period.end.toLocaleDateString("nl-NL", { day: "numeric", month: "long" })}.`);
   const { data, error } = await db()
     .from("seo_scans")
     .insert({ workspace_id: workspaceId, site_id: site.id, status: "queued", stage: "queued", progress: { pages: 0, limit: site.verified_at ? PAGE_LIMIT.verified : PAGE_LIMIT.unverified }, trigger, requested_by: userId })

@@ -2,6 +2,16 @@ import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { adminClient } from "./supabase";
 import { HttpError } from "./access";
+import { workspacePlan } from "./plan";
+import { ACTIONS, ACTION_ENTITLEMENT, FEATURE_ACTION, upgradeFor, type PlanId } from "../plans";
+
+/** A plan limit stops this action (402 Payment Required: an upgrade or the next period helps). */
+export class PlanError extends HttpError {
+  constructor(message: string, public upgrade: PlanId | null) {
+    super(402, message);
+  }
+}
+const creditsOf = (feature: string) => (FEATURE_ACTION[feature] ? ACTIONS[FEATURE_ACTION[feature]].credits : 0);
 
 // AI usage control around every AI request (ai_usage ledger, migration
 // 202610120001). Order: quota check -> concurrency/duplicate guard -> request
@@ -29,7 +39,9 @@ export type AiFeature =
   | "research"
   | "agent"
   | "image_generate"
-  | "image_edit";
+  | "image_inspire"
+  | "image_edit"
+  | "carousel_plan";
 
 // Output cap per feature (tokens); short drafts never need the model maximum.
 // Output cap per feature (tokens, including reasoning tokens). Deliberately
@@ -57,7 +69,10 @@ export const OUTPUT_LIMIT: Record<AiFeature, number> = {
   // size (1024x1024 = 0.211 USD at 30 USD/1M). 8,000 covers that with
   // margin, and gpt-image-1 high (max 6,240). Real usage is billed after.
   image_generate: 8000,
+  image_inspire: 8000,
   image_edit: 8000,
+  // Carousel plan: up to 10 slides with text and image brief, plus caption.
+  carousel_plan: 2600,
 };
 // Image model (OpenAI Images API). gpt-image-2.5-flare: text input 5 USD,
 // image input 8 USD, image output 30 USD per 1M tokens (OpenAI model page,
@@ -65,7 +80,7 @@ export const OUTPUT_LIMIT: Record<AiFeature, number> = {
 // safe side. OPENAI_IMAGE_MODEL=gpt-image-1 switches back.
 export const DEFAULT_IMAGE_MODEL = "gpt-image-2.5-flare";
 export const imageModel = () => (process.env.OPENAI_IMAGE_MODEL || "").trim() || DEFAULT_IMAGE_MODEL;
-export const IMAGE_FEATURES: AiFeature[] = ["image_generate", "image_edit"];
+export const IMAGE_FEATURES: AiFeature[] = ["image_generate", "image_inspire", "image_edit"];
 
 // OpenAI standard prices, USD per 1M tokens (pricing page, October 2026).
 export const PRICES: Record<string, { input: number; output: number }> = {
@@ -85,7 +100,9 @@ export const PRICES: Record<string, { input: number; output: number }> = {
 export const MAX_STEPS: Partial<Record<AiFeature, number>> = { agent: 4 };
 // Input cap per model call, in tokens. The agent carries tool results and a
 // compact history, so it gets more room; everything else keeps the default.
-export const INPUT_LIMIT: Partial<Record<AiFeature, number>> = { agent: 12_000, image_generate: 1_000, image_edit: 8_000 };
+export const INPUT_LIMIT: Partial<Record<AiFeature, number>> = { agent: 12_000, image_generate: 1_000, image_edit: 8_000, image_inspire: 14_000 };
+// image_inspire: up to 5 reference images (each downscaled to max 1024 px)
+// plus the prompt; input tokens are reserved for all of them.
 export const stepsFor = (feature: AiFeature) => MAX_STEPS[feature] ?? 1;
 export const inputLimitFor = (feature: AiFeature) => INPUT_LIMIT[feature] ?? MAX_INPUT_TOKENS;
 
@@ -167,6 +184,32 @@ export function reservationMicroUsd(feature: AiFeature) {
     output = Math.max(...prices.map((p) => p.output));
   return Math.round(stepsFor(feature) * (inputLimitFor(feature) * input + OUTPUT_LIMIT[feature] * output));
 }
+/**
+ * Credits for Account → AI: plan, period, used/remaining credits and, per
+ * action, how many were used and how many remain within the plan's maximum.
+ * Counts only succeeded requests and live reservations (failed = free).
+ */
+export async function creditSummary(workspaceId: string) {
+  const wp = await workspacePlan(workspaceId);
+  const { data, error } = await adminClient().from("ai_usage").select("feature,status,created_at").eq("workspace_id", workspaceId).gte("created_at", wp.period.start.toISOString()).in("status", ["succeeded", "pending"]).limit(20000);
+  if (error) throw new HttpError(503, notReady(error) ? "AI-gebruik wordt nog ingericht." : "AI-gebruik kon niet worden geladen.");
+  const recent = new Date(Date.now() - PENDING_TTL_MS).toISOString();
+  const rows = (data || []).filter((r) => r.status === "succeeded" || (r.created_at as string) >= recent);
+  const used = rows.reduce((s, r) => s + creditsOf(r.feature as string), 0);
+  const actions = (Object.keys(ACTIONS) as (keyof typeof ACTIONS)[]).map((a) => {
+    const count = rows.filter((r) => FEATURE_ACTION[r.feature as string] === a).length;
+    const need = ACTION_ENTITLEMENT[a];
+    const max = need && !wp.plan.entitlements.includes(need) ? 0 : wp.plan.limits[a];
+    return { action: a, label: ACTIONS[a].label, credits: ACTIONS[a].credits, used: count, limit: max ?? null, included: max !== 0 };
+  });
+  return {
+    plan: { id: wp.planId, name: wp.plan.name, state: wp.state },
+    credits: { total: wp.plan.credits, used, remaining: Math.max(0, wp.plan.credits - used) },
+    period: { start: wp.period.start.toISOString(), end: wp.period.end.toISOString() },
+    actions,
+  };
+}
+
 export async function usageSummary(workspaceId: string) {
   const db = adminClient();
   const { data, error } = await db
@@ -232,6 +275,22 @@ export async function metered<T>(
   if (used >= limit) throw new HttpError(429, "Het AI-tegoed van deze maand is op. Neem contact op met Mavix om het te verhogen.");
   if ((today.count || 0) >= l.dailyRequestsPerUser) throw new HttpError(429, "Je hebt vandaag het maximale aantal AI-verzoeken gebruikt. Morgen kun je verder.");
 
+  // 0. Plan: is this action part of the workspace's subscription at all?
+  const action = FEATURE_ACTION[feature];
+  if (!action) throw new HttpError(503, "Deze AI-functie is nog niet ingericht.");
+  const wp = await workspacePlan(auth.workspaceId);
+  const cost = ACTIONS[action].credits;
+  const label = ACTIONS[action].label.toLowerCase();
+  const renews = wp.period.end.toLocaleDateString("nl-NL", { day: "numeric", month: "long", timeZone: "Europe/Amsterdam" });
+  const hint = (() => {
+    const up = upgradeFor(wp.planId, action);
+    return up && wp.state !== "beta" ? ` In ${up.name} is meer mogelijk.` : "";
+  })();
+  if (wp.state === "inactive") throw new PlanError("Je abonnement is niet meer actief, dus AI-functies zijn uitgeschakeld. Je gegevens en content blijven bewaard.", null);
+  const need = ACTION_ENTITLEMENT[action];
+  if ((need && !wp.plan.entitlements.includes(need)) || wp.plan.limits[action] === 0)
+    throw new PlanError(`${ACTIONS[action].label} zitten niet in je ${wp.plan.name}-abonnement.${hint}`, upgradeFor(wp.planId, action)?.id || null);
+
   // 1. Reserve first: the row carries the worst-case cost of this request
   //    (longest allowed input, full output limit, priciest configured model).
   const key = requestKey && /^[\w-]{8,100}$/.test(requestKey) ? feature + ":" + requestKey : null;
@@ -253,20 +312,32 @@ export async function metered<T>(
   //    reservations, so simultaneous requests can never spend past the
   //    budget together; at worst they are all refused.
   const recent = new Date(Date.now() - PENDING_TTL_MS).toISOString();
-  const [settled, pending, running] = await Promise.all([
+  const [settled, pending, running, period] = await Promise.all([
     db.from("ai_usage").select("cost_micro_usd").in("status", ["succeeded", "failed"]).gte("created_at", monthStart()).limit(100000),
     db.from("ai_usage").select("cost_micro_usd").eq("status", "pending").gte("created_at", recent).limit(10000),
     db.from("ai_usage").select("id", { count: "exact", head: true }).eq("user_id", auth.user.id).eq("status", "pending").gte("created_at", recent),
+    // This workspace's credit period, including this request's own reservation
+    // and every concurrent one: whoever checks last sees them all.
+    db.from("ai_usage").select("feature,status,created_at").eq("workspace_id", auth.workspaceId).gte("created_at", wp.period.start.toISOString()).in("status", ["succeeded", "pending"]).limit(20000),
   ]);
-  const checkError = settled.error || pending.error || running.error;
+  const checkError = settled.error || pending.error || running.error || period.error;
   const sum = (rows: { cost_micro_usd: unknown }[] | null) => (rows || []).reduce((s, r) => s + Number(r.cost_micro_usd || 0), 0);
+  // Failed and refused requests use no credits; stale reservations stop counting.
+  const counted = (period.data || []).filter((r) => r.status === "succeeded" || (r.created_at as string) >= recent);
+  const creditsUsed = counted.reduce((s, r) => s + creditsOf(r.feature as string), 0);
+  const actionUsed = counted.filter((r) => FEATURE_ACTION[r.feature as string] === action).length;
+  const max = wp.plan.limits[action];
   const refusal = checkError
     ? fail(checkError)
     : sum(settled.data) + sum(pending.data) > l.globalMonthlyMicroUsd
       ? new HttpError(503, "Het AI-budget van Mavix voor deze maand is bereikt. Er is niets gegenereerd.")
       : (running.count || 0) > l.concurrentPerUser
         ? new HttpError(429, "Mavi is nog bezig met je vorige verzoek. Even geduld.")
-        : null;
+        : creditsUsed > wp.plan.credits
+          ? new PlanError(`Je AI-tegoed is op: er ${Math.max(0, wp.plan.credits - (creditsUsed - cost)) === 1 ? "is" : "zijn"} nog ${Math.max(0, wp.plan.credits - (creditsUsed - cost))} van de ${wp.plan.credits} credits over en deze actie kost ${cost}. Je tegoed vernieuwt op ${renews}.${hint}`, upgradeFor(wp.planId, action)?.id || null)
+          : max !== undefined && actionUsed > max
+            ? new PlanError(`Je hebt deze periode alle ${max} ${label} van je ${wp.plan.name}-abonnement gebruikt. Je tegoed vernieuwt op ${renews}.${hint}`, upgradeFor(wp.planId, action)?.id || null)
+            : null;
   if (refusal) {
     if (refusal.status === 503 && !checkError) console.error(JSON.stringify({ event: "ai_global_budget_reached" }));
     await settle({ status: "failed", model: "refused", cost_micro_usd: 0 });

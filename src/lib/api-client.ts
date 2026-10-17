@@ -89,10 +89,19 @@ export async function generateCampaignDraft(goal: string, channels: ("instagram"
 }
 
 /** A real AI image (OpenAI Images API, server-side). In test mode there is no AI: a clear error, no placeholder. */
-export async function generateImage(o: { mode: "generate" | "edit"; brief: string; format: "square" | "portrait"; photo?: string; useBrand?: boolean }): Promise<string> {
+export type SlideRequest = { visualStyle: string; slideBrief: string; index: number; total: number; styleReference?: string };
+export async function generateImage(o: { mode: "generate" | "edit"; brief: string; format: "square" | "portrait"; photo?: string; references?: string[]; slide?: SlideRequest; useBrand?: boolean }): Promise<string> {
   if (isBrowserDemo()) throw new Error("In de testmodus maakt Mavix geen AI-afbeeldingen. Met een echt account genereert Mavix hier een nieuwe afbeelding.");
   const { image } = await postJson<{ image: string }>("/api/generate/image", o);
   return image;
+}
+
+export type CarouselPlanResult = { title: string; concept: string; audience: string; goal: string; visual_style: string; slides: { headline: string; body: string; image_brief: string }[]; caption: string; hashtags: string };
+/** Phase A of a carousel: one coherent plan (server-side AI, metered as one carousel). */
+export async function generateCarouselPlan(o: { brief: string; goal: string; slides: number; product?: string; cta?: string; useBrand?: boolean }): Promise<CarouselPlanResult> {
+  if (isBrowserDemo()) throw new Error("In de testmodus maakt Mavix geen AI-carrousels. Met een echt account bedenkt Mavix hier het verhaal en de beelden.");
+  const { plan } = await postJson<{ plan: CarouselPlanResult }>("/api/generate/carousel", o);
+  return plan;
 }
 
 export async function generateCopyText(kind: string, prompt: string): Promise<string> {

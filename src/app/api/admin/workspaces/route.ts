@@ -29,7 +29,7 @@ export async function GET() {
     const none = Promise.resolve({ data: [] as Record<string, unknown>[] });
     const [{ data: owners }, { data: usage }, { data: subs }, { data: conns }, { data: audit }] = await Promise.all([
       ids.length ? db.from("workspace_members").select("workspace_id,user_id").eq("role", "OWNER").in("workspace_id", ids) : none,
-      ids.length ? db.from("ai_usage").select("workspace_id,input_tokens,output_tokens").gte("created_at", monthStart()).in("workspace_id", ids).limit(50000) : none,
+      ids.length ? db.from("ai_usage").select("workspace_id,input_tokens,output_tokens,cost_micro_usd").gte("created_at", monthStart()).in("workspace_id", ids).limit(50000) : none,
       ids.length ? db.from("subscriptions").select("workspace_id,plan,status").in("workspace_id", ids) : none,
       ids.length ? db.from("integration_connections").select("workspace_id,provider,status").in("workspace_id", ids) : none,
       // Recent administrative and billing events (event names only, no content).
@@ -42,6 +42,8 @@ export async function GET() {
       if (data?.user?.email) emails.set(o.workspace_id as string, data.user.email);
     }
     const tokens = new Map<string, number>();
+    const costs = new Map<string, number>();
+    for (const u of usage || []) costs.set(u.workspace_id as string, (costs.get(u.workspace_id as string) || 0) + Number(u.cost_micro_usd || 0));
     for (const u of usage || []) tokens.set(u.workspace_id as string, (tokens.get(u.workspace_id as string) || 0) + (u.input_tokens as number) + (u.output_tokens as number));
     return NextResponse.json(
       {
@@ -53,6 +55,8 @@ export async function GET() {
           createdAt: s.created_at,
           ownerEmail: emails.get(s.id as string) || null,
           tokensThisMonth: tokens.get(s.id as string) || 0,
+          // Real model cost this month (USD), for Mavix administrators only.
+          costUsdThisMonth: Math.round((costs.get(s.id as string) || 0) / 10_000) / 100,
           billing: billingState(((subs || []).find((x) => x.workspace_id === s.id) as Parameters<typeof billingState>[0]) || null),
           integrations: {
             connected: (conns || []).filter((c) => c.workspace_id === s.id && c.status === "connected").map((c) => c.provider as string),

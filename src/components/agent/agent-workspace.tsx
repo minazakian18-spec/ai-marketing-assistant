@@ -32,6 +32,7 @@ import { ConfirmDialog } from "@/components/account/confirm-dialog";
 import { isBrowserDemo } from "@/lib/demo";
 import { AGENT_SUGGESTIONS } from "@/lib/agent/capabilities";
 import { Markdown } from "./markdown";
+import { UpgradeNotice, usePlan } from "@/components/plan-gate";
 import { useAgent } from "./agent-provider";
 
 // Mavix Agent workspace: conversation sidebar (folders, pinned, recent,
@@ -84,6 +85,7 @@ export function AgentWorkspace() {
   const search = useSearchParams();
   const { takeHandoff, setActivity } = useAgent();
   const demo = isBrowserDemo();
+  const plan = usePlan();
 
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -718,15 +720,21 @@ export function AgentWorkspace() {
                     : "Mavix Agent is nog niet met een AI-model verbonden. Je kunt je vraag wel klaarzetten; er wordt niets verstuurd.")}
               </p>
             )}
-            <AgentComposer
-              key={draft.key}
-              size="large"
-              attachments={false}
-              defaultText={draft.text}
-              busy={sending}
-              onSubmit={(text) => void send(text)}
-              placeholder="Vraag Mavi om een plan, tekst of idee"
-            />
+            {plan && !plan.entitlements.includes("agent") ? (
+              <UpgradeNotice entitlement="agent" feature="Mavix Agent">
+                De Mavix Agent hoort bij Premium. Je eerdere gesprekken blijven leesbaar; in de andere modules gebruik je AI gewoon binnen je pakket.
+              </UpgradeNotice>
+            ) : (
+              <AgentComposer
+                key={draft.key}
+                size="large"
+                attachments={false}
+                defaultText={draft.text}
+                busy={sending}
+                onSubmit={(text) => void send(text)}
+                placeholder="Vraag Mavi om een plan, tekst of idee"
+              />
+            )}
             <p className="ag-disclaimer">Mavi kan fouten maken. Controleer feiten, prijzen en acties voordat je iets publiceert.</p>
           </div>
         </div>

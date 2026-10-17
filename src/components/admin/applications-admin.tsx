@@ -1,4 +1,5 @@
 "use client";
+import { PLAN_IDS, PLANS } from "@/lib/plans";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui";
 import { ACTION_LABEL, PAYMENT_LABEL, STATUS_LABEL, allowedActions, type AdminAction, type ApplicationStatus, type PaymentStatus } from "@/lib/applications";
@@ -37,7 +38,7 @@ const TONE: Record<ApplicationStatus, "warn" | "success" | "neutral" | "accent">
   rejected: "neutral",
   suspended: "neutral",
 };
-const PLAN: Record<string, string> = { starter: "Starter", growth: "Growth", autopilot: "Autopilot" };
+const PLAN: Record<string, string> = Object.fromEntries(PLAN_IDS.map((id) => [id, PLANS[id].name]));
 const date = (iso: string) => new Date(iso).toLocaleString("nl-NL", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const CONFIRM: Partial<Record<AdminAction, string>> = {
   approve: "Aanvraag goedkeuren? De klant krijgt (als e-mail is ingesteld) een bericht om een account aan te maken.",

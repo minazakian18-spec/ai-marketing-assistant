@@ -1,3 +1,4 @@
+import { PLAN_IDS, PLANS } from "../plans";
 import "server-only";
 import { appUrl } from "./supabase";
 
@@ -36,7 +37,7 @@ export type TemplateData = {
 
 type Rendered = { subject: string; heading: string; paragraphs: string[]; cta?: { label: string; href: string } };
 
-const PLAN: Record<string, string> = { starter: "Starter", growth: "Growth", autopilot: "Autopilot" };
+const PLAN: Record<string, string> = Object.fromEntries(PLAN_IDS.map((id) => [id, PLANS[id].name]));
 const first = (name: string) => name.trim().split(/\s+/)[0] || "";
 
 export function render(template: TemplateName, d: TemplateData): Rendered {

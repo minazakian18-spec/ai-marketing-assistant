@@ -6,7 +6,7 @@ import { ApplicationsAdmin } from "@/components/admin/applications-admin";
 
 // Private beta administration for Mavix staff (public.platform_admins). The
 // server refuses everyone else; this page only shows what the API returns.
-type Row = { id: string; name: string; status: "pending" | "approved" | "suspended"; aiLimit: number | null; createdAt: string; ownerEmail: string | null; tokensThisMonth: number; billing?: string; integrations?: { connected: string[]; attention: string[] } };
+type Row = { id: string; name: string; status: "pending" | "approved" | "suspended"; aiLimit: number | null; createdAt: string; ownerEmail: string | null; tokensThisMonth: number; costUsdThisMonth?: number; billing?: string; integrations?: { connected: string[]; attention: string[] } };
 type AuditRow = { workspace: string | null; event: string; at: string };
 const BILLING: Record<string, string> = { beta: "Beta (geen betaling)", active: "Betaald, actief", trialing: "Proefperiode", past_due: "Betaling mislukt", incomplete: "Betaling niet afgerond", canceled: "Opgezegd" };
 const LABEL = { pending: "Wacht op goedkeuring", approved: "Toegang", suspended: "Gepauzeerd" } as const;
@@ -84,7 +84,7 @@ export default function AdminPage() {
                   <Badge tone={TONE[r.status]}>{LABEL[r.status]}</Badge>
                 </span>
                 <span role="cell" className="admin-usage">
-                  {fmt.format(r.tokensThisMonth)} tokens
+                  {fmt.format(r.tokensThisMonth)} tokens · ${(r.costUsdThisMonth ?? 0).toFixed(2)}
                   <label>
                     <span className="sr-only">AI-limiet voor {r.name}</span>
                     <input

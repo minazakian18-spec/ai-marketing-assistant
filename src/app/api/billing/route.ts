@@ -14,6 +14,7 @@ import { billingState, checkoutAllowed, INTERVALS, PLANS } from "@/lib/billing-s
 
 const headers = { "Cache-Control": "no-store" };
 const enabled = () => process.env.BILLING_CHECKOUT_ENABLED === "1" && !!process.env.STRIPE_SECRET_KEY;
+const yearlyConfigured = () => PLANS.every((p) => !!process.env[`STRIPE_PRICE_${p.toUpperCase()}_YEAR`]);
 
 async function approved(workspaceId: string) {
   const { data } = await adminClient().from("workspaces").select("access_status").eq("id", workspaceId).maybeSingle();
@@ -38,7 +39,17 @@ export async function GET() {
     const subscription = data ? { plan: data.plan, status: data.status, billing_interval: data.billing_interval, current_period_end: data.current_period_end } : null;
     const state = billingState(subscription);
     return NextResponse.json(
-      { subscription, state, invoices, invoiceError, configured: !!process.env.STRIPE_SECRET_KEY, checkout: checkoutAllowed({ enabled: enabled(), approved: await approved(auth.workspaceId), state }), portal: !!data?.provider_customer_id && !!process.env.STRIPE_SECRET_KEY },
+      {
+        subscription,
+        state,
+        invoices,
+        invoiceError,
+        configured: !!process.env.STRIPE_SECRET_KEY,
+        checkout: checkoutAllowed({ enabled: enabled(), approved: await approved(auth.workspaceId), state }),
+        portal: !!data?.provider_customer_id && !!process.env.STRIPE_SECRET_KEY,
+        // Yearly billing only when every yearly Stripe price is configured.
+        yearly: yearlyConfigured(),
+      },
       { headers },
     );
   } catch (e) {
@@ -73,6 +84,7 @@ export async function POST(request: Request) {
     const state = billingState(subscription ? { plan: subscription.plan, status: subscription.status, billing_interval: subscription.billing_interval, current_period_end: subscription.current_period_end } : null);
     if (!checkoutAllowed({ enabled: enabled(), approved: await approved(auth.workspaceId), state }))
       throw new HttpError(409, state === "beta" || state === "canceled" ? "Betaalde abonnementen zijn nog niet open. Je werkruimte blijft in de beta zonder kosten." : "Beheer je bestaande abonnement via het betaalportaal.");
+    if (body.interval === "year" && !yearlyConfigured()) throw new HttpError(409, "Jaarlijks betalen is nog niet beschikbaar. Kies maandelijks.");
     const price = (() => {
       try {
         return priceId(body.plan, body.interval);

@@ -292,6 +292,82 @@ export async function generateCampaign(goal: string, channels: ("instagram" | "e
   };
 }
 
+// ---------- Instagram carousel plan ----------
+const SYSTEM_CAROUSEL = `You plan one Instagram carousel for a small business in Mavix: ONE post with several slides that tell one story the viewer swipes through (not separate posts).
+
+Rules:
+- Use only facts from <business_context> and <brief>. Never invent prices, discounts, opening hours, dates, awards or product details. If a fact is needed but missing, write a neutral line without it.
+- Exactly the requested number of slides. Slide 1 is a strong hook; the middle slides build the story; the last slide is the call to action.
+- Slide text (headline) is short enough to read on a phone: at most 8 words. "body" is optional, at most 14 words, empty when not needed.
+- image_brief: what the photo of that slide shows (subject, setting, framing), concrete and photographable, without any text or logos in the image.
+- visual_style: ONE shared photographic style for all slides (lighting, colour palette, mood, camera, styling), so the slides clearly belong together.
+- caption: one Instagram caption for the whole carousel with a hook, short paragraphs and a call to action; hashtags: 3 to 8 relevant hashtags.
+- Write in the language of the brief (Dutch when unclear).
+${BRAND_RULE}`;
+
+const CAROUSEL_SCHEMA = (() => {
+  const s = { type: "string" };
+  return {
+    name: "carousel",
+    schema: {
+      type: "object",
+      properties: {
+        title: s,
+        concept: s,
+        audience: s,
+        goal: s,
+        visual_style: s,
+        slides: { type: "array", items: { type: "object", properties: { headline: s, body: s, image_brief: s }, required: ["headline", "body", "image_brief"], additionalProperties: false } },
+        caption: s,
+        hashtags: s,
+      },
+      required: ["title", "concept", "audience", "goal", "visual_style", "slides", "caption", "hashtags"],
+      additionalProperties: false,
+    },
+  };
+})();
+
+export type CarouselPlan = {
+  title: string;
+  concept: string;
+  audience: string;
+  goal: string;
+  visual_style: string;
+  slides: { headline: string; body: string; image_brief: string }[];
+  caption: string;
+  hashtags: string;
+};
+
+/** One coherent carousel plan with exactly `count` slides. Nothing is saved here. */
+export async function generateCarouselPlan(o: { brief: string; goal: string; count: number; product?: string; cta?: string }, profile: Record<string, unknown> | null): Promise<CarouselPlan> {
+  const raw = await aiJson<CarouselPlan>(
+    SYSTEM_CAROUSEL,
+    [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "<business_context>\n" + data(profile ? businessContext(profile) : {}) + "\n</business_context>" },
+          { type: "text", text: "<brief>\n" + data({ what: o.brief.slice(0, 1000), goal: o.goal, slides: o.count, product: o.product || undefined, call_to_action: o.cta || undefined }) + "\n</brief>" },
+        ],
+      },
+    ],
+    CAROUSEL_SCHEMA,
+  );
+  const slides = (Array.isArray(raw.slides) ? raw.slides : []).slice(0, o.count).map((s) => ({ headline: cut(s.headline, 80), body: cut(s.body, 140), image_brief: cut(s.image_brief, 500) }));
+  // The model must return exactly the requested number; never pad with invented slides.
+  if (slides.length !== o.count || slides.some((s) => !s.image_brief)) throw new HttpError(502, "Mavi kon geen volledig carrouselplan maken. Probeer het opnieuw.");
+  return {
+    title: cut(raw.title, 120) || "Carrousel",
+    concept: cut(raw.concept, 400),
+    audience: cut(raw.audience, 200),
+    goal: cut(raw.goal, 200),
+    visual_style: cut(raw.visual_style, 600),
+    slides,
+    caption: cut(raw.caption, 2000),
+    hashtags: cut(raw.hashtags, 400),
+  };
+}
+
 // ---------- SEO suggestions ----------
 const SYSTEM_SEO = `You write SEO text suggestions for a small business website, for the Mavix SEO module. The owner copies a suggestion into their website themselves; you never change any website.
 

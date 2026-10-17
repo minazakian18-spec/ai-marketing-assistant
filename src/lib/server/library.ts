@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { adminClient } from "./supabase";
 import { HttpError } from "./access";
+import { workspacePlan } from "./plan";
 import {
   cleanName,
   LIBRARY_MAX_BYTES,
@@ -40,6 +41,12 @@ function setupCheck(error: { code?: string; message?: string } | null, what: str
 export function quotaBytes(): number | null {
   const n = Number(process.env.LIBRARY_QUOTA_BYTES);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+/** Storage limit of this workspace: its plan (Starter 500 MB, Growth 2 GB, Premium 5 GB), or the global override when lower. */
+export async function quotaFor(workspaceId: string): Promise<number> {
+  const plan = (await workspacePlan(workspaceId)).plan.storageBytes;
+  const global = quotaBytes();
+  return global !== null ? Math.min(global, plan) : plan;
 }
 
 async function ensureSystemAlbums(workspaceId: string) {
@@ -104,7 +111,7 @@ export async function listLibrary(workspaceId: string, canEdit: boolean): Promis
       createdAt: f.created_at as string,
       url: signed.get(f.storage_path as string) || "",
     })),
-    usage: { used, quota: quotaBytes() },
+    usage: { used, quota: await quotaFor(workspaceId) },
     canEdit,
   };
 }
@@ -129,13 +136,19 @@ export async function uploadFiles(
     if (!LIBRARY_TYPES[f.type]) throw new HttpError(415, `"${cleanName(f.name)}" heeft een bestandstype dat niet wordt ondersteund.`);
     if (f.size > LIBRARY_MAX_BYTES) throw new HttpError(413, `"${cleanName(f.name)}" is groter dan 50 MB.`);
   }
-  const quota = quotaBytes();
-  if (quota !== null) {
+  const quota = await quotaFor(ctx.workspaceId);
+  {
     const total = files.reduce((n, f) => n + f.size, 0);
     if ((await usage(ctx.workspaceId)) + total > quota) throw new HttpError(413, "Er is niet genoeg opslag beschikbaar voor deze bestanden.");
   }
   const created: string[] = [];
   for (const f of files) {
+    // The same file (name and size) is stored once per workspace.
+    const { data: same } = await db().from("library_files").select("id").eq("workspace_id", ctx.workspaceId).eq("name", cleanName(f.name.replace(/\.[^.]+$/, "")) || "Bestand").eq("size_bytes", f.size).limit(1);
+    if (same?.[0]) {
+      created.push(same[0].id as string);
+      continue;
+    }
     const ext = (f.name.match(/\.([a-z0-9]{1,8})$/i)?.[1] || "bin").toLowerCase();
     const path = `${ctx.workspaceId}/${randomUUID()}.${ext}`;
     const { error: upErr } = await db().storage.from(BUCKET).upload(path, f, { contentType: f.type, upsert: false });
@@ -209,8 +222,8 @@ export async function storeImage(ctx: { workspaceId: string; userId: string | nu
   const { data: existing, error: findError } = await db().from("library_files").select("id").eq("workspace_id", ctx.workspaceId).eq("name", name).eq("size_bytes", bytes.length).limit(1);
   setupCheck(findError, "library_files");
   if (existing?.[0]) return existing[0].id as string;
-  const quota = quotaBytes();
-  if (quota !== null && (await usage(ctx.workspaceId)) + bytes.length > quota) throw new HttpError(413, "Er is niet genoeg opslag beschikbaar in je Bibliotheek.");
+  const quota = await quotaFor(ctx.workspaceId);
+  if ((await usage(ctx.workspaceId)) + bytes.length > quota) throw new HttpError(413, "Er is niet genoeg opslag beschikbaar in je Bibliotheek.");
   const path = `${ctx.workspaceId}/${randomUUID()}.${o.mime.split("/")[1] === "jpeg" ? "jpg" : o.mime.split("/")[1]}`;
   const { error: upErr } = await db().storage.from(BUCKET).upload(path, bytes, { contentType: o.mime, upsert: false });
   if (upErr && /bucket/i.test(upErr.message)) setupCheck(upErr, "storage bucket library");

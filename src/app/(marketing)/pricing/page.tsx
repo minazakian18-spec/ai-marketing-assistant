@@ -1,118 +1,46 @@
 import type { Metadata } from "next";
-import { Check } from "lucide-react";
-import { PricingCards } from "@/components/marketing/pricing-cards";
-import { Faq, type FaqItem } from "@/components/marketing/faq";
+import { Faq } from "@/components/marketing/faq";
 import { Reveal } from "@/components/marketing/reveal";
-import { compareRows, pricingPlans } from "@/lib/pricing-data";
+import { PricingExperience } from "@/components/marketing/pricing-experience";
+import { FAQ } from "@/lib/pricing-content";
+import { PLAN_IDS, PLANS } from "@/lib/plans";
 import { pageMetadata } from "@/lib/site";
+import "../../pricing.css";
 
 export const metadata: Metadata = pageMetadata({
   title: "Prijzen en abonnementen voor AI-marketing",
-  description:
-    "Bekijk de Mavix-abonnementen voor AI-marketing: Starter, Growth en Autopilot. Maandelijks opzegbaar, prijzen exclusief btw.",
+  description: `Vergelijk Mavix Starter (€${PLANS.starter.monthlyPrice}), Growth (€${PLANS.growth.monthlyPrice}) en Premium (€${PLANS.autopilot.monthlyPrice}) per maand: AI-credits, AI-afbeeldingen, functies en limieten. Prijzen exclusief btw.`,
   path: "/pricing",
 });
 
-const pricingFaq: FaqItem[] = [
-  {
-    q: "Kan ik op elk moment op- of afschalen?",
-    a: "Ja, je kunt op elk moment upgraden. Downgraden gaat in op de eerstvolgende factureringsdatum.",
-  },
-  {
-    q: "Welke betaalmethoden ondersteunt Mavix?",
-    a: "iDEAL, creditcard/debitcard en PayPal.",
-  },
-  {
-    q: "Zijn de prijzen inclusief btw?",
-    a: "Nee, alle prijzen zijn exclusief btw. Het toepasselijke btw-tarief wordt op je factuur getoond op basis van je factuurgegevens.",
-  },
-  {
-    q: "Kan ik op elk moment opzeggen?",
-    a: "Ja. Elk abonnement is maandelijks opzegbaar; bij jaarlijkse facturering loopt het abonnement door tot het einde van de betaalde periode.",
-  },
-];
+// Yearly billing is only offered when every yearly Stripe price exists and
+// checkout is open; otherwise the toggle says it is coming soon.
+const yearlyAvailable = () => process.env.BILLING_CHECKOUT_ENABLED === "1" && PLAN_IDS.every((p) => !!process.env[`STRIPE_PRICE_${p.toUpperCase()}_YEAR`]);
 
 export default function PricingPage() {
   return (
-    <main>
-      <section className="mkt-hero">
+    <main className="pr">
+      <section className="mkt-hero pr-hero">
         <div className="mkt-container mkt-hero-inner">
           <Reveal>
             <span className="mkt-eyebrow">Prijzen</span>
           </Reveal>
           <Reveal delay={80}>
-            <h1 className="mkt-h1">Simpele prijzen, geen verrassingen.</h1>
+            <h1 className="mkt-h1">Eén slimme werkruimte. Het pakket dat bij jou past.</h1>
           </Reveal>
           <Reveal delay={140}>
             <p className="mkt-lede" style={{ margin: "0 auto" }}>
-              Kies een plan dat past bij hoeveel je Mavix nu al wilt laten
-              automatiseren — en groei mee wanneer je er klaar voor bent.
+              Van je eerste AI-post tot complete marketingondersteuning. Kies hoeveel hulp, automatisering en AI-capaciteit jouw bedrijf nodig heeft.
             </p>
           </Reveal>
         </div>
       </section>
-
-      <section className="mkt-section" style={{ paddingTop: 0 }}>
+      <section className="mkt-section pr-main">
         <div className="mkt-container">
-          <Reveal>
-            <PricingCards />
-          </Reveal>
+          <PricingExperience yearlyAvailable={yearlyAvailable()} />
         </div>
       </section>
-
-      <section className="mkt-section mkt-section-tight">
-        <div className="mkt-container">
-          <Reveal>
-            <div className="mkt-section-head">
-              <span className="mkt-eyebrow">Vergelijk</span>
-              <h2 className="mkt-h2">Vergelijk alle features</h2>
-            </div>
-          </Reveal>
-          <Reveal>
-            <div style={{ overflowX: "auto" }}>
-              <table className="mkt-compare-table">
-                <thead>
-                  <tr>
-                    <th>Feature</th>
-                    {pricingPlans.map((p) => (
-                      <th key={p.id}>{p.name}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {compareRows.map((row) => (
-                    <tr key={row.label}>
-                      <td>{row.label}</td>
-                      {row.values.map((v, i) => (
-                        <td key={i}>{v}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <section className="mkt-section-tight">
-        <div className="mkt-container">
-          <Reveal>
-            <div
-              className="mkt-preview-card-line"
-              style={{ maxWidth: 640, margin: "0 auto", display: "flex", gap: 10 }}
-            >
-              <Check size={18} style={{ flexShrink: 0, color: "var(--color-primary)" }} />
-              <span>
-                <strong>Opzegbaar wanneer je wilt.</strong> Geen langlopende
-                contracten — je kunt maandelijks op- of afschalen.
-              </span>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <Faq items={pricingFaq} heading="Vragen over facturering" />
+      <Faq items={FAQ} heading="Veelgestelde vragen over abonnementen" />
     </main>
   );
 }

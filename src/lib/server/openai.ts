@@ -178,7 +178,12 @@ export function imagePlan(format: "square" | "portrait", model = imageModel()) {
   return model.startsWith("gpt-image-1") ? { size: "1024x1536", crop: true } : { size: "1024x1280", crop: false };
 }
 
-export async function aiImage(o: { prompt: string; size: string; photo?: { data: Buffer; mime: string } }): Promise<Buffer> {
+/**
+ * `photo`: one own photo to EDIT. `references`: inspiration images for a NEW
+ * image (sent as real image inputs to the edit endpoint, which accepts
+ * several; the prompt tells the model to create something new in their style).
+ */
+export async function aiImage(o: { prompt: string; size: string; photo?: { data: Buffer; mime: string }; references?: { data: Buffer; mime: string }[] }): Promise<Buffer> {
   const model = imageModel();
   if (o.prompt.length > currentInputLimit() * 3) throw new HttpError(413, "Deze beschrijving is te lang. Maak hem korter.");
   takeStep();
@@ -189,18 +194,19 @@ export async function aiImage(o: { prompt: string; size: string; photo?: { data:
     // a retry would be a second paid image. Images can take a minute.
     const common = { model, prompt: o.prompt, size: o.size as "1024x1024", quality: "high" as const, output_format: "jpeg" as const, output_compression: 90, n: 1 };
     const options = { timeout: 150_000, maxRetries: 0 };
-    let photo = o.photo;
-    if (photo) {
-      // Bound the input tokens of an edit: at most 1024 px on the long side.
+    // Bound the input tokens: every input image at most 1024 px on the long side.
+    const shrink = async (img: { data: Buffer; mime: string }) => {
       try {
         const sharp = (await import("sharp")).default;
-        photo = { data: await sharp(photo.data).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer(), mime: "image/jpeg" };
+        return { data: await sharp(img.data).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer(), mime: "image/jpeg" };
       } catch {
-        /* without sharp the original (max 8 MB) is sent */
+        return img; // without sharp the validated original (max 8 MB) is sent
       }
-    }
-    const response = photo
-      ? await openai().images.edit({ ...common, image: await toFile(photo.data, "foto." + (photo.mime.split("/")[1] || "png"), { type: photo.mime }) }, options)
+    };
+    const inputs = await Promise.all((o.photo ? [o.photo] : o.references || []).map(shrink));
+    const files = await Promise.all(inputs.map((img, i) => toFile(img.data, `beeld-${i + 1}.${img.mime.split("/")[1] || "png"}`, { type: img.mime })));
+    const response = files.length
+      ? await openai().images.edit({ ...common, image: files.length === 1 ? files[0] : files }, options)
       : await openai().images.generate(common, options);
     const usage = response.usage;
     if (usage) recordTokens(model, usage.input_tokens || 0, usage.output_tokens || 0);

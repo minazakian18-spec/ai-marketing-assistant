@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Reveal } from "./reveal";
+import { PLAN_IDS, PLANS, euro } from "@/lib/plans";
 
 const cards = [
   {
@@ -27,10 +28,13 @@ export function PricingNewTrending() {
               <span className="mkt-eyebrow mkt-eyebrow-on-dark">Prijzen</span>
               <h2>Plannen en prijzen.</h2>
               <p>
-                Kies hoeveel van je marketing je aan Mavix wilt overlaten.
+                {PLAN_IDS.map((id) => PLANS[id].name).join(", ")}: vanaf {euro(PLANS.starter.monthlyPrice)} per maand, excl. btw. Kies hoeveel hulp en AI-capaciteit je nodig hebt.
               </p>
               <Link href="/pricing" className="mkt-btn mkt-btn-secondary">
                 Bekijk alle pakketten
+              </Link>
+              <Link href="/pricing#vergelijk" className="mkt-pnt-compare">
+                Vergelijk alle functies
               </Link>
             </div>
           </Reveal>

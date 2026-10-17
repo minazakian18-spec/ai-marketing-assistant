@@ -4,35 +4,39 @@ import { workspace, sameOrigin, limited, failure, HttpError } from "@/lib/server
 import { metered } from "@/lib/server/ai-usage";
 import { aiConfigured, aiImage, imagePlan } from "@/lib/server/openai";
 import { storedProfile } from "@/lib/server/stored-profile";
-import { readImage, storeImage } from "@/lib/server/library";
+import { storeImage } from "@/lib/server/library";
+import { workspacePlan } from "@/lib/server/plan";
+import { assertImageAccess, loadImageInput } from "@/lib/server/image-input";
 import { brandStyleOf, buildImagePrompt } from "@/lib/image-prompt";
-import { mediaIdOf, mediaRef } from "@/lib/media-ref";
+import { mediaRef } from "@/lib/media-ref";
 
-// AI images for Social / Content Studio (OpenAI Images API, metered as
-// image_generate / image_edit). "generate" makes a new visual from the brief,
-// with Brand Hub only as optional style context; no business photo is needed.
-// "edit" changes one photo the user chose. The result is stored once in the
-// Bibliotheek (private storage, kind "ai") and returned as a media
-// reference, so the workspace document only holds a short link.
+// AI images for Social / Content Studio (OpenAI Images API). Three modes:
+//   generate  a new image from the brief                      → image_generate
+//             with inspiration images (references): new image
+//             in their style, references sent as real inputs   → image_inspire
+//   edit      change one own photo                             → image_edit
+// A carousel slide is a generate request with `slide` context; it needs the
+// carousel entitlement and may carry the first slide as style reference.
+// Every request is one metered image: credits and the monthly image limit
+// apply per image, so carousels cannot bypass them. Results are stored once
+// in the Bibliotheek and returned as a media reference.
 
-// Closed live test: only these workspaces may generate or edit AI images.
-// AI_IMAGE_WORKSPACES (comma-separated workspace ids) overrides the default;
-// "*" opens it to every approved workspace.
-const TEST_WORKSPACES = ["a81c4faa-e42b-4ba0-95cc-ed8a3cdc812e"]; // Telepizza Amstelveen
-function imageAccess(workspaceId: string) {
-  const configured = (process.env.AI_IMAGE_WORKSPACES || "").trim();
-  if (configured === "*") return true;
-  const list = configured ? configured.split(",").map((s) => s.trim()) : TEST_WORKSPACES;
-  return list.includes(workspaceId);
-}
-
-const PHOTO = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/;
 const input = z.object({
   mode: z.enum(["generate", "edit"]),
   brief: z.string().trim().min(3).max(800),
   format: z.enum(["square", "portrait"]).default("square"),
   photo: z.string().max(12_000_000).optional(),
+  references: z.array(z.string().max(12_000_000)).max(5).default([]),
   useBrand: z.boolean().default(true),
+  slide: z
+    .object({
+      visualStyle: z.string().trim().max(600),
+      slideBrief: z.string().trim().min(3).max(600),
+      index: z.number().int().min(1).max(10),
+      total: z.number().int().min(2).max(10),
+      styleReference: z.string().max(12_000_000).optional(),
+    })
+    .optional(),
 });
 
 /** gpt-image-1 portrait (2:3) is cropped to Instagram's 4:5. */
@@ -49,24 +53,42 @@ export async function POST(request: Request) {
   try {
     sameOrigin(request);
     const auth = await workspace(["OWNER", "ADMIN"]);
-    if (!imageAccess(auth.workspaceId)) throw new HttpError(403, "AI-afbeeldingen zijn nog in een besloten test en nog niet beschikbaar voor jouw werkruimte. Eigen foto's gebruiken kan wel.");
+    assertImageAccess(auth.workspaceId);
     await limited("ai-image:" + auth.user.id, 5);
     await limited("ai-image-ws:" + auth.workspaceId, 10);
     const body = input.parse(await request.json());
     if (!aiConfigured()) throw new HttpError(503, "AI is nog niet geconfigureerd. Er is geen afbeelding gemaakt.");
+    const wp = await workspacePlan(auth.workspaceId);
+
     let photo: { data: Buffer; mime: string } | undefined;
     if (body.mode === "edit") {
-      const ref = body.photo ? mediaIdOf(body.photo) : null;
-      const m = body.photo ? PHOTO.exec(body.photo) : null;
-      if (ref) photo = await readImage(auth.workspaceId, ref);
-      else if (m) photo = { data: Buffer.from(m[2], "base64"), mime: "image/" + m[1] };
-      else throw new HttpError(400, "Kies eerst een foto (JPG, PNG of WebP) om te bewerken.");
-      if (photo.data.length > 8 * 1024 * 1024) throw new HttpError(413, "Deze foto is groter dan 8 MB.");
+      if (!body.photo) throw new HttpError(400, "Kies eerst een foto (JPG, PNG of WebP) om te bewerken.");
+      photo = await loadImageInput(auth.workspaceId, body.photo, "De foto");
     }
+    // Inspiration images: plan maximum per request (Starter 1, Growth 3, Premium 5).
+    if (body.references.length > wp.plan.inspirationMax)
+      throw new HttpError(402, `Je ${wp.plan.name}-abonnement staat ${wp.plan.inspirationMax} ${wp.plan.inspirationMax === 1 ? "inspiratiebeeld" : "inspiratiebeelden"} per afbeelding toe.`);
+    if (body.slide) {
+      if (!wp.plan.entitlements.includes("carousels")) throw new HttpError(402, `AI-carrousels zitten niet in je ${wp.plan.name}-abonnement. Maak complete Instagram-carrousels met Mavix Growth.`);
+      if (body.slide.total > wp.plan.carouselSlides) throw new HttpError(402, `Je ${wp.plan.name}-abonnement staat carrousels tot ${wp.plan.carouselSlides} slides toe.`);
+    }
+    const references = body.mode === "generate" ? await Promise.all(body.references.map((r, i) => loadImageInput(auth.workspaceId, r, `Inspiratiebeeld ${i + 1}`))) : [];
+    // Carousel consistency: the first slide as extra style reference (system-added).
+    if (body.mode === "generate" && body.slide?.styleReference) references.push(await loadImageInput(auth.workspaceId, body.slide.styleReference, "De eerste slide"));
+
     const profile = body.useBrand ? await storedProfile(auth.workspaceId) : null;
-    const prompt = buildImagePrompt({ brief: body.brief, mode: body.mode, format: body.format, brand: brandStyleOf(profile as Parameters<typeof brandStyleOf>[0]) });
+    const mode = body.mode === "edit" ? "edit" : references.length ? "inspire" : "generate";
+    const prompt = buildImagePrompt({
+      brief: body.brief,
+      mode,
+      format: body.format,
+      brand: brandStyleOf(profile as Parameters<typeof brandStyleOf>[0]),
+      references: body.references.length,
+      slide: body.slide ? { visualStyle: body.slide.visualStyle, slideBrief: body.slide.slideBrief, index: body.slide.index, total: body.slide.total, styleReference: !!body.slide.styleReference } : undefined,
+    });
     const plan = imagePlan(body.format);
-    let jpeg = await metered(auth, body.mode === "edit" ? "image_edit" : "image_generate", () => aiImage({ prompt, size: plan.size, photo }), request.headers.get("idempotency-key"));
+    const feature = mode === "edit" ? "image_edit" : mode === "inspire" ? "image_inspire" : "image_generate";
+    let jpeg = await metered(auth, feature, () => aiImage({ prompt, size: plan.size, photo, references: references.length ? references : undefined }), request.headers.get("idempotency-key"));
     if (plan.crop) jpeg = await crop45(jpeg);
     // Paid result: store it in the Bibliotheek. If storage is not available,
     // the image is still returned (as data) rather than lost.

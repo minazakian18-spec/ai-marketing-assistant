@@ -34,6 +34,9 @@ import { generateInstagramContent, editContentText, generateImage, CONTENT_EDIT_
 import { readImages } from "@/lib/local-images";
 import { isBrowserDemo } from "@/lib/demo";
 import { mediaRef } from "@/lib/media-ref";
+import { usePlan } from "@/components/plan-gate";
+import { InspirationPicker } from "./inspiration-picker";
+import { CarouselStudio } from "./carousel-studio";
 import { instagramGoals, type InstagramGoal } from "@/lib/ai/instagram-instruction";
 import { PostVisual } from "./shared";
 import { PlanningNotice } from "@/components/calendar/planning-notice";
@@ -48,11 +51,11 @@ import { CAPTION_LIMIT, HASHTAG_LIMIT, hashtagCount, instagramCaption, publishPr
 const FORMATS: { id: ContentType; label: string; hint: string; Icon: typeof ImageIcon }[] = [
   { id: "Post", label: "Post", hint: "Caption, hashtags en je foto", Icon: ImageIcon },
   { id: "Image", label: "Afbeelding", hint: "Beeldpost met korte tekst", Icon: ImagePlus },
+  { id: "Carousel", label: "Carrousel", hint: "Meerdere samenhangende slides in één post", Icon: Images },
   { id: "Captions & Hashtags", label: "Caption", hint: "Alleen tekst en hashtags", Icon: Type },
   { id: "Content Ideas", label: "Ideeën", hint: "5 postideeën", Icon: Lightbulb },
 ];
 const UPCOMING: Record<string, string> = {
-  Carousel: "Carrousels met meerdere slides zijn in ontwikkeling.",
   Story: "Verticale stories zijn in ontwikkeling.",
   Reel: "AI-video is in ontwikkeling.",
   "Animate Image": "AI-video is in ontwikkeling.",
@@ -118,6 +121,8 @@ export function CreateStudio({
   const [useBrand, setUseBrand] = useState(true);
   const [editIndex, setEditIndex] = useState(0);
   const [editBrief, setEditBrief] = useState("");
+  const [inspiration, setInspiration] = useState<string[]>([]);
+  const plan = usePlan();
   const [status, setStatus] = useState<SaveStatus>(editPost ? "saved" : "idle");
   const [history, setHistory] = useState<{ caption: string; hashtags: string }[]>([]);
   const [alternatives, setAlternatives] = useState<string[]>([]);
@@ -286,7 +291,7 @@ export function CreateStudio({
     setMessage("");
     setBusy("image");
     try {
-      const image = await generateImage({ mode: "generate", brief, format: imageFormat, useBrand });
+      const image = await generateImage({ mode: "generate", brief, format: imageFormat, useBrand, references: inspiration.length ? inspiration : undefined });
       const next = [image, ...(fresh ? fresh.media || [] : photos)].slice(0, 4);
       setPhotos(next);
       await keepImage(next, fresh);
@@ -398,6 +403,9 @@ export function CreateStudio({
   const video = VIDEO.includes(post?.contentType || type);
   const generating = busy === "generate";
 
+  // Carousel: its own editor (one post, several slides), same concept storage.
+  if (type === "Carousel") return <CarouselStudio profile={profile} editPost={editPost?.contentType === "Carousel" ? editPost : undefined} initialBrief={prompt} onPersist={onPersist} onSingle={() => setType("Post")} />;
+
   return (
     <>
       {fromCalendar && <PlanningNotice action="Publiceren" dateTime={date} returnDate={returnDate} existing={!!editPost} />}
@@ -455,7 +463,7 @@ export function CreateStudio({
                   </button>
                 ))}
               </div>
-              <p className="cs-hint">Binnenkort: carrousel, story en reel.</p>
+              <p className="cs-hint">Binnenkort: story en reel.</p>
             </fieldset>
             <label className="cs-field">
               <span>Doel</span>
@@ -534,6 +542,7 @@ export function CreateStudio({
                         Staand (4:5)
                       </button>
                     </div>
+                    <InspirationPicker value={inspiration} onChange={setInspiration} max={plan?.inspirationMax ?? 3} disabled={!!busy} />
                     <label className="cs-check">
                       <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} />
                       <span>Stijl, kleuren en doelgroep uit Brand Hub meenemen (als ze zijn ingevuld)</span>

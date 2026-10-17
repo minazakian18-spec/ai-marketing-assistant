@@ -68,6 +68,39 @@ export type Post = {
    * comes from the earlier simulation.
    */
   instagram?: { mediaId: string; permalink?: string; publishedAt: string };
+  /**
+   * Instagram carousel (contentType "Carousel"): the slides in order with
+   * their editable text layers and the plan they came from. `media` mirrors
+   * the slide images in the same order, so calendar, approvals, preview and
+   * publishing keep working (src/lib/carousel.ts keeps them in sync).
+   */
+  carousel?: Carousel;
+};
+export type CarouselSlide = {
+  id: string;
+  /** Bibliotheek reference or data URL; empty while not generated yet. */
+  image: string;
+  headline: string;
+  body: string;
+  showText: boolean;
+  imageBrief: string;
+  source: "ai" | "own" | "empty";
+  /** Text layer styling (defaults: bottom, medium, white, sans, left). */
+  style?: SlideTextStyle;
+  /** Final image with the text drawn in (Bibliotheek reference), used for publishing; cleared when the slide changes. */
+  rendered?: string;
+};
+export type SlideTextStyle = {
+  position: "top" | "center" | "bottom";
+  size: "s" | "m" | "l";
+  color: string;
+  font: "sans" | "serif" | "rounded" | "mono";
+  align: "left" | "center" | "right";
+};
+export type Carousel = {
+  slides: CarouselSlide[];
+  format: "square" | "portrait";
+  plan?: { title: string; concept: string; audience: string; goal: string; visualStyle: string };
 };
 export type ContactStatus = "Ingeschreven" | "Niet bevestigd" | "Uitgeschreven";
 export type Contact = {

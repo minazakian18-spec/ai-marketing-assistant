@@ -8,6 +8,8 @@ import {z} from 'zod';
 import {copyValid} from '@/lib/studio';
 import {campaignValid,campaignLinksValid} from '@/lib/campaigns';
 import {goalsValid} from '@/lib/insights';
+import {carouselValid} from '@/lib/carousel';
+import {workspacePlan} from '@/lib/server/plan';
 // Newsletter signups are merged into the stored contacts when the workspace is
 // loaded (syncNewsletterContacts); saves keep unsubscribes and suppressions in
 // step with the Contacts module.
@@ -22,6 +24,11 @@ export async function PUT(request:Request){try{sameOrigin(request);const {db,wor
  const profile=brandProfileSchema.parse(data.profile);
  // Content Studio marketing copy: own records in the same workspace blob.
  if(data.copies!==undefined&&(!Array.isArray(data.copies)||data.copies.length>1000||!data.copies.every(copyValid)))throw new HttpError(400,'Ongeldige marketingteksten.');
+ // Instagram carousels: slide data within limits.
+ if(data.posts.some(p=>!carouselValid((p as {carousel?:unknown}).carousel)))throw new HttpError(400,'Ongeldige carrousel.');
+ // New carousels need the carousel entitlement (Growth and Premium); existing ones stay editable.
+ const hadCarousel=new Set(oldPosts.filter((o:{carousel?:unknown})=>o.carousel).map((o:{id:string})=>o.id));
+ if(data.posts.some(p=>(p as {carousel?:unknown}).carousel&&!hadCarousel.has(p.id))){const wpc=await workspacePlan(workspaceId);if(!wpc.plan.entitlements.includes('carousels'))throw new HttpError(402,`Carrousels zitten niet in je ${wpc.plan.name}-abonnement. Maak complete Instagram-carrousels met Mavix Growth.`);}
  // Insights goals: at most one per kind, within sane ranges.
  if(!goalsValid(data.goals))throw new HttpError(400,'Ongeldige doelen.');
  // Content Studio campaigns: own small records; items only link to them (campaignId).
@@ -29,6 +36,8 @@ export async function PUT(request:Request){try{sameOrigin(request);const {db,wor
  if(!campaignLinksValid(data as unknown as Parameters<typeof campaignLinksValid>[0]))throw new HttpError(400,'Een concept verwijst naar een campagne die niet bestaat.');
  if(!brandAssetsValid(profile,previous.data?.profile||{}))throw new HttpError(400,'Ongeldige afbeelding. Gebruik een PNG-, JPG- of WebP-bestand binnen de uploadlimiet.');
  const before=(Array.isArray(previous.data?.contacts)?previous.data.contacts:[]) as Contact[],after=(Array.isArray(data.contacts)?data.contacts:[]) as Contact[];
+ // Contacts per plan. Existing contacts are never removed; only growth beyond the limit is refused.
+ const wp=await workspacePlan(workspaceId);if(after.length>before.length&&after.length>wp.plan.contacts)throw new HttpError(402,`Je ${wp.plan.name}-abonnement heeft ruimte voor ${wp.plan.contacts.toLocaleString('nl-NL')} contacten. Verwijder contacten of kies een groter abonnement.`);
  // Refuse re-subscribing suppressed addresses; record new unsubscribes first.
  await contactConsentGuard(workspaceId,before,after);await applyContactUnsubscribes(workspaceId,before,after);
  delete data.account;delete data.integrations;delete data.notifications;const {data:updated,error}=await db.from('business_profiles').update({data,version:version+1,updated_at:new Date().toISOString()}).eq('workspace_id',workspaceId).eq('version',version).select('version').maybeSingle();if(error)throw new HttpError(503,'Opslaan is niet gelukt.');if(!updated)throw new HttpError(409,'De werkruimte is elders gewijzigd. Herlaad voor je opnieuw opslaat.');return NextResponse.json(updated);}catch(e){if(e instanceof z.ZodError)return failure(new HttpError(400,'Ongeldige werkruimtegegevens.'));return failure(e);}}

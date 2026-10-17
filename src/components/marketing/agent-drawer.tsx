@@ -1,4 +1,5 @@
 "use client";
+import { PLAN_IDS, PLANS, euro } from "@/lib/plans";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Send, X } from "lucide-react";
@@ -24,29 +25,29 @@ function reply(question: string): Message {
   if (/prij|kost|pakket|abonnement|betal/.test(q))
     return {
       role: "agent",
-      text: "Mavix heeft drie pakketten: Starter, Growth en Autopilot. Alle pakketten zijn maandelijks opzegbaar.",
+      text: `Mavix heeft drie pakketten: ${PLAN_IDS.map((id) => `${PLANS[id].name} (${euro(PLANS[id].monthlyPrice)} per maand, ${PLANS[id].credits} AI-credits)`).join(", ")}. Prijzen zijn exclusief btw; Growth is ons aanbevolen pakket.`,
       link: { href: "/pricing", label: "Bekijk alle pakketten" },
     };
   if (/review|google|beoordel/.test(q))
     return {
       role: "agent",
-      text: "Review AI leest je nieuwe Google-reviews en stelt een persoonlijke reactie voor in de toon van jouw merk. Jij keurt goed, past aan of laat Mavix automatisch reageren.",
+      text: "Review AI leest je nieuwe Google-reviews en stelt een persoonlijke reactie voor in de toon van jouw merk. Jij keurt goed of past aan voordat je reageert. De koppeling met Google wacht nog op goedkeuring van Google.",
     };
   if (/insta|social|post/.test(q))
     return {
       role: "agent",
-      text: "Ja. Mavix maakt captions, hashtags en beeldconcepten die passen bij je merk, en zet ze in je contentkalender zodat je ze kunt goedkeuren en plannen.",
+      text: "Ja. Mavix maakt captions, hashtags en echte AI-afbeeldingen die passen bij je merk, en zet ze in je contentkalender zodat je ze kunt goedkeuren en plannen.",
     };
   if (/begin|start|account|aanmeld|registr/.test(q))
     return {
       role: "agent",
-      text: "Maak een account aan, vul je merkgegevens in de Brand Hub in en koppel je kanalen. Daarna kan Mavix direct content voor je voorbereiden.",
+      text: "Vraag een demo of account aan. Na een persoonlijke kennismaking zetten we je werkruimte klaar; daarna vul je je Brand Hub in en kan Mavix direct content voor je voorbereiden.",
       link: { href: "/demo", label: "Demo aanvragen" },
     };
   if (/mail|nieuwsbrief|campagne/.test(q))
     return {
       role: "agent",
-      text: "Met Email AI maak je campagnes en nieuwsbrieven, en verstuur je ze via je eigen gekoppelde Gmail-account.",
+      text: "Met E-mail AI schrijf je campagnes en nieuwsbrieven en bekijk je ze voor desktop en mobiel. Versturen naar je ontvangers komt beschikbaar zodra het verzenddomein is ingericht.",
     };
   return {
     role: "agent",

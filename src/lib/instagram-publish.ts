@@ -24,8 +24,15 @@ export function hashtagCount(text: string) {
 const IMAGE = /^data:image\/(jpeg|png|webp);base64,/;
 
 /** Problems that block publishing this post to Instagram (empty = ok). */
-export function publishProblems(p: Pick<Post, "caption" | "hashtags" | "media" | "contentType">): string[] {
+export function publishProblems(p: Pick<Post, "caption" | "hashtags" | "media" | "contentType"> & { carousel?: Post["carousel"] }): string[] {
   const out: string[] = [];
+  if (p.carousel) {
+    if (p.carousel.slides.some((s) => !s.image)) out.push("Niet elke slide heeft een afbeelding. Genereer of kies eerst een afbeelding voor elke slide.");
+    if (p.carousel.slides.length < 2) out.push("Een carrousel heeft minstens 2 slides.");
+    // Slides with text are published as the final composed image (made when approving).
+    if (p.carousel.slides.some((s) => s.showText && (s.headline.trim() || s.body.trim()) && !s.rendered))
+      out.push("De definitieve slides met tekst zijn nog niet gemaakt. Keur de carrousel goed om ze te maken.");
+  }
   const caption = instagramCaption(p);
   const media = p.media || [];
   if (p.contentType && !["Post", "Image", "Carousel"].includes(p.contentType))

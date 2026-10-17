@@ -4,7 +4,9 @@
 // a new image from the brief alone. Business photos are never required.
 
 export type ImageFormat = "square" | "portrait";
-export type ImageMode = "generate" | "edit";
+export type ImageMode = "generate" | "edit" | "inspire";
+/** One slide of a carousel: the shared visual brief keeps all slides consistent. */
+export type SlideContext = { visualStyle: string; slideBrief: string; index: number; total: number; styleReference: boolean };
 export type BrandStyle = {
   name?: string;
   industry?: string;
@@ -30,10 +32,22 @@ export function brandStyleOf(profile: { name?: string; industry?: string; audien
   };
 }
 
-export function buildImagePrompt(o: { brief: string; mode: ImageMode; format: ImageFormat; brand?: BrandStyle }): string {
+export function buildImagePrompt(o: { brief: string; mode: ImageMode; format: ImageFormat; brand?: BrandStyle; slide?: SlideContext; references?: number }): string {
   const b = o.brand || {};
   const lines: string[] = [];
-  if (o.mode === "edit") {
+  if (o.slide) {
+    lines.push(`Slide ${o.slide.index} of ${o.slide.total} of one Instagram carousel. Shared visual style for every slide: ${clip(o.slide.visualStyle, 600)}.`);
+    lines.push(`This slide shows: ${clip(o.slide.slideBrief, 600)}.`);
+    if (o.slide.styleReference) lines.push("The last input image is an earlier slide of this carousel: match its lighting, colour grade, photographic style and mood exactly so the slides belong together, but show this slide's own subject.");
+  }
+  if (o.mode === "inspire") {
+    lines.push(`Create a NEW, original professional photograph for Instagram: ${clip(o.brief, 800)}.`);
+    lines.push(
+      `Use the ${o.references && o.references > 1 ? "reference images" : "reference image"} only as visual inspiration for composition, lighting, colour palette, photographic style, mood, camera angle and styling. Do not reproduce them: no copied people, objects, logos, text, watermarks, brand marks or distinctive designs from the references.`,
+    );
+    lines.push(o.format === "portrait" ? "Vertical 4:5 composition, important content inside the frame." : "Square composition with a clear focal point.");
+    lines.push("Crisp detail, realistic textures, refined colour grade, like a top marketing agency shot it.");
+  } else if (o.mode === "edit") {
     lines.push(`Edit this photo for an Instagram marketing post: ${clip(o.brief, 800)}.`);
     lines.push("Keep the main subject, products and setting recognisable and realistic; only change what the instruction asks for. Finish it like a professional retoucher: natural colours, clean light, crisp detail.");
   } else {
