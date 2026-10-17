@@ -83,6 +83,15 @@ test("platform admin: only users listed in platform_admins pass", async () => {
   assert.equal((await staff.load("src/lib/server/access.ts").platformAdmin()).user.id, "staff");
 });
 
+test("Beheer link: /api/admin/me is true only for platform admins, never for workspace owners", async () => {
+  const tables = () => ({ platform_admins: [{ user_id: "staff" }], workspace_members: [{ user_id: "owner", workspace_id: "w1", role: "OWNER", created_at: "1" }], workspaces: [{ id: "w1", deleted_at: null, access_status: "approved" }] });
+  const staff = await setup(tables(), "staff").load("src/app/api/admin/me/route.ts").GET();
+  assert.deepEqual(await staff.json(), { admin: true });
+  const owner = await setup(tables(), "owner").load("src/app/api/admin/me/route.ts").GET();
+  assert.deepEqual(await owner.json(), { admin: false });
+  assert.match(owner.headers.get("cache-control") || "", /no-store/);
+});
+
 test("AI metering: tokens are recorded per request, without prompt or output", async () => {
   const tables = { workspaces: [{ id: "w1", ai_monthly_token_limit: null }], ai_usage: [] };
   const { load } = setup(tables);

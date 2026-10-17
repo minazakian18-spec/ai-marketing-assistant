@@ -154,6 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <strong>
               {links.find((item) => item.href === path)?.label ||
                 accountLinks.find(([href]) => href === path)?.[1] ||
+                (path === "/beheer" ? "Beheer" : "") ||
                 "Mavix"}
             </strong>
           </span>

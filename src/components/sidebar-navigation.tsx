@@ -1,6 +1,9 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ShieldCheck } from "lucide-react";
+import { isBrowserDemo } from "@/lib/demo";
 import {
   isActive,
   navigationGroups,
@@ -68,11 +71,33 @@ export function SidebarNavigation({ onNavigate }: { onNavigate: () => void }) {
   );
 }
 
+// "Beheer" only for Mavix staff: the server decides (platform_admins), the
+// link stays hidden until it has confirmed. /beheer and /api/admin/* keep
+// refusing everyone else on their own.
+const ADMIN_ITEM: NavItem = { href: "/beheer", label: "Beheer", icon: ShieldCheck };
+function usePlatformAdmin() {
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    if (isBrowserDemo()) return;
+    let live = true;
+    fetch("/api/admin/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { admin: false }))
+      .then((d) => live && setAdmin(d.admin === true))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  return admin;
+}
+
 export function SystemNavigation({ onNavigate }: { onNavigate: () => void }) {
   const path = navigationPath(usePathname());
+  const admin = usePlatformAdmin();
+  const items = admin ? systemNavigation.flatMap((item) => (item.href === "/account" ? [ADMIN_ITEM, item] : [item])) : systemNavigation;
   return (
     <nav className="side-nav side-nav-system" aria-label="Systeem">
-      {systemNavigation.map((item) => (
+      {items.map((item) => (
         <Item key={item.href} item={item} path={path} onNavigate={onNavigate} />
       ))}
     </nav>
