@@ -15,6 +15,17 @@ import { mediaIdOf, mediaRef } from "@/lib/media-ref";
 // Bibliotheek (private storage, kind "ai") and returned as a media
 // reference, so the workspace document only holds a short link.
 
+// Closed live test: only these workspaces may generate or edit AI images.
+// AI_IMAGE_WORKSPACES (comma-separated workspace ids) overrides the default;
+// "*" opens it to every approved workspace.
+const TEST_WORKSPACES = ["a81c4faa-e42b-4ba0-95cc-ed8a3cdc812e"]; // Telepizza Amstelveen
+function imageAccess(workspaceId: string) {
+  const configured = (process.env.AI_IMAGE_WORKSPACES || "").trim();
+  if (configured === "*") return true;
+  const list = configured ? configured.split(",").map((s) => s.trim()) : TEST_WORKSPACES;
+  return list.includes(workspaceId);
+}
+
 const PHOTO = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/;
 const input = z.object({
   mode: z.enum(["generate", "edit"]),
@@ -38,6 +49,7 @@ export async function POST(request: Request) {
   try {
     sameOrigin(request);
     const auth = await workspace(["OWNER", "ADMIN"]);
+    if (!imageAccess(auth.workspaceId)) throw new HttpError(403, "AI-afbeeldingen zijn nog in een besloten test en nog niet beschikbaar voor jouw werkruimte. Eigen foto's gebruiken kan wel.");
     await limited("ai-image:" + auth.user.id, 5);
     await limited("ai-image-ws:" + auth.workspaceId, 10);
     const body = input.parse(await request.json());

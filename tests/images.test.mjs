@@ -13,6 +13,7 @@ import { serverLoader, memoryDb } from "./helpers/server-loader.mjs";
 const origin = "https://mavix.webbo-solutions.nl";
 process.env.OPENAI_API_KEY = "sk-test-fixture-images";
 delete process.env.OPENAI_IMAGE_MODEL;
+process.env.AI_IMAGE_WORKSPACES = "w1"; // closed test: only the test workspace
 const sharp = (await import("sharp")).default;
 const jpeg = (w, h, color = "#d96") => sharp({ create: { width: w, height: h, channels: 3, background: color } }).jpeg().toBuffer();
 
@@ -47,6 +48,7 @@ test("model, sizes and prices: gpt-image-2.5-flare, direct 4:5, reservation cove
     assert.ok(u.costMicroUsd("gpt-image-1", 1000, 6240) <= u.reservationMicroUsd("image_generate"));
   } finally {
     delete process.env.OPENAI_IMAGE_MODEL;
+process.env.AI_IMAGE_WORKSPACES = "w1"; // closed test: only the test workspace
   }
   const o = serverLoader({ [path.resolve("src/lib/server/supabase.ts")]: { adminClient: () => ({}) } })("src/lib/server/openai.ts");
   assert.deepEqual(o.imagePlan("portrait", "gpt-image-2.5-flare"), { size: "1024x1280", crop: false });
@@ -218,4 +220,22 @@ test("moving old post images into the Bibliotheek replaces data with references,
   const posts = e.tables.business_profiles[0].data.posts;
   assert.ok(posts.every((p) => p.media.every((m) => m.startsWith("/api/library/media/"))));
   assert.ok(!JSON.stringify(posts).includes("base64"), "no image data left in the workspace document");
+});
+
+test("closed live test: other approved workspaces cannot generate images; default allows only Telepizza", async (t) => {
+  quiet(t);
+  const e = env({ user: "u3" }); // owner of w2 (approved)
+  e.tables.business_profiles.push({ workspace_id: "w2", version: 1, data: { profile: {}, posts: [] } });
+  const r = await e.post({ mode: "generate", brief: "een pizza" });
+  assert.equal(r.status, 403);
+  assert.match(r.body.error, /besloten test/);
+  assert.equal(e.calls.length, 0, "no OpenAI request");
+  assert.equal(e.tables.ai_usage.length, 0, "nothing reserved");
+  delete process.env.AI_IMAGE_WORKSPACES;
+  try {
+    const d = env();
+    assert.equal((await d.post({ mode: "generate", brief: "een pizza" })).status, 403, "without config only the Telepizza workspace is allowed");
+  } finally {
+    process.env.AI_IMAGE_WORKSPACES = "w1";
+  }
 });
