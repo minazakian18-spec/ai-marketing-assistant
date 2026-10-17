@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { workspace, sameOrigin, limited, failure, HttpError } from "@/lib/server/access";
 import { metered } from "@/lib/server/ai-usage";
-import { aiConfigured, aiImage } from "@/lib/server/openai";
+import { aiConfigured, aiImage, imagePlan } from "@/lib/server/openai";
 import { storedProfile } from "@/lib/server/stored-profile";
+import { readImage, storeImage } from "@/lib/server/library";
 import { brandStyleOf, buildImagePrompt } from "@/lib/image-prompt";
+import { mediaIdOf, mediaRef } from "@/lib/media-ref";
 
 // AI images for Social / Content Studio (OpenAI Images API, metered as
 // image_generate / image_edit). "generate" makes a new visual from the brief,
 // with Brand Hub only as optional style context; no business photo is needed.
-// "edit" changes one photo the user chose. The image is returned to the
-// browser as a JPEG data URL; nothing is saved or published here.
+// "edit" changes one photo the user chose. The result is stored once in the
+// Bibliotheek (private storage, kind "ai") and returned as a media
+// reference, so the workspace document only holds a short link.
 
 const PHOTO = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/;
 const input = z.object({
@@ -21,12 +24,11 @@ const input = z.object({
   useBrand: z.boolean().default(true),
 });
 
-/** Instagram accepts 4:5 at most for portrait; the model makes 2:3, so crop the centre. */
-async function toInstagramRatio(jpeg: Buffer, format: "square" | "portrait") {
-  if (format === "square") return jpeg;
+/** gpt-image-1 portrait (2:3) is cropped to Instagram's 4:5. */
+async function crop45(jpeg: Buffer) {
   try {
     const sharp = (await import("sharp")).default;
-    return await sharp(jpeg).resize(1024, 1280, { fit: "cover", position: "centre" }).jpeg({ quality: 85 }).toBuffer();
+    return await sharp(jpeg).resize(1024, 1280, { fit: "cover", position: "centre" }).jpeg({ quality: 90 }).toBuffer();
   } catch {
     throw new HttpError(503, "Staande afbeeldingen zijn nu niet beschikbaar. Kies vierkant.");
   }
@@ -38,27 +40,31 @@ export async function POST(request: Request) {
     const auth = await workspace(["OWNER", "ADMIN"]);
     await limited("ai-image:" + auth.user.id, 5);
     await limited("ai-image-ws:" + auth.workspaceId, 10);
-    await limited("ai-ws:" + auth.workspaceId, 60);
     const body = input.parse(await request.json());
     if (!aiConfigured()) throw new HttpError(503, "AI is nog niet geconfigureerd. Er is geen afbeelding gemaakt.");
     let photo: { data: Buffer; mime: string } | undefined;
     if (body.mode === "edit") {
+      const ref = body.photo ? mediaIdOf(body.photo) : null;
       const m = body.photo ? PHOTO.exec(body.photo) : null;
-      if (!m) throw new HttpError(400, "Kies eerst een foto (JPG, PNG of WebP) om te bewerken.");
-      const data = Buffer.from(m[2], "base64");
-      if (data.length > 8 * 1024 * 1024) throw new HttpError(413, "Deze foto is groter dan 8 MB.");
-      photo = { data, mime: "image/" + m[1] };
+      if (ref) photo = await readImage(auth.workspaceId, ref);
+      else if (m) photo = { data: Buffer.from(m[2], "base64"), mime: "image/" + m[1] };
+      else throw new HttpError(400, "Kies eerst een foto (JPG, PNG of WebP) om te bewerken.");
+      if (photo.data.length > 8 * 1024 * 1024) throw new HttpError(413, "Deze foto is groter dan 8 MB.");
     }
     const profile = body.useBrand ? await storedProfile(auth.workspaceId) : null;
     const prompt = buildImagePrompt({ brief: body.brief, mode: body.mode, format: body.format, brand: brandStyleOf(profile as Parameters<typeof brandStyleOf>[0]) });
-    const jpeg = await metered(
-      auth,
-      body.mode === "edit" ? "image_edit" : "image_generate",
-      () => aiImage({ prompt, size: body.format === "portrait" ? "1024x1536" : "1024x1024", photo }),
-      request.headers.get("idempotency-key"),
-    );
-    const image = await toInstagramRatio(jpeg, body.format);
-    return NextResponse.json({ image: "data:image/jpeg;base64," + image.toString("base64"), ai: true }, { headers: { "Cache-Control": "private, no-store" } });
+    const plan = imagePlan(body.format);
+    let jpeg = await metered(auth, body.mode === "edit" ? "image_edit" : "image_generate", () => aiImage({ prompt, size: plan.size, photo }), request.headers.get("idempotency-key"));
+    if (plan.crop) jpeg = await crop45(jpeg);
+    // Paid result: store it in the Bibliotheek. If storage is not available,
+    // the image is still returned (as data) rather than lost.
+    try {
+      const id = await storeImage({ workspaceId: auth.workspaceId, userId: auth.user.id }, jpeg, { kind: "ai", mime: "image/jpeg" });
+      return NextResponse.json({ image: mediaRef(id), fileId: id, stored: true }, { headers: { "Cache-Control": "private, no-store" } });
+    } catch (e) {
+      console.error(JSON.stringify({ event: "ai_image_store_failed", code: (e as HttpError).status || "error" }));
+      return NextResponse.json({ image: "data:image/jpeg;base64," + jpeg.toString("base64"), stored: false }, { headers: { "Cache-Control": "private, no-store" } });
+    }
   } catch (e) {
     if (e instanceof z.ZodError) return failure(new HttpError(400, "Beschrijf in een paar woorden wat er op de afbeelding moet staan."));
     return failure(e);

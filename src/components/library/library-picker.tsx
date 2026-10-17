@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Check, ImageOff, X } from "lucide-react";
 import { IconButton } from "@/components/ui";
 import { isBrowserDemo } from "@/lib/demo";
-import { readImages } from "@/lib/local-images";
+import { mediaRef } from "@/lib/media-ref";
 
 // Pick images from the Bibliotheek for a post. The library serves short-lived
 // signed URLs, so a chosen image is downloaded once and stored with the post
@@ -50,15 +50,9 @@ export function LibraryPicker({ open, max, onClose, onPick }: { open: boolean; m
     setBusy(true);
     setError("");
     try {
-      const blobs = await Promise.all(
-        picked.map(async (f) => {
-          const r = await fetch(f.url!);
-          if (!r.ok) throw new Error("Een afbeelding kon niet worden geladen. Probeer het opnieuw.");
-          const blob = await r.blob();
-          return new File([blob], f.name, { type: blob.type || f.mimeType });
-        }),
-      );
-      onPick(await readImages(blobs, max));
+      if (picked.length > max) throw new Error("Kies maximaal " + max + " afbeeldingen.");
+      // A reference to the file in the Bibliotheek: no copy, no re-encoding.
+      onPick(picked.map((f) => mediaRef(f.id)));
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Afbeeldingen toevoegen is niet gelukt.");

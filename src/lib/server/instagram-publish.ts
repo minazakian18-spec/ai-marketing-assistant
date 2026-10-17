@@ -5,6 +5,8 @@ import { HttpError } from "./access";
 import { graph, igGraph, metaConfigured, metaConnection } from "./meta";
 import { mutateWorkspace, readWorkspace } from "./workspace-store";
 import { instagramCaption, publishProblems } from "../instagram-publish";
+import { mediaIdOf } from "../media-ref";
+import { readImage } from "./library";
 import type { Post } from "../types";
 
 // Instagram publishing through Meta's official Content Publishing API.
@@ -70,10 +72,19 @@ export function metaPublishError(status: number, e: { code?: number; error_subco
 }
 
 /** JPEG bytes for Instagram (PNG/WebP are converted when the image library is available). */
-async function toJpeg(dataUrl: string): Promise<Buffer> {
-  const m = /^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(dataUrl);
-  if (!m) throw new HttpError(400, "Gebruik JPG-, PNG- of WebP-foto's.");
-  const bytes = Buffer.from(m[2], "base64");
+async function toJpeg(workspaceId: string, src: string): Promise<Buffer> {
+  let m: string[] | null = /^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(src);
+  let bytes: Buffer;
+  const ref = mediaIdOf(src);
+  if (ref) {
+    // Bibliotheek image of this workspace (private storage).
+    const file = await readImage(workspaceId, ref);
+    bytes = file.data;
+    m = ["", file.mime.split("/")[1], ""];
+  } else {
+    if (!m) throw new HttpError(400, "Gebruik JPG-, PNG- of WebP-foto's.");
+    bytes = Buffer.from(m[2], "base64");
+  }
   type Sharp = (b: Buffer) => { metadata(): Promise<{ width?: number; height?: number }>; jpeg(o: { quality: number }): { toBuffer(): Promise<Buffer> } };
   // sharp ships with Next.js for image optimisation; without it only JPEG is accepted.
   const sharp = await import("sharp").then((m) => m.default as unknown as Sharp).catch(() => null as Sharp | null);
@@ -111,7 +122,7 @@ async function publishToInstagram(workspaceId: string, post: Post) {
     const urls: string[] = [];
     for (const m of post.media || []) {
       const path = `instagram-publish/${workspaceId}/${randomUUID()}.jpg`;
-      const { error } = await db().storage.from(BUCKET).upload(path, await toJpeg(m), { contentType: "image/jpeg", upsert: false });
+      const { error } = await db().storage.from(BUCKET).upload(path, await toJpeg(workspaceId, m), { contentType: "image/jpeg", upsert: false });
       if (error) throw new HttpError(503, "De foto kon niet worden klaargezet voor Instagram.");
       uploaded.push(path);
       const { data, error: signError } = await db().storage.from(BUCKET).createSignedUrl(path, 3600);

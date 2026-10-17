@@ -1,4 +1,5 @@
 "use client";
+import { isDataImage } from "@/lib/media-ref";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import {
   Download,
@@ -204,6 +205,21 @@ export default function LibraryPage() {
 
   // One-time import of images from the previous (workspace-JSON) library.
   const legacy = (workspace.library || []).filter((a) => a.preview?.startsWith("data:"));
+  // Post images still stored inside the workspace document (older posts).
+  const postImages = new Set(workspace.posts.flatMap((p) => (p.media || []).filter(isDataImage))).size;
+  async function migratePostImages() {
+    setUploading("Foto's verplaatsen…");
+    try {
+      const d = await api<{ moved: number; stored: number; remaining: number }>("/api/library/migrate-media", { method: "POST", body: "{}" });
+      setMessage(`${d.stored} ${d.stored === 1 ? "foto" : "foto's"} in de Bibliotheek gezet.` + (d.remaining ? ` Nog ${d.remaining} te gaan: klik nog een keer.` : ""));
+      window.dispatchEvent(new Event("mavix:workspace-reload"));
+      await load();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Verplaatsen is niet gelukt.");
+    } finally {
+      setUploading("");
+    }
+  }
   async function importLegacy() {
     const imported: string[] = [];
     setUploading("Importeren…");
@@ -338,6 +354,15 @@ export default function LibraryPage() {
               Je hebt {legacy.length} {legacy.length === 1 ? "afbeelding" : "afbeeldingen"} uit de vorige bibliotheek.
               <button type="button" className="button secondary" onClick={() => void importLegacy()} disabled={!!uploading}>
                 Importeren
+              </button>
+            </p>
+          )}
+
+          {postImages > 0 && canEdit && (
+            <p className="lb-legacy" role="status">
+              {postImages} {postImages === 1 ? "foto in je posts staat" : "foto's in je posts staan"} nog in je werkruimte zelf. Zet ze veilig in je Bibliotheek; je posts blijven hetzelfde.
+              <button type="button" className="button secondary" onClick={() => void migratePostImages()} disabled={!!uploading}>
+                Naar Bibliotheek
               </button>
             </p>
           )}

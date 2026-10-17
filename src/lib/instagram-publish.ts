@@ -1,4 +1,5 @@
 import type { Post } from "./types";
+import { isMediaRef } from "./media-ref.ts";
 
 // Rules of Instagram's Content Publishing API that Mavix checks before a post
 // can be scheduled or published (browser and server use the same checks).
@@ -31,8 +32,9 @@ export function publishProblems(p: Pick<Post, "caption" | "hashtags" | "media" |
     out.push(`${p.contentType} kan Mavix nog niet publiceren. Alleen foto's en carrousels worden ondersteund.`);
   if (!media.length) out.push("Voeg minstens één foto toe. Instagram publiceert geen berichten zonder beeld.");
   if (media.length > CAROUSEL_MAX) out.push(`Een carrousel heeft maximaal ${CAROUSEL_MAX} foto's.`);
-  if (media.some((m) => !IMAGE.test(m))) out.push("Gebruik JPG-, PNG- of WebP-foto's. Video's kan Mavix nog niet publiceren.");
-  if (media.some((m) => Math.floor((m.length - m.indexOf(",") - 1) * 0.75) > IMAGE_BYTES_MAX)) out.push("Een foto is groter dan 8 MB.");
+  // Photos are Bibliotheek references (checked on the server) or older data URLs.
+  if (media.some((m) => !IMAGE.test(m) && !isMediaRef(m))) out.push("Gebruik JPG-, PNG- of WebP-foto's. Video's kan Mavix nog niet publiceren.");
+  if (media.some((m) => IMAGE.test(m) && Math.floor((m.length - m.indexOf(",") - 1) * 0.75) > IMAGE_BYTES_MAX)) out.push("Een foto is groter dan 8 MB.");
   if (caption.length > CAPTION_LIMIT) out.push(`Tekst en hashtags samen zijn ${caption.length} tekens; Instagram staat er ${CAPTION_LIMIT} toe.`);
   if (hashtagCount(caption) > HASHTAG_LIMIT) out.push(`Gebruik maximaal ${HASHTAG_LIMIT} hashtags.`);
   return out;

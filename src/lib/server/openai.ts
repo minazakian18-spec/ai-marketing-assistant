@@ -167,24 +167,55 @@ export async function aiStep(instructions: string, input: ResponseInputItem[], t
  * prompt; "edit" changes the given photo. Returns JPEG bytes. Same step
  * accounting, token recording and error mapping as the text calls.
  */
-export async function aiImage(o: { prompt: string; size: "1024x1024" | "1024x1536"; photo?: { data: Buffer; mime: string } }): Promise<Buffer> {
+/**
+ * Size to request per format. gpt-image-2.5 accepts custom sizes (multiples
+ * of 16), so portrait is generated directly at Instagram's 4:5 (1024x1280).
+ * gpt-image-1 only knows fixed sizes: portrait is made at 1024x1536 and
+ * cropped to 4:5 afterwards.
+ */
+export function imagePlan(format: "square" | "portrait", model = imageModel()) {
+  if (format === "square") return { size: "1024x1024", crop: false };
+  return model.startsWith("gpt-image-1") ? { size: "1024x1536", crop: true } : { size: "1024x1280", crop: false };
+}
+
+export async function aiImage(o: { prompt: string; size: string; photo?: { data: Buffer; mime: string } }): Promise<Buffer> {
   const model = imageModel();
   if (o.prompt.length > currentInputLimit() * 3) throw new HttpError(413, "Deze beschrijving is te lang. Maak hem korter.");
   takeStep();
+  // Worst case of this request, recorded when the outcome (and bill) is unknown.
+  const worstCase = () => recordTokens(model, currentInputLimit(), currentOutputLimit());
   try {
-    // Quality over price: "high" gives agency-grade detail (1024x1024 = 4,160
-    // output tokens, about 0.17 USD; 1024x1536 = 6,240, about 0.25 USD).
-    const common = { model, prompt: o.prompt, size: o.size, quality: "high" as const, output_format: "jpeg" as const, output_compression: 90, n: 1 };
-    const response = o.photo
-      ? await openai().images.edit({ ...common, image: await toFile(o.photo.data, "foto." + (o.photo.mime.split("/")[1] || "png"), { type: o.photo.mime }) })
-      : await openai().images.generate(common);
+    // Quality over price: "high" for agency-grade detail. No automatic retry:
+    // a retry would be a second paid image. Images can take a minute.
+    const common = { model, prompt: o.prompt, size: o.size as "1024x1024", quality: "high" as const, output_format: "jpeg" as const, output_compression: 90, n: 1 };
+    const options = { timeout: 150_000, maxRetries: 0 };
+    let photo = o.photo;
+    if (photo) {
+      // Bound the input tokens of an edit: at most 1024 px on the long side.
+      try {
+        const sharp = (await import("sharp")).default;
+        photo = { data: await sharp(photo.data).resize(1024, 1024, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer(), mime: "image/jpeg" };
+      } catch {
+        /* without sharp the original (max 8 MB) is sent */
+      }
+    }
+    const response = photo
+      ? await openai().images.edit({ ...common, image: await toFile(photo.data, "foto." + (photo.mime.split("/")[1] || "png"), { type: photo.mime }) }, options)
+      : await openai().images.generate(common, options);
     const usage = response.usage;
     if (usage) recordTokens(model, usage.input_tokens || 0, usage.output_tokens || 0);
+    else worstCase();
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) throw new HttpError(502, "Mavi kon geen afbeelding maken. Probeer een andere beschrijving.");
     console.info(JSON.stringify({ event: "ai_image", model, mode: o.photo ? "edit" : "generate", input: usage?.input_tokens || 0, output: usage?.output_tokens || 0 }));
     return Buffer.from(b64, "base64");
   } catch (e) {
+    // Timeout or broken connection: OpenAI may have made (and billed) the
+    // image anyway. Count the worst case so the budget never under-counts.
+    if (e instanceof OpenAI.APIConnectionError) {
+      worstCase();
+      return Promise.reject(new HttpError(504, "Het maken van de afbeelding duurde te lang. Probeer het opnieuw; dit verzoek is voor de zekerheid meegeteld in je AI-tegoed."));
+    }
     // Refused by the provider's safety system: say so plainly.
     if (e instanceof OpenAI.BadRequestError && /safety|moderation/i.test(String((e as { code?: string }).code || e.message))) return Promise.reject(new HttpError(400, "Deze beschrijving kan Mavi niet als afbeelding maken. Pas de beschrijving aan."));
     throw aiError(e);

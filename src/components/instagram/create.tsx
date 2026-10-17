@@ -32,6 +32,8 @@ import type { Post, Profile } from "@/lib/types";
 import type { ContentType } from "@/lib/instagram-model";
 import { generateInstagramContent, editContentText, generateImage, CONTENT_EDIT_LABELS, type ContentEditAction } from "@/lib/api-client";
 import { readImages } from "@/lib/local-images";
+import { isBrowserDemo } from "@/lib/demo";
+import { mediaRef } from "@/lib/media-ref";
 import { instagramGoals, type InstagramGoal } from "@/lib/ai/instagram-instruction";
 import { PostVisual } from "./shared";
 import { PlanningNotice } from "@/components/calendar/planning-notice";
@@ -245,6 +247,21 @@ export function CreateStudio({
     } finally {
       setBusy("");
     }
+  }
+
+  // Own photos go into the Bibliotheek (private storage) and the post keeps
+  // a reference. In test mode there is no storage: small local copies.
+  async function ownPhotos(files: File[]): Promise<string[]> {
+    if (isBrowserDemo()) return readImages(files);
+    if (files.length > 4) throw new Error("Kies maximaal 4 foto's.");
+    if (files.some((f) => !["image/png", "image/jpeg", "image/webp"].includes(f.type) || f.size > 8 * 1024 * 1024)) throw new Error("Gebruik JPG, PNG of WebP van maximaal 8 MB per foto.");
+    const form = new FormData();
+    files.forEach((f) => form.append("files", f));
+    form.append("kind", "image");
+    const r = await fetch("/api/library/files", { method: "POST", body: form });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "De foto's konden niet worden opgeslagen.");
+    return (d.ids as string[]).map(mediaRef);
   }
 
   // A paid image must never get lost: save it right away. Without a concept
@@ -568,7 +585,7 @@ export function CreateStudio({
                       setBusy("upload");
                       setError("");
                       try {
-                        setPhotos(await readImages(files));
+                        setPhotos(await ownPhotos(files));
                       } catch (err) {
                         setError(err instanceof Error ? err.message : "Foto toevoegen is niet gelukt.");
                       } finally {

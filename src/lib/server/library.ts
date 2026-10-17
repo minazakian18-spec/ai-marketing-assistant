@@ -1,5 +1,5 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { adminClient } from "./supabase";
 import { HttpError } from "./access";
 import {
@@ -194,6 +194,57 @@ export async function deleteFiles(workspaceId: string, ids: string[]) {
   const { error: delErr } = await db().from("library_files").delete().eq("workspace_id", workspaceId).in("id", rows.map((r) => r.id));
   if (delErr) throw delErr;
   return rows.length;
+}
+
+/**
+ * Stores one image (AI result or a photo moved out of a post) in the
+ * Bibliotheek. The same bytes are stored once per workspace: the content
+ * hash is part of the name, and an existing file with that name and size is
+ * reused instead of uploading a copy. Returns the library file id.
+ */
+export async function storeImage(ctx: { workspaceId: string; userId: string | null }, bytes: Buffer, o: { kind: "ai" | "image"; mime: string }) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(o.mime)) throw new HttpError(415, "Dit afbeeldingstype wordt niet ondersteund.");
+  const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
+  const name = (o.kind === "ai" ? "AI-afbeelding " : "Foto ") + hash;
+  const { data: existing, error: findError } = await db().from("library_files").select("id").eq("workspace_id", ctx.workspaceId).eq("name", name).eq("size_bytes", bytes.length).limit(1);
+  setupCheck(findError, "library_files");
+  if (existing?.[0]) return existing[0].id as string;
+  const quota = quotaBytes();
+  if (quota !== null && (await usage(ctx.workspaceId)) + bytes.length > quota) throw new HttpError(413, "Er is niet genoeg opslag beschikbaar in je Bibliotheek.");
+  const path = `${ctx.workspaceId}/${randomUUID()}.${o.mime.split("/")[1] === "jpeg" ? "jpg" : o.mime.split("/")[1]}`;
+  const { error: upErr } = await db().storage.from(BUCKET).upload(path, bytes, { contentType: o.mime, upsert: false });
+  if (upErr && /bucket/i.test(upErr.message)) setupCheck(upErr, "storage bucket library");
+  if (upErr) throw new HttpError(502, "De afbeelding kon niet worden opgeslagen.");
+  const { data, error } = await db()
+    .from("library_files")
+    .insert({ workspace_id: ctx.workspaceId, album_id: null, name, kind: o.kind, mime_type: o.mime, size_bytes: bytes.length, storage_path: path, created_by: ctx.userId })
+    .select("id")
+    .single();
+  if (error || !data) {
+    await db().storage.from(BUCKET).remove([path]);
+    throw new HttpError(503, "De afbeelding kon niet worden opgeslagen.");
+  }
+  return data.id as string;
+}
+
+/** Signed URL to show an image (no download header), after the workspace check. */
+export async function mediaUrl(workspaceId: string, id: string) {
+  if (!UUID.test(id)) throw new HttpError(404, "Bestand niet gevonden.");
+  const { data: f } = await db().from("library_files").select("storage_path,mime_type").eq("workspace_id", workspaceId).eq("id", id).maybeSingle();
+  if (!f || !String(f.mime_type).startsWith("image/")) throw new HttpError(404, "Bestand niet gevonden.");
+  const { data, error } = await db().storage.from(BUCKET).createSignedUrl(f.storage_path as string, 3600);
+  if (error || !data) throw new HttpError(502, "De afbeelding kon niet worden geladen.");
+  return data.signedUrl;
+}
+
+/** The bytes of one image in this workspace (for publishing and AI edits). */
+export async function readImage(workspaceId: string, id: string): Promise<{ data: Buffer; mime: string }> {
+  if (!UUID.test(id)) throw new HttpError(404, "Afbeelding niet gevonden.");
+  const { data: f } = await db().from("library_files").select("storage_path,mime_type").eq("workspace_id", workspaceId).eq("id", id).maybeSingle();
+  if (!f || !String(f.mime_type).startsWith("image/")) throw new HttpError(404, "Afbeelding niet gevonden.");
+  const { data, error } = await db().storage.from(BUCKET).download(f.storage_path as string);
+  if (error || !data) throw new HttpError(502, "De afbeelding kon niet worden geladen.");
+  return { data: Buffer.from(await data.arrayBuffer()), mime: String(f.mime_type) };
 }
 
 export async function downloadUrl(workspaceId: string, id: string) {
