@@ -30,7 +30,7 @@ import { SaveIndicator, type SaveStatus } from "@/components/save-indicator";
 import { useWorkspace } from "@/components/workspace-provider";
 import type { Post, Profile } from "@/lib/types";
 import type { ContentType } from "@/lib/instagram-model";
-import { generateInstagramContent, editContentText, CONTENT_EDIT_LABELS, type ContentEditAction } from "@/lib/api-client";
+import { generateInstagramContent, editContentText, generateImage, CONTENT_EDIT_LABELS, type ContentEditAction } from "@/lib/api-client";
 import { readImages } from "@/lib/local-images";
 import { instagramGoals, type InstagramGoal } from "@/lib/ai/instagram-instruction";
 import { PostVisual } from "./shared";
@@ -57,6 +57,12 @@ const UPCOMING: Record<string, string> = {
   "Photos to Reel": "AI-video is in ontwikkeling.",
 };
 const VIDEO = ["Reel", "Animate Image", "Photos to Reel"];
+type VisualMode = "ai" | "own" | "edit";
+const VISUAL_MODES: { id: VisualMode; label: string; Icon: typeof ImageIcon }[] = [
+  { id: "ai", label: "AI-afbeelding genereren", Icon: Wand2 },
+  { id: "own", label: "Eigen foto gebruiken", Icon: ImagePlus },
+  { id: "edit", label: "Foto bewerken met AI", Icon: PenLine },
+];
 const AUTOSAVE_MS = 1500;
 
 export function CreateStudio({
@@ -102,7 +108,14 @@ export function CreateStudio({
   const [date, setDate] = useState(editPost?.date || initialDate || "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState<"" | "generate" | "edit" | "upload">("");
+  const [busy, setBusy] = useState<"" | "generate" | "edit" | "upload" | "image">("");
+  // Visual: a new AI image (default for "Afbeelding"), an own photo, or an own photo edited with AI.
+  const [imageMode, setImageMode] = useState<VisualMode>((editPost?.contentType || initialType) === "Image" && !editPost?.media?.length ? "ai" : "own");
+  const [imageBrief, setImageBrief] = useState("");
+  const [imageFormat, setImageFormat] = useState<"square" | "portrait">("square");
+  const [useBrand, setUseBrand] = useState(true);
+  const [editIndex, setEditIndex] = useState(0);
+  const [editBrief, setEditBrief] = useState("");
   const [status, setStatus] = useState<SaveStatus>(editPost ? "saved" : "idle");
   const [history, setHistory] = useState<{ caption: string; hashtags: string }[]>([]);
   const [alternatives, setAlternatives] = useState<string[]>([]);
@@ -110,6 +123,11 @@ export function CreateStudio({
   const [view, setView] = useState<"edit" | "preview">(focusPreview && editPost ? "preview" : "edit");
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
+  // Choosing "Afbeelding" without a photo makes AI generation the default.
+  useEffect(() => {
+    if (type === "Image" && !photos.length) setImageMode("ai");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the format changes
+  }, [type]);
 
   const products = profile.productList?.length
     ? profile.productList.filter((p) => p.active).map((p) => p.name)
@@ -216,9 +234,69 @@ export function CreateStudio({
         setStatus("saved");
         setMessage(again ? "Nieuwe versie gemaakt en opgeslagen als concept." : "Concept gemaakt en opgeslagen.");
         setView("edit");
+        // "Afbeelding" without an own photo: make the real AI visual right away.
+        if (type === "Image" && imageMode === "ai" && !photos.length) {
+          setBusy("");
+          await makeImage(undefined, next);
+        }
       } else setStatus("error");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Genereren is niet gelukt. Probeer het opnieuw.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  // A paid image must never get lost: save it right away. Without a concept
+  // yet, a draft is created for it (caption can follow); with a concept the
+  // current editor state is saved with the new photos.
+  async function keepImage(media: string[], fresh?: Post) {
+    const now = new Date().toISOString();
+    // `fresh` = the concept generate() just saved (its text is newer than this render's state).
+    const base: Post = fresh || post || { id: crypto.randomUUID(), prompt: (imageBrief.trim() || prompt.trim()).slice(0, 1000), caption: "", hashtags: "", status: "draft", date: date || "", createdAt: now, variant: 0, contentType: type, source: "manual", media: [] };
+    const next: Post = fresh ? { ...fresh, media, updatedAt: now } : { ...base, caption, hashtags, date, media, updatedAt: now };
+    setStatus("saving");
+    const ok = await onPersist(next);
+    setStatus(ok ? "saved" : "error");
+    if (ok) setPost(next);
+    else setError("De afbeelding staat in de editor, maar is nog niet opgeslagen. Probeer opnieuw op te slaan.");
+  }
+
+  // A new AI image from the brief (Brand Hub only as optional style context).
+  async function makeImage(brief = imageBrief.trim() || prompt.trim(), fresh?: Post) {
+    if (!brief) return setError("Beschrijf wat er op de afbeelding moet staan.");
+    setError("");
+    setMessage("");
+    setBusy("image");
+    try {
+      const image = await generateImage({ mode: "generate", brief, format: imageFormat, useBrand });
+      const next = [image, ...(fresh ? fresh.media || [] : photos)].slice(0, 4);
+      setPhotos(next);
+      await keepImage(next, fresh);
+      setMessage("AI-afbeelding gemaakt en opgeslagen. Bekijk hem in het voorbeeld; je kunt een nieuwe laten maken of hem verwijderen.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "De afbeelding kon niet worden gemaakt. Probeer het opnieuw.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  // Edit the chosen own photo with AI; the original stays.
+  async function editImage() {
+    const photo = photos[editIndex];
+    if (!photo) return setError("Kies eerst een foto om te bewerken.");
+    setError("");
+    setMessage("");
+    setBusy("image");
+    try {
+      const image = await generateImage({ mode: "edit", brief: editBrief.trim(), format: imageFormat, photo, useBrand });
+      const next = [image, ...photos].slice(0, 4);
+      setPhotos(next);
+      await keepImage(next);
+      setEditIndex(0);
+      setMessage("Bewerkte foto toegevoegd. Het origineel staat er nog naast.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "De foto kon niet worden bewerkt. Probeer het opnieuw.");
     } finally {
       setBusy("");
     }
@@ -297,7 +375,7 @@ export function CreateStudio({
   // Instagram's own limits, checked while editing (same rules as the server).
   const captionTotal = instagramCaption({ caption, hashtags }).length;
   const tags = hashtagCount(caption + " " + hashtags);
-  const publishable = ["Post", "Carousel"].includes(post?.contentType || type);
+  const publishable = ["Post", "Image", "Carousel"].includes(post?.contentType || type);
   const checks = [...(publishable ? publishProblems({ caption, hashtags, media: photos, contentType: post?.contentType || type }) : []), ...(date && post?.status !== "published" ? scheduleProblems(date) : [])];
 
   const video = VIDEO.includes(post?.contentType || type);
@@ -416,7 +494,65 @@ export function CreateStudio({
             </label>
             {type !== "Captions & Hashtags" && type !== "Content Ideas" && (
               <div className="cs-field">
-                <span>Foto&apos;s</span>
+                <span id="ig-visual-label">Beeld</span>
+                <div className="cs-visual-modes" role="radiogroup" aria-labelledby="ig-visual-label">
+                  {VISUAL_MODES.map((m) => (
+                    <button key={m.id} type="button" role="radio" aria-checked={imageMode === m.id} disabled={!!busy} onClick={() => setImageMode(m.id)}>
+                      <m.Icon size={14} aria-hidden="true" />
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                {imageMode === "ai" && (
+                  <div className="cs-visual-panel">
+                    <label className="cs-label" htmlFor="ig-image-brief">
+                      Wat moet er op de afbeelding staan?
+                    </label>
+                    <textarea id="ig-image-brief" rows={3} maxLength={800} value={imageBrief} placeholder={prompt.trim() || "Bijvoorbeeld: een dampende pizza op een houten plank op een zonnig terras"} onChange={(e) => setImageBrief(e.target.value)} />
+                    <div className="cs-visual-format" role="radiogroup" aria-label="Formaat">
+                      <button type="button" role="radio" aria-checked={imageFormat === "square"} onClick={() => setImageFormat("square")}>
+                        Vierkant
+                      </button>
+                      <button type="button" role="radio" aria-checked={imageFormat === "portrait"} onClick={() => setImageFormat("portrait")}>
+                        Staand (4:5)
+                      </button>
+                    </div>
+                    <label className="cs-check">
+                      <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} />
+                      <span>Stijl, kleuren en doelgroep uit Brand Hub meenemen (als ze zijn ingevuld)</span>
+                    </label>
+                    <button type="button" className="button primary" disabled={!!busy || !(imageBrief.trim() || prompt.trim())} onClick={() => void makeImage()}>
+                      <Wand2 size={15} aria-hidden="true" />
+                      {busy === "image" ? "Afbeelding maken…" : photos.length ? "Nieuwe AI-afbeelding" : "AI-afbeelding genereren"}
+                    </button>
+                    <p className="cs-hint">Mavix maakt een nieuwe afbeelding met AI. Je hebt geen eigen foto nodig. Dit duurt meestal 15 tot 40 seconden.</p>
+                  </div>
+                )}
+                {imageMode === "edit" && photos.length > 0 && (
+                  <div className="cs-visual-panel">
+                    <span className="cs-label">Kies de foto die je wilt bewerken</span>
+                    <div className="cs-photos cs-photos-pick" role="radiogroup" aria-label="Foto om te bewerken">
+                      {photos.map((photo, i) => (
+                        <button key={i} type="button" role="radio" aria-checked={editIndex === i} onClick={() => setEditIndex(i)} aria-label={"Foto " + (i + 1)}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={photo} alt="" />
+                        </button>
+                      ))}
+                    </div>
+                    <label className="cs-label" htmlFor="ig-edit-brief">
+                      Wat moet Mavix aanpassen?
+                    </label>
+                    <textarea id="ig-edit-brief" rows={3} maxLength={800} value={editBrief} placeholder="Bijvoorbeeld: maak de achtergrond lichter en voeg een zomers terras toe" onChange={(e) => setEditBrief(e.target.value)} />
+                    <button type="button" className="button primary" disabled={!!busy || editBrief.trim().length < 3} onClick={() => void editImage()}>
+                      <Wand2 size={15} aria-hidden="true" />
+                      {busy === "image" ? "Foto bewerken…" : "Bewerken met AI"}
+                    </button>
+                    <p className="cs-hint">Het origineel blijft staan; de bewerkte versie wordt toegevoegd.</p>
+                  </div>
+                )}
+                {imageMode === "edit" && !photos.length && <p className="cs-hint">Kies eerst een eigen foto of een foto uit de Bibliotheek om te bewerken.</p>}
+                {imageMode !== "ai" && (
+                <>
                 <label className={"cs-upload" + (busy === "upload" ? " is-busy" : "")}>
                   <ImagePlus size={16} aria-hidden="true" />
                   {photos.length ? "Andere foto's kiezen" : "Foto toevoegen"}
@@ -445,6 +581,8 @@ export function CreateStudio({
                   <Images size={16} aria-hidden="true" />
                   Kies uit Bibliotheek
                 </button>
+                </>
+                )}
                 {photos.length > 0 && (
                   <div className="cs-photos">
                     {photos.map((photo, i) => (

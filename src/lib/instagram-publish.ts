@@ -27,7 +27,7 @@ export function publishProblems(p: Pick<Post, "caption" | "hashtags" | "media" |
   const out: string[] = [];
   const caption = instagramCaption(p);
   const media = p.media || [];
-  if (p.contentType && p.contentType !== "Post" && p.contentType !== "Carousel")
+  if (p.contentType && !["Post", "Image", "Carousel"].includes(p.contentType))
     out.push(`${p.contentType} kan Mavix nog niet publiceren. Alleen foto's en carrousels worden ondersteund.`);
   if (!media.length) out.push("Voeg minstens één foto toe. Instagram publiceert geen berichten zonder beeld.");
   if (media.length > CAROUSEL_MAX) out.push(`Een carrousel heeft maximaal ${CAROUSEL_MAX} foto's.`);

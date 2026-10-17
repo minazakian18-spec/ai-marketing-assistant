@@ -1,8 +1,8 @@
 import "server-only";
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import { HttpError } from "./access";
 import type { FunctionTool, ResponseInputItem, ResponseFunctionToolCall } from "openai/resources/responses/responses";
-import { currentOutputLimit, currentInputLimit, recordTokens, takeStep, DEFAULT_MODEL, DEFAULT_ADVANCED_MODEL } from "./ai-usage";
+import { currentOutputLimit, currentInputLimit, recordTokens, takeStep, imageModel, DEFAULT_MODEL, DEFAULT_ADVANCED_MODEL } from "./ai-usage";
 export { DEFAULT_MODEL, DEFAULT_ADVANCED_MODEL };
 
 // Central OpenAI configuration for every Mavix AI feature (Responses API,
@@ -157,6 +157,36 @@ export async function aiStep(instructions: string, input: ResponseInputItem[], t
     console.info(JSON.stringify({ event: "ai_step", model, input: usage?.input_tokens || 0, output: usage?.output_tokens || 0, tools: calls.map((c) => c.name) }));
     return { text, calls, carry };
   } catch (e) {
+    throw aiError(e);
+  }
+}
+
+/**
+ * One AI image through the OpenAI Images API (gpt-image-1 by default,
+ * OPENAI_IMAGE_MODEL to override). "generate" makes a new image from the
+ * prompt; "edit" changes the given photo. Returns JPEG bytes. Same step
+ * accounting, token recording and error mapping as the text calls.
+ */
+export async function aiImage(o: { prompt: string; size: "1024x1024" | "1024x1536"; photo?: { data: Buffer; mime: string } }): Promise<Buffer> {
+  const model = imageModel();
+  if (o.prompt.length > currentInputLimit() * 3) throw new HttpError(413, "Deze beschrijving is te lang. Maak hem korter.");
+  takeStep();
+  try {
+    // Quality over price: "high" gives agency-grade detail (1024x1024 = 4,160
+    // output tokens, about 0.17 USD; 1024x1536 = 6,240, about 0.25 USD).
+    const common = { model, prompt: o.prompt, size: o.size, quality: "high" as const, output_format: "jpeg" as const, output_compression: 90, n: 1 };
+    const response = o.photo
+      ? await openai().images.edit({ ...common, image: await toFile(o.photo.data, "foto." + (o.photo.mime.split("/")[1] || "png"), { type: o.photo.mime }) })
+      : await openai().images.generate(common);
+    const usage = response.usage;
+    if (usage) recordTokens(model, usage.input_tokens || 0, usage.output_tokens || 0);
+    const b64 = response.data?.[0]?.b64_json;
+    if (!b64) throw new HttpError(502, "Mavi kon geen afbeelding maken. Probeer een andere beschrijving.");
+    console.info(JSON.stringify({ event: "ai_image", model, mode: o.photo ? "edit" : "generate", input: usage?.input_tokens || 0, output: usage?.output_tokens || 0 }));
+    return Buffer.from(b64, "base64");
+  } catch (e) {
+    // Refused by the provider's safety system: say so plainly.
+    if (e instanceof OpenAI.BadRequestError && /safety|moderation/i.test(String((e as { code?: string }).code || e.message))) return Promise.reject(new HttpError(400, "Deze beschrijving kan Mavi niet als afbeelding maken. Pas de beschrijving aan."));
     throw aiError(e);
   }
 }

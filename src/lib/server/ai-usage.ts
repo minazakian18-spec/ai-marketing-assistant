@@ -27,7 +27,9 @@ export type AiFeature =
   | "seo_suggest"
   | "review_reply"
   | "research"
-  | "agent";
+  | "agent"
+  | "image_generate"
+  | "image_edit";
 
 // Output cap per feature (tokens); short drafts never need the model maximum.
 // Output cap per feature (tokens, including reasoning tokens). Deliberately
@@ -49,7 +51,16 @@ export const OUTPUT_LIMIT: Record<AiFeature, number> = {
   research: 900,
   // Room for a full campaign proposal (prepare_campaign_drafts) in one step.
   agent: 1800,
+  // Images: output tokens are fixed by size and quality (high: 1024x1024 =
+  // 4,160, 1024x1536 = 6,240). The reservation covers the largest size.
+  image_generate: 6300,
+  image_edit: 6300,
 };
+// Image model (OpenAI Images API) and its price per 1M tokens: image output
+// 40 USD, input counted at the image-input rate (10 USD) to stay conservative.
+export const DEFAULT_IMAGE_MODEL = "gpt-image-1";
+export const imageModel = () => (process.env.OPENAI_IMAGE_MODEL || "").trim() || DEFAULT_IMAGE_MODEL;
+export const IMAGE_FEATURES: AiFeature[] = ["image_generate", "image_edit"];
 
 // OpenAI standard prices, USD per 1M tokens (pricing page, October 2026).
 export const PRICES: Record<string, { input: number; output: number }> = {
@@ -59,6 +70,8 @@ export const PRICES: Record<string, { input: number; output: number }> = {
   "gpt-5.4-nano": { input: 0.2, output: 1.25 },
   "gpt-5-mini": { input: 0.25, output: 2 },
   "gpt-5-nano": { input: 0.05, output: 0.4 },
+  "gpt-image-1": { input: 10, output: 40 },
+  "gpt-image-1-mini": { input: 2.5, output: 8 },
 };
 // Model calls one metered request may make (the agent's tool loop: each step
 // is one call). The budget reservation covers all of them, so a multi-step
@@ -66,7 +79,7 @@ export const PRICES: Record<string, { input: number; output: number }> = {
 export const MAX_STEPS: Partial<Record<AiFeature, number>> = { agent: 4 };
 // Input cap per model call, in tokens. The agent carries tool results and a
 // compact history, so it gets more room; everything else keeps the default.
-export const INPUT_LIMIT: Partial<Record<AiFeature, number>> = { agent: 12_000 };
+export const INPUT_LIMIT: Partial<Record<AiFeature, number>> = { agent: 12_000, image_generate: 1_000, image_edit: 3_000 };
 export const stepsFor = (feature: AiFeature) => MAX_STEPS[feature] ?? 1;
 export const inputLimitFor = (feature: AiFeature) => INPUT_LIMIT[feature] ?? MAX_INPUT_TOKENS;
 
@@ -142,7 +155,8 @@ const PENDING_TTL_MS = 15 * 60_000;
 // Unknown model without a configured price: assume an expensive one.
 const FALLBACK_PRICE = { input: 5, output: 30 };
 export function reservationMicroUsd(feature: AiFeature) {
-  const prices = configuredModels().map((m) => priceFor(m) || FALLBACK_PRICE);
+  // Image features are billed at the image model's price, not the text models'.
+  const prices = (IMAGE_FEATURES.includes(feature) ? [imageModel()] : configuredModels()).map((m) => priceFor(m) || FALLBACK_PRICE);
   const input = Math.max(...prices.map((p) => p.input)),
     output = Math.max(...prices.map((p) => p.output));
   return Math.round(stepsFor(feature) * (inputLimitFor(feature) * input + OUTPUT_LIMIT[feature] * output));

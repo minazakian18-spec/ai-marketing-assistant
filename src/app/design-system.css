@@ -731,3 +731,16 @@ button:focus-visible > .cs-chip, .cs-chip:focus-visible { outline: none; box-sha
   flex-shrink: 1;
   min-width: 0;
 }
+
+/* Visual source: AI image, own photo, or own photo edited with AI. */
+.cs-visual-modes { display: grid; gap: 6px; }
+.cs-visual-modes button, .cs-visual-format button { display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--ds-border-strong, #d8d3e6); border-radius: 8px; background: #fff; font: inherit; font-size: 13px; text-align: left; color: var(--text-body); cursor: pointer; }
+.cs-visual-modes button[aria-checked="true"], .cs-visual-format button[aria-checked="true"] { border-color: var(--ds-accent, #6d28d9); background: var(--ds-accent-soft, #f3eefe); color: var(--text-heading); font-weight: 600; }
+.cs-visual-panel { display: grid; gap: 8px; padding: 10px; border-radius: 10px; background: #faf9fd; }
+.cs-visual-panel textarea { width: 100%; resize: vertical; }
+.cs-visual-panel .button { justify-self: start; }
+.cs-visual-format { display: flex; gap: 6px; }
+.cs-check { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: var(--text-body); }
+.cs-photos-pick button { position: relative; inset: auto; width: auto; height: auto; aspect-ratio: 1; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: #eee; cursor: pointer; }
+.cs-photos-pick button[aria-checked="true"] { border-color: var(--ds-accent, #6d28d9); }
+.cs-check input { flex: none; width: 16px; height: 16px; margin-top: 2px; }

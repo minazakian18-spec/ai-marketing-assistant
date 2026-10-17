@@ -88,6 +88,13 @@ export async function generateCampaignDraft(goal: string, channels: ("instagram"
   return { draft, example: false };
 }
 
+/** A real AI image (OpenAI Images API, server-side). In test mode there is no AI: a clear error, no placeholder. */
+export async function generateImage(o: { mode: "generate" | "edit"; brief: string; format: "square" | "portrait"; photo?: string; useBrand?: boolean }): Promise<string> {
+  if (isBrowserDemo()) throw new Error("In de testmodus maakt Mavix geen AI-afbeeldingen. Met een echt account genereert Mavix hier een nieuwe afbeelding.");
+  const { image } = await postJson<{ image: string }>("/api/generate/image", o);
+  return image;
+}
+
 export async function generateCopyText(kind: string, prompt: string): Promise<string> {
   if (isBrowserDemo()) throw new Error("AI-teksten maken werkt alleen met een echt account. Je kunt de tekst wel zelf schrijven.");
   const { text } = await postJson<{ text: string }>("/api/generate/copy", { kind, prompt });
