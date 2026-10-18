@@ -480,7 +480,7 @@ export async function GET(request: Request, { params }: Context) {
     if (action === "accounts" && provider === "instagram") {
       const { data: c } = await db
         .from("integration_connections")
-        .select("encrypted_credentials,metadata")
+        .select("encrypted_credentials,metadata,scopes")
         .eq("workspace_id", auth.workspaceId)
         .eq("provider", "instagram")
         .maybeSingle();
@@ -498,7 +498,7 @@ export async function GET(request: Request, { params }: Context) {
       // Never return Page tokens to the browser.
       return NextResponse.json(
         {
-          accounts: (await listInstagramAccounts(creds.user_token)).map(
+          accounts: (await listInstagramAccounts(creds.user_token, { messaging: metaScopes.instagramMessaging.every((s) => (c.scopes || []).includes(s)) })).map(
             (a) => ({
               id: a.id,
               username: a.username,
@@ -531,7 +531,8 @@ export async function GET(request: Request, { params }: Context) {
         if (provider === "instagram" && instagramMode() === "facebook") {
           const fb = await completeInstagramFacebook(code);
           stage = "accounts";
-          const accounts = await listInstagramAccounts(fb.userToken);
+          const messaging = !fb.messagingMissing.length;
+          const accounts = await listInstagramAccounts(fb.userToken, { messaging });
           // Nothing usable: keep whatever this workspace had before.
           if (!accounts.length) {
             console.error(JSON.stringify({ event: "meta_oauth_failed", provider, stage: "accounts", reason: "no_instagram_account" }));
@@ -565,7 +566,8 @@ export async function GET(request: Request, { params }: Context) {
           if (accounts.length > 1) return back("select=instagram");
           stage = "select";
           await selectInstagramAccount(auth.workspaceId, accounts[0].id);
-          return back("connected=instagram");
+          // Connected; Inbox messages stay off until Meta grants the messaging rights.
+          return back("connected=instagram" + (messaging ? "" : "&messaging=off"));
         }
         if (provider === "instagram") {
           const ig = await completeInstagram(code);

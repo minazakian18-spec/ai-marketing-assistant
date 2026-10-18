@@ -1385,3 +1385,10 @@ details.int-section summary {
 .ai-actions li { display: grid; gap: 4px; }
 .ai-actions-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: 13.5px; color: var(--text-body); }
 .ai-actions-row small { color: var(--ds-muted); }
+
+/* Instagram connected without Inbox messaging (two-stage Meta connection). */
+.int-info small.int-limited {
+  display: block;
+  margin-top: 4px;
+  color: #92400e;
+}

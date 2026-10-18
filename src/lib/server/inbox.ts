@@ -1536,7 +1536,8 @@ export async function metaConnected(
   provider: MetaProvider,
 ) {
   try {
-    await metaConnection(workspaceId, provider);
+    // For the Inbox a channel counts only when it may be used for messages.
+    await metaConnection(workspaceId, provider, { messaging: true });
     return true;
   } catch {
     return false;

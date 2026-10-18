@@ -15,7 +15,7 @@ type Connection = {
   scopes?: string[];
   last_synced_at?: string | null;
   expires_at?: string | null;
-  metadata?: { authMode?: string } | null;
+  metadata?: { authMode?: string; messaging?: boolean; messagingMissing?: string[] } | null;
 };
 type Group = "recommended" | "communication" | "productivity" | "other";
 type Integration = {
@@ -73,7 +73,7 @@ const SCOPE_LABEL: Record<string, string> = {
 };
 const GMAIL_READ = "https://www.googleapis.com/auth/gmail.readonly";
 const NOTICES: Record<string, string> = {
-  "connected=instagram": "Instagram is verbonden. Nieuwe berichten verschijnen in de Inbox.",
+  "connected=instagram": "Instagram is verbonden.",
   "connected=messenger": "Messenger is verbonden. Nieuwe berichten verschijnen in de Inbox.",
   "connected=gmail": "Gmail is gekoppeld. Je klantmails verschijnen zo in de Inbox.",
   "error=offline_access": "Google gaf geen blijvende toegang. Koppel opnieuw; trek zo nodig eerst de toegang van Mavix in je Google-account in.",
@@ -160,7 +160,7 @@ export default function IntegrationsPage() {
     // Which Meta permissions were not granted (names only, from our own callback).
     const missing = (q.get("missing") || "").split(",").filter((s) => /^[a-z_]{3,60}$/.test(s));
     if (key) setNoticeError(key.startsWith("error="));
-    if (key) setNotice(NOTICES[key] + (key === "error=permission" && missing.length ? " Ontbrekende Meta-toestemming: " + missing.join(", ") + "." : ""));
+    if (key) setNotice(NOTICES[key] + (key === "error=permission" && missing.length ? " Ontbrekende Meta-toestemming: " + missing.join(", ") + "." : "") + (key === "connected=instagram" ? (q.get("messaging") === "off" ? " Let op: berichten in de Inbox zijn nog niet ingeschakeld. Daarvoor is extra Meta-toestemming nodig (pages_manage_metadata); je account blijft gewoon gekoppeld." : " Nieuwe berichten verschijnen in de Inbox.") : ""));
     if (q.get("select") === "google_business") setGbpPicker(true);
     if (q.toString()) window.history.replaceState(null, "", "/account/integraties");
     if (isDemo) {
@@ -312,6 +312,9 @@ export default function IntegrationsPage() {
                     <strong>{item.name}</strong>
                     <p>{item.description}</p>
                     {linked && c?.display_name && <small>{c.display_name}</small>}
+                    {item.provider === "instagram" && state === "connected" && c?.metadata?.messaging === false && (
+                      <small className="int-limited">Berichten in de Inbox: nog niet ingeschakeld (Meta-toestemming {(c.metadata.messagingMissing || ["pages_manage_metadata"]).join(", ")} ontbreekt)</small>
+                    )}
                   </div>
                   <span className={"int-state is-" + state}>{STATE_TEXT[state]}</span>
                   {item.planned ? (

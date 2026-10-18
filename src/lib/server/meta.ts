@@ -20,10 +20,19 @@ export type MetaProvider='instagram'|'messenger'|'whatsapp';
 export const metaScopes={
  instagram:['instagram_business_basic','instagram_business_manage_messages'],
  messenger:['pages_show_list','pages_manage_metadata','pages_messaging'],
- // Required for Instagram DMs with Facebook Login. The configuration may grant
- // more (instagram_content_publish, pages_read_engagement, business_management).
- instagramFacebook:['instagram_basic','instagram_manage_messages','pages_show_list','pages_manage_metadata'],
+ // Instagram with Facebook Login, in two stages. Connecting needs only the
+ // account and its Page (core). Inbox messages additionally need the messaging
+ // rights: instagram_manage_messages and pages_manage_metadata (to subscribe
+ // the Page to message webhooks). pages_manage_metadata only appears in a
+ // Facebook Login for Business configuration once the app has the Pages use
+ // case ("Manage everything on your Page"); without it Instagram still
+ // connects, with messaging switched off and shown honestly.
+ instagramFacebook:['instagram_basic','pages_show_list'],
+ instagramMessaging:['instagram_manage_messages','pages_manage_metadata'],
 };
+// Whether a connection may be used for Inbox messages. Connections made before
+// the two stages existed carry no flag and were made with all rights.
+export const instagramMessaging=(c:{metadata?:unknown})=>(c.metadata as {messaging?:boolean}|null)?.messaging!==false;
 // Publishing (instagram_business_content_publish) is only requested when
 // INSTAGRAM_PUBLISH_SCOPE=1: asking for a permission Meta has not approved for
 // the app would break the whole login for customers. With Facebook Login for
@@ -103,6 +112,7 @@ export async function completeInstagramFacebook(code:string){
  if(info.type!=='USER')throw new InstagramTokenTypeError(String(info.type||'unknown'));
  const granted=Array.isArray(info.scopes)?info.scopes.map(String):[];
  const missing=metaScopes.instagramFacebook.filter(s=>!granted.includes(s));
+ const messagingMissing=metaScopes.instagramMessaging.filter(s=>!granted.includes(s));
  // Permission names (never tokens) travel along, so the customer and the logs
  // see exactly which right the Meta configuration did not grant.
  if(missing.length)throw Object.assign(new HttpError(403,'Geef Mavix toegang tot je Instagram-account, berichten en gekoppelde Facebook-pagina.'),{missing});
@@ -110,14 +120,14 @@ export async function completeInstagramFacebook(code:string){
  const userToken=String(long.access_token||'');
  if(!userToken)throw new HttpError(502,'Meta gaf geen blijvende toegang terug.');
  const dataAccess=Number(info.data_access_expires_at)||0;
- return {userToken,granted,dataAccessExpiresAt:dataAccess>0?new Date(dataAccess*1000).toISOString():null};
+ return {userToken,granted,messagingMissing,dataAccessExpiresAt:dataAccess>0?new Date(dataAccess*1000).toISOString():null};
 }
 
 export type InstagramAccount={id:string;username:string;name:string;pageId:string;pageName:string;pageToken:string};
 // Professional Instagram accounts reachable through the user's Pages: the Page
 // must be linked to an Instagram Business/Creator account and the user must be
 // allowed to handle its messages (MESSAGING task).
-export async function listInstagramAccounts(userToken:string):Promise<InstagramAccount[]>{
+export async function listInstagramAccounts(userToken:string,{messaging=true}:{messaging?:boolean}={}):Promise<InstagramAccount[]>{
  const out:InstagramAccount[]=[];
  type Page={id:string;name?:string;access_token?:string;tasks?:string[];instagram_business_account?:{id?:string;username?:string;name?:string}};
  let url:string|undefined=graph('/me/accounts?fields=id,name,access_token,tasks,instagram_business_account{id,username,name}&limit=100');
@@ -126,7 +136,8 @@ export async function listInstagramAccounts(userToken:string):Promise<InstagramA
   for(const p of d.data||[]){
    const ig=p.instagram_business_account;
    if(!ig?.id||!/^\d{1,30}$/.test(String(ig.id))||!/^\d{1,30}$/.test(String(p.id))||!p.access_token)continue;
-   if(p.tasks&&!p.tasks.includes('MESSAGING')&&!p.tasks.includes('MANAGE'))continue;
+   // Messages need the MESSAGING task; a connection without messaging does not.
+   if(messaging&&p.tasks&&!p.tasks.includes('MESSAGING')&&!p.tasks.includes('MANAGE'))continue;
    out.push({id:String(ig.id),username:String(ig.username||'').slice(0,100),name:String(ig.name||'').slice(0,200),pageId:String(p.id),pageName:String(p.name||'').slice(0,200),pageToken:p.access_token});
   }
   url=d.paging?.next&&d.paging.next.startsWith('https://graph.facebook.com/')?d.paging.next:undefined;
@@ -149,21 +160,25 @@ async function assertInstagramFree(workspaceId:string,igId:string){
 // user token; nothing is stored unless Meta returns it.
 export async function selectInstagramAccount(workspaceId:string,igId:string){
  const db=adminClient();
- const {data:c}=await db.from('integration_connections').select('id,encrypted_credentials,metadata').eq('workspace_id',workspaceId).eq('provider','instagram').maybeSingle();
+ const {data:c}=await db.from('integration_connections').select('id,encrypted_credentials,metadata,scopes').eq('workspace_id',workspaceId).eq('provider','instagram').maybeSingle();
  if(!c?.encrypted_credentials||!viaFacebook(c))throw new HttpError(409,'Verbind eerst Instagram via Facebook.');
+ // Messaging only when Meta granted both messaging rights to this connection.
+ const scopes:string[]=Array.isArray(c.scopes)?c.scopes:[];
+ const messaging=metaScopes.instagramMessaging.every(s=>scopes.includes(s));
  const creds=decrypt<MetaCredentials>(c.encrypted_credentials,workspaceId+':instagram');
  if(!creds.user_token)throw new HttpError(409,'Verbind Instagram opnieuw om een ander account te kiezen.');
- const account=(await listInstagramAccounts(creds.user_token)).find(a=>a.id===igId);
+ const account=(await listInstagramAccounts(creds.user_token,{messaging})).find(a=>a.id===igId);
  if(!account)throw new HttpError(403,'Geen toegang tot dit Instagram-account.');
  await assertInstagramFree(workspaceId,account.id);
- // Install the app on the linked Page so Instagram message webhooks arrive.
- await metaJson(graph('/'+account.pageId+'/subscribed_apps?subscribed_fields=messages'),{method:'POST',headers:{Authorization:'Bearer '+account.pageToken}},'instagram').catch(e=>{throw e instanceof HttpError&&!(e as {provider?:{retryable?:boolean}}).provider?.retryable?new HttpError(400,'Mavix kon berichtmeldingen voor de gekoppelde Facebook-pagina niet inschakelen. Controleer of je deze pagina mag beheren.'):e;});
+  // Install the app on the linked Page so Instagram message webhooks arrive
+ // (needs pages_manage_metadata, so only with messaging).
+ if(messaging)await metaJson(graph('/'+account.pageId+'/subscribed_apps?subscribed_fields=messages'),{method:'POST',headers:{Authorization:'Bearer '+account.pageToken}},'instagram').catch(e=>{throw e instanceof HttpError&&!(e as {provider?:{retryable?:boolean}}).provider?.retryable?new HttpError(400,'Mavix kon berichtmeldingen voor de gekoppelde Facebook-pagina niet inschakelen. Controleer of je deze pagina mag beheren.'):e;});
  const {error}=await db.from('integration_connections').update({
   provider_account_id:account.id,
   display_name:account.username?'@'+account.username:account.name||'Instagram',
   status:'connected',
   encrypted_credentials:encrypt({access_token:account.pageToken,user_token:creds.user_token,page_id:account.pageId,obtained_at:Date.now()},workspaceId+':instagram'),
-  metadata:{authMode:'facebook',pageId:account.pageId,pageName:account.pageName,username:account.username},
+  metadata:{authMode:'facebook',pageId:account.pageId,pageName:account.pageName,username:account.username,messaging,...(messaging?{}:{messagingMissing:metaScopes.instagramMessaging.filter(s=>!scopes.includes(s))})},
  }).eq('id',c.id);
  if(error?.code==='23505')throw new HttpError(409,INSTAGRAM_TAKEN);
  if(error)throw error;
@@ -229,12 +244,13 @@ export async function subscribeWhatsApp(input:WaInput){
 
 // Decrypted credentials for a Meta connection. Instagram long-lived tokens
 // are refreshed when they are older than a day and expire within 10 days.
-export async function metaConnection(workspaceId:string,provider:MetaProvider){
+export async function metaConnection(workspaceId:string,provider:MetaProvider,{messaging=false}:{messaging?:boolean}={}){
  const db=adminClient();
  const {data:c,error}=await db.from('integration_connections').select('*').eq('workspace_id',workspaceId).eq('provider',provider).single();
  if(error||!c?.encrypted_credentials||c.status==='disconnected')throw new HttpError(409,'Verbind eerst dit kanaal.');
  if(c.status==='reconnect_required')throw new HttpError(409,'Verbind dit kanaal opnieuw.');
  if(c.status==='selection_required'||!c.provider_account_id)throw new HttpError(409,'Kies eerst welk account Mavix gebruikt.');
+ if(messaging&&provider==='instagram'&&!instagramMessaging(c))throw new HttpError(409,'Instagram-berichten zijn nog niet ingeschakeld. Hiervoor is extra Meta-toestemming nodig (pages_manage_metadata).');
  let creds=decrypt<MetaCredentials>(c.encrypted_credentials,workspaceId+':'+provider);
  // Facebook Login: the Page token does not expire by itself; Meta's data
  // access for the user does (expires_at). After that, reconnect.
@@ -256,7 +272,7 @@ async function flag(id:string,e:unknown){const p=(e as {provider?:{connection?:s
 
 // Send a text reply; returns the provider message id.
 export async function sendMetaText(workspaceId:string,provider:MetaProvider,recipient:string,text:string):Promise<string>{
- const {creds,c}=await metaConnection(workspaceId,provider);
+ const {creds,c}=await metaConnection(workspaceId,provider,{messaging:true});
  const headers={Authorization:'Bearer '+creds.access_token,'Content-Type':'application/json'};
  try{
   // Instagram with Facebook Login: same /{page-id}/messages endpoint as

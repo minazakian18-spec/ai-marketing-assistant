@@ -169,7 +169,7 @@ test("callback stores the Page token encrypted, picks the only account and subsc
   assert.match(res.headers.get("location"), /connected=instagram$/);
   const c = f.row("w1");
   assert.deepEqual([c.status, c.provider_account_id, c.display_name], ["connected", "178001", "@account178001"]);
-  assert.deepEqual(c.metadata, { authMode: "facebook", pageId: "700001", pageName: "Pagina 700001", username: "account178001" });
+  assert.deepEqual(c.metadata, { authMode: "facebook", pageId: "700001", pageName: "Pagina 700001", username: "account178001", messaging: true });
   assert.equal(c.expires_at, new Date(1900000000 * 1000).toISOString(), "Meta data-access expiry is tracked");
   assert.ok(c.scopes.includes("instagram_manage_messages") && c.scopes.includes("instagram_content_publish"));
   for (const token of [PAGE_TOKEN, USER_TOKEN, "short-user-token"]) assert.ok(!c.encrypted_credentials.includes(token));
@@ -203,8 +203,8 @@ test("a token issued to another app, missing permissions or a used code never co
   assert.equal(f.row("w1"), undefined);
 
   const g = setup(t);
-  g.net.scopes = ["instagram_basic", "pages_show_list"];
-  assert.match(await g.connect(), /error=permission&provider=instagram&missing=instagram_manage_messages,pages_manage_metadata$/);
+  g.net.scopes = ["instagram_basic", "instagram_manage_messages"];
+  assert.match(await g.connect(), /error=permission&provider=instagram&missing=pages_show_list$/);
   assert.equal(g.row("w1"), undefined);
 
   const h = setup(t);
@@ -219,12 +219,12 @@ test("a token issued to another app, missing permissions or a used code never co
 });
 
 test("callback failures always return to Integraties with a clear reason and safe logs", async (t) => {
-  // The Meta configuration without pages_manage_metadata (as in production).
+  // Core rights missing: nothing connects, the missing right is named.
   const a = setup(t);
-  a.net.scopes = ["business_management", "instagram_basic", "instagram_content_publish", "instagram_manage_messages", "pages_read_engagement", "pages_show_list"];
-  assert.match(await a.connect(), /error=permission&provider=instagram&missing=pages_manage_metadata$/);
+  a.net.scopes = ["instagram_basic", "instagram_manage_messages"];
+  assert.match(await a.connect(), /error=permission&provider=instagram&missing=pages_show_list$/);
   assert.equal(a.row("w1"), undefined);
-  assert.ok(a.logs.some((l) => l.includes("meta_oauth_failed") && l.includes("pages_manage_metadata")));
+  assert.ok(a.logs.some((l) => l.includes("meta_oauth_failed") && l.includes("pages_show_list")));
 
   // Returning in another browser or app: no state cookie there.
   const c = setup(t);
@@ -248,6 +248,31 @@ test("callback failures always return to Integraties with a clear reason and saf
   assert.match(await e.connect(), /error=failed&provider=instagram$/);
 
   for (const f of [a, c, d, e]) assert.ok(!f.logs.some((l) => l.includes(SECRET) || l.includes(USER_TOKEN) || l.includes(PAGE_TOKEN) || l.includes("fixture-code")), "no secrets or codes in logs");
+});
+
+test("two stages: without pages_manage_metadata Instagram connects, messaging stays off and is refused", async (t) => {
+  // The production configuration: everything except pages_manage_metadata.
+  const f = setup(t, { pages: [page("700001", "178001", { tasks: ["CREATE_CONTENT", "ANALYZE"] })] });
+  f.net.scopes = ["business_management", "instagram_basic", "instagram_content_publish", "instagram_manage_messages", "pages_read_engagement", "pages_show_list"];
+  assert.match(await f.connect(), /connected=instagram&messaging=off$/);
+  const c = f.row("w1");
+  assert.deepEqual([c.status, c.provider_account_id], ["connected", "178001"]);
+  assert.equal(c.metadata.messaging, false);
+  assert.deepEqual(c.metadata.messagingMissing, ["pages_manage_metadata"]);
+  assert.ok(!f.requests.some((r) => r.url.includes("subscribed_apps")), "no Page subscription without pages_manage_metadata");
+  // Messaging is honestly unavailable: sending is refused, the Inbox does not count it.
+  await assert.rejects(f.meta.sendMetaText("w1", "instagram", "9910001", "Hoi"), (e) => e.status === 409 && /pages_manage_metadata/.test(e.message));
+  assert.ok(!f.requests.some((r) => r.url.includes("/messages")));
+  // Publishing and other non-messaging use keep working.
+  assert.equal((await f.meta.metaConnection("w1", "instagram")).c.provider_account_id, "178001");
+});
+
+test("existing connections made with all rights keep messaging", async (t) => {
+  const f = setup(t, { connections: [fbConnection("w1", "178001", { encrypted_credentials: null })] });
+  const enc = f.crypto.encrypt({ access_token: PAGE_TOKEN + "700001", page_id: "700001" }, "w1:instagram");
+  f.tables.integration_connections[0].encrypted_credentials = enc;
+  assert.equal(f.meta.instagramMessaging(f.row("w1")), true);
+  assert.equal(await f.meta.sendMetaText("w1", "instagram", "9910001", "Hoi"), "mid.out1");
 });
 
 // ---------------------------------------------------------------- Account selection
