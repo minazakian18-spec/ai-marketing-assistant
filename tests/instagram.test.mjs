@@ -181,8 +181,9 @@ test("callback stores the Page token encrypted, picks the only account and subsc
   assert.equal(sub.headers.Authorization, "Bearer " + PAGE_TOKEN + "700001");
   const debug = f.requests.find((r) => r.url.includes("/debug_token"));
   assert.equal(new URL(debug.url).searchParams.get("input_token"), "short-user-token");
-  // The state cannot be replayed.
-  assert.equal((await f.complete(url)).status, 400);
+  // The state cannot be replayed: back to Integraties with a reason, not raw JSON.
+  assert.match((await f.complete(url)).headers.get("location"), /error=state(_cookie)?&provider=instagram$/);
+  assert.equal(f.row("w1").status, "connected", "a replay changes nothing");
   assert.ok(!f.logs.some((l) => l.includes(SECRET) || l.includes(PAGE_TOKEN) || l.includes(USER_TOKEN)), "no secrets in logs");
 });
 
@@ -203,7 +204,7 @@ test("a token issued to another app, missing permissions or a used code never co
 
   const g = setup(t);
   g.net.scopes = ["instagram_basic", "pages_show_list"];
-  assert.match(await g.connect(), /error=permission&provider=instagram$/);
+  assert.match(await g.connect(), /error=permission&provider=instagram&missing=instagram_manage_messages,pages_manage_metadata$/);
   assert.equal(g.row("w1"), undefined);
 
   const h = setup(t);
@@ -215,6 +216,38 @@ test("a token issued to another app, missing permissions or a used code never co
   const denied = await i.action("callback", "GET", { query: "?error=access_denied&state=" + url.searchParams.get("state") });
   assert.match(denied.headers.get("location"), /error=denied&provider=instagram$/);
   assert.equal(i.row("w1"), undefined);
+});
+
+test("callback failures always return to Integraties with a clear reason and safe logs", async (t) => {
+  // The Meta configuration without pages_manage_metadata (as in production).
+  const a = setup(t);
+  a.net.scopes = ["business_management", "instagram_basic", "instagram_content_publish", "instagram_manage_messages", "pages_read_engagement", "pages_show_list"];
+  assert.match(await a.connect(), /error=permission&provider=instagram&missing=pages_manage_metadata$/);
+  assert.equal(a.row("w1"), undefined);
+  assert.ok(a.logs.some((l) => l.includes("meta_oauth_failed") && l.includes("pages_manage_metadata")));
+
+  // Returning in another browser or app: no state cookie there.
+  const c = setup(t);
+  const u2 = await c.start();
+  c.as("u2");
+  const other = await c.complete(u2);
+  assert.match(other.headers.get("location"), /error=state_cookie&provider=instagram$/);
+  assert.ok(c.logs.some((l) => l.includes("meta_oauth_failed") && l.includes("cookie_missing")));
+  assert.equal(c.tables.oauth_states.length, 1, "state stays unused");
+
+  // Meta aborts for another reason than the customer saying no.
+  const d = setup(t);
+  const u3 = await d.start();
+  const aborted = await d.action("callback", "GET", { query: "?error=server_error&error_reason=config&error_code=200&state=" + u3.searchParams.get("state") });
+  assert.match(aborted.headers.get("location"), /error=meta&provider=instagram$/);
+
+  // Unexpected failure while saving: still a redirect, never raw JSON.
+  const e = setup(t);
+  const save = e.db.from;
+  e.db.from = (name) => (name === "integration_connections" ? Object.assign(save(name), { upsert: async () => ({ error: { code: "XX000" } }) }) : save(name));
+  assert.match(await e.connect(), /error=failed&provider=instagram$/);
+
+  for (const f of [a, c, d, e]) assert.ok(!f.logs.some((l) => l.includes(SECRET) || l.includes(USER_TOKEN) || l.includes(PAGE_TOKEN) || l.includes("fixture-code")), "no secrets or codes in logs");
 });
 
 // ---------------------------------------------------------------- Account selection

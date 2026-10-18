@@ -350,6 +350,31 @@ export async function POST(request: Request, { params }: Context) {
     return failure(e);
   }
 }
+// Why a state check failed (for logs only): the browser that returns from the
+// provider must be the one that started the connection.
+class StateError extends HttpError {
+  constructor(public reason: "cookie_missing" | "mismatch" | "not_found") {
+    super(400, "Ongeldige of verlopen autorisatie.");
+  }
+}
+// Meta callbacks always return to Integraties with a reason, never to a raw
+// JSON error page. Logged: stage, status and Meta's error code, never tokens,
+// codes, cookies or secrets.
+const SAFE = /^[\w.-]{1,60}$/;
+function metaFailure(provider: string, stage: string, e: unknown) {
+  const p = (e as { provider?: { code?: unknown } })?.provider;
+  console.error(
+    JSON.stringify({
+      event: "meta_oauth_failed",
+      provider,
+      stage,
+      status: e instanceof HttpError ? e.status : 500,
+      reason: e instanceof StateError ? e.reason : undefined,
+      metaCode: typeof p?.code === "number" || (typeof p?.code === "string" && SAFE.test(p.code)) ? p.code : undefined,
+      missing: (e as { missing?: string[] })?.missing?.filter((s) => SAFE.test(s)),
+    }),
+  );
+}
 async function consumeState(
   provider: string,
   url: URL,
@@ -357,8 +382,9 @@ async function consumeState(
 ) {
   const state = url.searchParams.get("state"),
     jar = await cookies();
-  if (!oauthStateMatches(state, jar.get("mavix_oauth_" + provider)?.value))
-    throw new HttpError(400, "Ongeldige of verlopen autorisatie.");
+  const cookie = jar.get("mavix_oauth_" + provider)?.value;
+  if (!cookie) throw new StateError("cookie_missing");
+  if (!oauthStateMatches(state, cookie)) throw new StateError("mismatch");
   jar.delete("mavix_oauth_" + provider);
   const { data: rows, error } = await adminClient()
     .from("oauth_states")
@@ -369,15 +395,17 @@ async function consumeState(
     .eq("provider", provider)
     .gt("expires_at", new Date().toISOString())
     .select();
-  if (error || rows?.length !== 1)
-    throw new HttpError(400, "Autorisatie is verlopen of al gebruikt.");
+  if (error || rows?.length !== 1) throw new StateError("not_found");
   return rows[0] as { verifier: string; connection_generation?: string };
 }
 export async function GET(request: Request, { params }: Context) {
   let gmailCallback = false;
+  let metaCallbackProvider: string | null = null;
+  let stage = "session";
   try {
     const route = await params;
     gmailCallback = route.provider === "gmail" && route.action === "callback";
+    if ((route.provider === "instagram" || route.provider === "messenger") && route.action === "callback") metaCallbackProvider = route.provider;
     if (
       route.provider === "google_calendar" ||
       route.provider === "google-calendar"
@@ -487,18 +515,29 @@ export async function GET(request: Request, { params }: Context) {
     if (provider === "instagram" || provider === "messenger") {
       if (url.searchParams.get("error")) {
         await consumeState(provider, url, auth).catch(() => {});
-        return back("error=denied&provider=" + provider);
+        // Meta reports why (user_denied, or a configuration problem); only
+        // short, safe identifiers are logged.
+        const reason = url.searchParams.get("error_reason") || url.searchParams.get("error") || "";
+        const code = url.searchParams.get("error_code") || "";
+        console.error(JSON.stringify({ event: "meta_oauth_denied", provider, reason: SAFE.test(reason) ? reason : "other", code: /^\d{1,10}$/.test(code) ? code : undefined }));
+        return back((reason === "user_denied" || reason === "access_denied" ? "error=denied" : "error=meta") + "&provider=" + provider);
       }
+      stage = "state";
       await consumeState(provider, url, auth);
       const code = url.searchParams.get("code");
       if (!code) return back("error=denied&provider=" + provider);
+      stage = "exchange";
       try {
         if (provider === "instagram" && instagramMode() === "facebook") {
           const fb = await completeInstagramFacebook(code);
+          stage = "accounts";
           const accounts = await listInstagramAccounts(fb.userToken);
           // Nothing usable: keep whatever this workspace had before.
-          if (!accounts.length)
+          if (!accounts.length) {
+            console.error(JSON.stringify({ event: "meta_oauth_failed", provider, stage: "accounts", reason: "no_instagram_account" }));
             return back("error=no_instagram_account&provider=instagram");
+          }
+          stage = "save";
           const { error } = await db.from("integration_connections").upsert(
             {
               workspace_id: auth.workspaceId,
@@ -524,6 +563,7 @@ export async function GET(request: Request, { params }: Context) {
           if (error) throw error;
           await audit(auth.workspaceId, auth.user.id, "integration_authorized");
           if (accounts.length > 1) return back("select=instagram");
+          stage = "select";
           await selectInstagramAccount(auth.workspaceId, accounts[0].id);
           return back("connected=instagram");
         }
@@ -592,6 +632,7 @@ export async function GET(request: Request, { params }: Context) {
             : "error=no_pages&provider=messenger",
         );
       } catch (e) {
+        metaFailure(provider, stage, e);
         if (e instanceof InstagramTokenTypeError) {
           // Configuration issued e.g. a System-user token: refuse, store nothing.
           console.error(
@@ -602,8 +643,10 @@ export async function GET(request: Request, { params }: Context) {
           );
           return back("error=token_type&provider=instagram");
         }
-        if (e instanceof HttpError && e.status === 403)
-          return back("error=permission&provider=" + provider);
+        if (e instanceof HttpError && e.status === 403) {
+          const missing = ((e as { missing?: string[] }).missing || []).filter((s) => /^[a-z_]{3,60}$/.test(s));
+          return back("error=permission&provider=" + provider + (missing.length ? "&missing=" + missing.join(",") : ""));
+        }
         if (provider === "instagram" && e instanceof HttpError) {
           if (e.status === 409 && e.message === INSTAGRAM_TAKEN)
             return back("error=instagram_taken&provider=instagram");
@@ -613,7 +656,7 @@ export async function GET(request: Request, { params }: Context) {
               : "error=failed") + "&provider=instagram",
           );
         }
-        throw e;
+        return back("error=failed&provider=" + provider);
       }
     }
     if (!GOOGLE.includes(provider)) throw new HttpError(404, "Niet gevonden.");
@@ -781,6 +824,13 @@ export async function GET(request: Request, { params }: Context) {
       ),
     );
   } catch (e) {
+    // Meta callbacks: the state or session check failed before anything was
+    // exchanged. Return to Integraties with the reason instead of raw JSON.
+    if (metaCallbackProvider) {
+      metaFailure(metaCallbackProvider, stage, e);
+      const kind = e instanceof StateError ? (e.reason === "cookie_missing" ? "error=state_cookie" : "error=state") : e instanceof HttpError && (e.status === 401 || e.status === 403) ? "error=session" : "error=failed";
+      return back(kind + "&provider=" + metaCallbackProvider);
+    }
     // The Gmail consent screen returns to a browser page: show a clear Dutch
     // notice on Integraties instead of a raw error response.
     if (gmailCallback && !(e instanceof HttpError && e.status === 401))

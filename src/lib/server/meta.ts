@@ -102,7 +102,10 @@ export async function completeInstagramFacebook(code:string){
  if(!info?.is_valid||String(info.app_id)!==appId)throw new HttpError(400,'De Instagram-autorisatie kon niet worden gecontroleerd. Probeer opnieuw.');
  if(info.type!=='USER')throw new InstagramTokenTypeError(String(info.type||'unknown'));
  const granted=Array.isArray(info.scopes)?info.scopes.map(String):[];
- if(metaScopes.instagramFacebook.some(s=>!granted.includes(s)))throw new HttpError(403,'Geef Mavix toegang tot je Instagram-account, berichten en gekoppelde Facebook-pagina.');
+ const missing=metaScopes.instagramFacebook.filter(s=>!granted.includes(s));
+ // Permission names (never tokens) travel along, so the customer and the logs
+ // see exactly which right the Meta configuration did not grant.
+ if(missing.length)throw Object.assign(new HttpError(403,'Geef Mavix toegang tot je Instagram-account, berichten en gekoppelde Facebook-pagina.'),{missing});
  const long=await metaJson(graph('/oauth/access_token?'+new URLSearchParams({grant_type:'fb_exchange_token',client_id:appId,client_secret:secret,fb_exchange_token:short.access_token})),{},'instagram');
  const userToken=String(long.access_token||'');
  if(!userToken)throw new HttpError(502,'Meta gaf geen blijvende toegang terug.');

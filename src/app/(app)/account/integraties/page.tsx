@@ -88,6 +88,11 @@ const NOTICES: Record<string, string> = {
   "error=denied": "Je hebt geen toestemming gegeven. Er is niets gekoppeld.",
   "error=permission": "Niet alle benodigde toestemmingen zijn gegeven. Verbind opnieuw en sta alle gevraagde toegang toe.",
   "error=no_pages": "Er is geen Facebook-pagina gevonden waarop je berichten mag beheren.",
+  "error=state_cookie":
+    "De koppeling kon niet worden afgerond: je kwam in een andere browser terug dan waar je op Koppelen klikte (bijvoorbeeld via de Facebook- of Instagram-app), of je browser blokkeerde de beveiligingscookie. Klik opnieuw op Koppelen en rond de toestemming af in hetzelfde browservenster.",
+  "error=state": "Deze koppelpoging is verlopen, al gebruikt of hoort niet bij jouw sessie. Klik opnieuw op Koppelen en rond de toestemming binnen 10 minuten af.",
+  "error=session": "Je was niet meer ingelogd bij Mavix toen Meta je terugstuurde. Log in en klik opnieuw op Koppelen.",
+  "error=meta": "Meta heeft de koppeling afgebroken. Controleer of je de juiste Facebook-pagina en het Instagram-account hebt geselecteerd en probeer het opnieuw. Blijft dit gebeuren, neem dan contact op met de beheerder.",
   "connected=google_business": "Google Bedrijfsprofiel is gekoppeld. Je reviews staan nu onder Reviews.",
   "select=google_business": "Google-account gekoppeld. Kies hieronder je bedrijfslocatie.",
   "error=no_locations": "Google-account gekoppeld, maar er is geen bedrijfslocatie gevonden die je mag beheren.",
@@ -126,6 +131,7 @@ export default function IntegrationsPage() {
   const [group, setGroup] = useState<Group | "all">("all");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeError, setNoticeError] = useState(false);
   const [manage, setManage] = useState<Integration | null>(null);
   // After OAuth with several locations: open the Google Bedrijfsprofiel picker.
   const [gbpPicker, setGbpPicker] = useState(false);
@@ -151,7 +157,10 @@ export default function IntegrationsPage() {
     setDemo(isDemo);
     const q = new URLSearchParams(window.location.search);
     const key = [...q.entries()].map(([k, v]) => k + "=" + v).find((k) => NOTICES[k]);
-    if (key) setNotice(NOTICES[key]);
+    // Which Meta permissions were not granted (names only, from our own callback).
+    const missing = (q.get("missing") || "").split(",").filter((s) => /^[a-z_]{3,60}$/.test(s));
+    if (key) setNoticeError(key.startsWith("error="));
+    if (key) setNotice(NOTICES[key] + (key === "error=permission" && missing.length ? " Ontbrekende Meta-toestemming: " + missing.join(", ") + "." : ""));
     if (q.get("select") === "google_business") setGbpPicker(true);
     if (q.toString()) window.history.replaceState(null, "", "/account/integraties");
     if (isDemo) {
@@ -248,7 +257,7 @@ export default function IntegrationsPage() {
     <div className="int">
       <PageHeading eyebrow="Account" title="Integraties" description="Koppel je kanalen en tools. Je geeft per dienst zelf toestemming." />
       {notice && (
-        <p role="status" className="int-notice">
+        <p role={noticeError ? "alert" : "status"} className={noticeError ? "int-notice int-error" : "int-notice"}>
           {notice}
           <IconButton label="Melding sluiten" onClick={() => setNotice("")}>
             <X size={14} />
