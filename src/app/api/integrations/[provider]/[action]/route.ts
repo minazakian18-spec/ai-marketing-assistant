@@ -35,6 +35,8 @@ import {
   listInstagramAccounts,
   listPages,
   selectInstagramAccount,
+  instagramAuthOf,
+  encryptPendingAuth,
   metaConfigured,
   metaScopes,
   missingMetaConfig,
@@ -319,7 +321,7 @@ export async function POST(request: Request, { params }: Context) {
       const { account } = z
         .object({ account: z.string().regex(/^\d{1,30}$/) })
         .parse(await request.json());
-      await selectInstagramAccount(auth.workspaceId, account);
+      await selectInstagramAccount(auth.workspaceId, account, { userId: auth.user.id });
       await audit(auth.workspaceId, auth.user.id, "integration_connected");
       return NextResponse.json({ ok: true });
     }
@@ -480,17 +482,15 @@ export async function GET(request: Request, { params }: Context) {
     if (action === "accounts" && provider === "instagram") {
       const { data: c } = await db
         .from("integration_connections")
-        .select("encrypted_credentials,metadata,scopes")
+        .select("encrypted_credentials,metadata,scopes,expires_at")
         .eq("workspace_id", auth.workspaceId)
         .eq("provider", "instagram")
         .maybeSingle();
       if (!c?.encrypted_credentials || c.metadata?.authMode !== "facebook")
         throw new HttpError(409, "Verbind eerst Instagram via Facebook.");
-      const creds = decrypt<MetaCredentials>(
-        c.encrypted_credentials,
-        auth.workspaceId + ":instagram",
-      );
-      if (!creds.user_token)
+      // A pending authorization (reconnect next to a working connection) or the connection's own.
+      const igAuth = instagramAuthOf(auth.workspaceId, c);
+      if (!igAuth)
         throw new HttpError(
           409,
           "Verbind Instagram opnieuw om een ander account te kiezen.",
@@ -498,7 +498,7 @@ export async function GET(request: Request, { params }: Context) {
       // Never return Page tokens to the browser.
       return NextResponse.json(
         {
-          accounts: (await listInstagramAccounts(creds.user_token, { messaging: metaScopes.instagramMessaging.every((s) => (c.scopes || []).includes(s)) })).map(
+          accounts: (await listInstagramAccounts(igAuth.userToken, { messaging: metaScopes.instagramMessaging.every((s) => igAuth.scopes.includes(s)) })).map(
             (a) => ({
               id: a.id,
               username: a.username,
@@ -538,34 +538,40 @@ export async function GET(request: Request, { params }: Context) {
             console.error(JSON.stringify({ event: "meta_oauth_failed", provider, stage: "accounts", reason: "no_instagram_account" }));
             return back("error=no_instagram_account&provider=instagram");
           }
-          stage = "save";
-          const { error } = await db.from("integration_connections").upsert(
-            {
-              workspace_id: auth.workspaceId,
-              provider,
-              connected_user: auth.user.id,
-              provider_account_id: null,
-              display_name: null,
-              status: "selection_required",
-              encrypted_credentials: encrypt(
-                {
-                  access_token: fb.userToken,
-                  user_token: fb.userToken,
-                  obtained_at: Date.now(),
-                },
-                auth.workspaceId + ":instagram",
-              ),
-              scopes: fb.granted,
-              expires_at: fb.dataAccessExpiresAt,
-              metadata: { authMode: "facebook" },
-            },
-            { onConflict: "workspace_id,provider" },
-          );
-          if (error) throw error;
-          await audit(auth.workspaceId, auth.user.id, "integration_authorized");
-          if (accounts.length > 1) return back("select=instagram");
+          const igAuth = { userToken: fb.userToken, scopes: fb.granted, expiresAt: fb.dataAccessExpiresAt };
+          if (accounts.length > 1) {
+            stage = "save";
+            // A choice is needed. A working connection keeps working until the
+            // choice is made: the new authorization is parked next to it,
+            // encrypted. Without one, the record waits for the choice.
+            const { data: existing, error: readError } = await db.from("integration_connections").select("id,status,provider_account_id,metadata").eq("workspace_id", auth.workspaceId).eq("provider", "instagram").maybeSingle();
+            if (readError) throw readError;
+            const { error } =
+              existing?.status === "connected" && existing.provider_account_id
+                ? await db.from("integration_connections").update({ metadata: { ...(existing.metadata || {}), pendingAuth: encryptPendingAuth(auth.workspaceId, igAuth) } }).eq("id", existing.id)
+                : await db.from("integration_connections").upsert(
+                    {
+                      workspace_id: auth.workspaceId,
+                      provider,
+                      connected_user: auth.user.id,
+                      provider_account_id: null,
+                      display_name: null,
+                      status: "selection_required",
+                      encrypted_credentials: encrypt({ access_token: fb.userToken, user_token: fb.userToken, obtained_at: Date.now() }, auth.workspaceId + ":instagram"),
+                      scopes: fb.granted,
+                      expires_at: fb.dataAccessExpiresAt,
+                      metadata: { authMode: "facebook" },
+                    },
+                    { onConflict: "workspace_id,provider" },
+                  );
+            if (error) throw error;
+            await audit(auth.workspaceId, auth.user.id, "integration_authorized");
+            return back("select=instagram");
+          }
           stage = "select";
-          await selectInstagramAccount(auth.workspaceId, accounts[0].id);
+          // One account: connect it directly; nothing is written before this succeeds.
+          await selectInstagramAccount(auth.workspaceId, accounts[0].id, { auth: igAuth, userId: auth.user.id });
+          await audit(auth.workspaceId, auth.user.id, "integration_authorized");
           // Connected; Inbox messages stay off until Meta grants the messaging rights.
           return back("connected=instagram" + (messaging ? "" : "&messaging=off"));
         }

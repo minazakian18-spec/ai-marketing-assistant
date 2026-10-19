@@ -28,7 +28,9 @@ export const metaScopes={
  // case ("Manage everything on your Page"); without it Instagram still
  // connects, with messaging switched off and shown honestly.
  instagramFacebook:['instagram_basic','pages_show_list'],
- instagramMessaging:['instagram_manage_messages','pages_manage_metadata'],
+ // Subscribing the Page to the "messages" webhook field also needs
+ // pages_messaging (Meta: "To subscribe to the messages field ... pages_messaging").
+ instagramMessaging:['instagram_manage_messages','pages_manage_metadata','pages_messaging'],
 };
 // Whether a connection may be used for Inbox messages. Connections made before
 // the two stages existed carry no flag and were made with all rights.
@@ -155,36 +157,66 @@ async function assertInstagramFree(workspaceId:string,igId:string){
  if(data?.length)throw new HttpError(409,INSTAGRAM_TAKEN);
 }
 
+// The authorization a choice is made with: a fresh one from the callback, a
+// pending one parked next to a working connection (encrypted, never sent to
+// the browser), or the user token of the connection itself.
+export type InstagramAuth={userToken:string;scopes:string[];expiresAt:string|null};
+const PENDING=(ws:string)=>ws+':instagram:pending';
+export function encryptPendingAuth(workspaceId:string,auth:InstagramAuth){return encrypt(auth,PENDING(workspaceId));}
+export function instagramAuthOf(workspaceId:string,c:{encrypted_credentials?:string|null;metadata?:unknown;scopes?:unknown;expires_at?:string|null}|null):InstagramAuth|null{
+ if(!c||!viaFacebook(c))return null;
+ const pending=(c.metadata as {pendingAuth?:unknown}|null)?.pendingAuth;
+ if(typeof pending==='string'&&pending)return decrypt<InstagramAuth>(pending,PENDING(workspaceId));
+ if(!c.encrypted_credentials)return null;
+ const creds=decrypt<MetaCredentials>(c.encrypted_credentials,workspaceId+':instagram');
+ return creds.user_token?{userToken:creds.user_token,scopes:Array.isArray(c.scopes)?c.scopes.map(String):[],expiresAt:c.expires_at||null}:null;
+}
+
 // Choose the Instagram account for a workspace. The id from the browser is
 // only used to look the account up again, live, with this workspace's own
-// user token; nothing is stored unless Meta returns it.
-export async function selectInstagramAccount(workspaceId:string,igId:string){
+// user token; nothing is stored unless Meta returns it. The complete,
+// connected record is written once, at the end: a failure before that leaves
+// any existing connection exactly as it was.
+export async function selectInstagramAccount(workspaceId:string,igId:string,opts:{auth?:InstagramAuth;userId?:string}={}){
  const db=adminClient();
- const {data:c}=await db.from('integration_connections').select('id,encrypted_credentials,metadata,scopes').eq('workspace_id',workspaceId).eq('provider','instagram').maybeSingle();
- if(!c?.encrypted_credentials||!viaFacebook(c))throw new HttpError(409,'Verbind eerst Instagram via Facebook.');
- // Messaging only when Meta granted both messaging rights to this connection.
- const scopes:string[]=Array.isArray(c.scopes)?c.scopes:[];
+ const {data:c}=await db.from('integration_connections').select('id,encrypted_credentials,metadata,scopes,expires_at').eq('workspace_id',workspaceId).eq('provider','instagram').maybeSingle();
+ const auth=opts.auth||instagramAuthOf(workspaceId,c);
+ if(!auth)throw new HttpError(409,c?.encrypted_credentials&&viaFacebook(c)?'Verbind Instagram opnieuw om een ander account te kiezen.':'Verbind eerst Instagram via Facebook.');
+ // Messaging only when Meta granted every messaging right to this authorization.
+ const scopes=auth.scopes;
  const messaging=metaScopes.instagramMessaging.every(s=>scopes.includes(s));
- const creds=decrypt<MetaCredentials>(c.encrypted_credentials,workspaceId+':instagram');
- if(!creds.user_token)throw new HttpError(409,'Verbind Instagram opnieuw om een ander account te kiezen.');
- const account=(await listInstagramAccounts(creds.user_token,{messaging})).find(a=>a.id===igId);
+ const account=(await listInstagramAccounts(auth.userToken,{messaging})).find(a=>a.id===igId);
  if(!account)throw new HttpError(403,'Geen toegang tot dit Instagram-account.');
  await assertInstagramFree(workspaceId,account.id);
-  // Install the app on the linked Page so Instagram message webhooks arrive
- // (needs pages_manage_metadata, so only with messaging).
- if(messaging)await metaJson(graph('/'+account.pageId+'/subscribed_apps?subscribed_fields=messages'),{method:'POST',headers:{Authorization:'Bearer '+account.pageToken}},'instagram').catch(e=>{throw e instanceof HttpError&&!(e as {provider?:{retryable?:boolean}}).provider?.retryable?new HttpError(400,'Mavix kon berichtmeldingen voor de gekoppelde Facebook-pagina niet inschakelen. Controleer of je deze pagina mag beheren.'):e;});
- const {error}=await db.from('integration_connections').update({
+ // Install the app on the linked Page so Instagram message webhooks arrive
+ // (only with all messaging rights). A refused subscription never blocks the
+ // account itself: it is connected with messaging honestly switched off.
+ let messagingOn=messaging,messagingIssue:string|undefined;
+ if(messaging){
+  try{await metaJson(graph('/'+account.pageId+'/subscribed_apps?subscribed_fields=messages'),{method:'POST',headers:{Authorization:'Bearer '+account.pageToken}},'instagram');}
+  catch(e){
+   if(!(e instanceof HttpError)||(e as {provider?:{retryable?:boolean}}).provider?.retryable)throw e;
+   const code=(e as {provider?:{code?:unknown}}).provider?.code;
+   console.error(JSON.stringify({event:'instagram_webhook_subscribe_failed',status:e.status,metaCode:typeof code==='number'||typeof code==='string'?String(code).slice(0,20):undefined}));
+   messagingOn=false;messagingIssue='webhook_subscription_failed';
+  }
+ }
+ const {error}=await db.from('integration_connections').upsert({
+  workspace_id:workspaceId,
+  provider:'instagram',
+  ...(opts.userId?{connected_user:opts.userId}:{}),
   provider_account_id:account.id,
   display_name:account.username?'@'+account.username:account.name||'Instagram',
   status:'connected',
-  encrypted_credentials:encrypt({access_token:account.pageToken,user_token:creds.user_token,page_id:account.pageId,obtained_at:Date.now()},workspaceId+':instagram'),
-  metadata:{authMode:'facebook',pageId:account.pageId,pageName:account.pageName,username:account.username,messaging,...(messaging?{}:{messagingMissing:metaScopes.instagramMessaging.filter(s=>!scopes.includes(s))})},
- }).eq('id',c.id);
+  encrypted_credentials:encrypt({access_token:account.pageToken,user_token:auth.userToken,page_id:account.pageId,obtained_at:Date.now()},workspaceId+':instagram'),
+  scopes,
+  expires_at:auth.expiresAt,
+  metadata:{authMode:'facebook',pageId:account.pageId,pageName:account.pageName,username:account.username,messaging:messagingOn,...(messaging?{}:{messagingMissing:metaScopes.instagramMessaging.filter(s=>!scopes.includes(s))}),...(messagingIssue?{messagingIssue}:{})},
+ },{onConflict:'workspace_id,provider'});
  if(error?.code==='23505')throw new HttpError(409,INSTAGRAM_TAKEN);
  if(error)throw error;
  return account.username?'@'+account.username:account.name;
 }
-
 // Messenger: code -> user token -> long-lived user token; the Page is chosen
 // afterwards (automatically when there is exactly one).
 export async function completeMessenger(code:string){
@@ -250,7 +282,7 @@ export async function metaConnection(workspaceId:string,provider:MetaProvider,{m
  if(error||!c?.encrypted_credentials||c.status==='disconnected')throw new HttpError(409,'Verbind eerst dit kanaal.');
  if(c.status==='reconnect_required')throw new HttpError(409,'Verbind dit kanaal opnieuw.');
  if(c.status==='selection_required'||!c.provider_account_id)throw new HttpError(409,'Kies eerst welk account Mavix gebruikt.');
- if(messaging&&provider==='instagram'&&!instagramMessaging(c))throw new HttpError(409,'Instagram-berichten zijn nog niet ingeschakeld. Hiervoor is extra Meta-toestemming nodig (pages_manage_metadata).');
+ if(messaging&&provider==='instagram'&&!instagramMessaging(c))throw new HttpError(409,'Instagram-berichten zijn nog niet ingeschakeld. Hiervoor is extra Meta-toestemming nodig (zie Integraties).');
  let creds=decrypt<MetaCredentials>(c.encrypted_credentials,workspaceId+':'+provider);
  // Facebook Login: the Page token does not expire by itself; Meta's data
  // access for the user does (expires_at). After that, reconnect.

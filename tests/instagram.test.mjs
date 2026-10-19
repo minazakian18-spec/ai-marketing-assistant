@@ -67,7 +67,7 @@ function setup(t, { pages = [page("700001", "178001")], connections = [] } = {})
     pages,
     tokenType: "USER",
     appId: APP_ID,
-    scopes: [...REQUIRED, "instagram_content_publish", "pages_read_engagement", "business_management"],
+    scopes: [...REQUIRED, "pages_messaging", "instagram_content_publish", "pages_read_engagement", "business_management"],
     handle: async (url, init = {}) => {
       const u = new URL(url);
       const p = u.pathname.replace(/^\/v[\d.]+/, "");
@@ -118,7 +118,7 @@ function setup(t, { pages = [page("700001", "178001")], connections = [] } = {})
     while (queued.length) await queued.shift()();
     return res;
   };
-  return { tables, db, state, logs, requests, net, meta, crypto, route, as, action, start, complete, connect, row, deliver };
+  return { tables, db, state, logs, requests, net, meta, crypto, route, load, as, action, start, complete, connect, row, deliver };
 }
 
 const dm = (igId, mid, text = "Hebben jullie nog plek?", sender = "9910001") => ({
@@ -258,13 +258,71 @@ test("two stages: without pages_manage_metadata Instagram connects, messaging st
   const c = f.row("w1");
   assert.deepEqual([c.status, c.provider_account_id], ["connected", "178001"]);
   assert.equal(c.metadata.messaging, false);
-  assert.deepEqual(c.metadata.messagingMissing, ["pages_manage_metadata"]);
+  assert.deepEqual(c.metadata.messagingMissing, ["pages_manage_metadata", "pages_messaging"]);
   assert.ok(!f.requests.some((r) => r.url.includes("subscribed_apps")), "no Page subscription without pages_manage_metadata");
   // Messaging is honestly unavailable: sending is refused, the Inbox does not count it.
-  await assert.rejects(f.meta.sendMetaText("w1", "instagram", "9910001", "Hoi"), (e) => e.status === 409 && /pages_manage_metadata/.test(e.message));
+  await assert.rejects(f.meta.sendMetaText("w1", "instagram", "9910001", "Hoi"), (e) => e.status === 409 && /nog niet ingeschakeld/.test(e.message));
   assert.ok(!f.requests.some((r) => r.url.includes("/messages")));
   // Publishing and other non-messaging use keep working.
   assert.equal((await f.meta.metaConnection("w1", "instagram")).c.provider_account_id, "178001");
+});
+
+test("the current production rights (pages_manage_metadata, no pages_messaging) connect the account without a Page subscription", async (t) => {
+  const f = setup(t);
+  f.net.scopes = ["business_management", "instagram_basic", "instagram_content_publish", "instagram_manage_messages", "pages_read_engagement", "pages_manage_metadata", "pages_show_list"];
+  assert.match(await f.connect(), /connected=instagram&messaging=off$/);
+  const c = f.row("w1");
+  assert.deepEqual([c.status, c.provider_account_id, c.metadata.messaging], ["connected", "178001", false]);
+  assert.deepEqual(c.metadata.messagingMissing, ["pages_messaging"]);
+  assert.ok(!f.requests.some((r) => r.url.includes("subscribed_apps")));
+});
+
+test("a refused webhook subscription never blocks the account: connected, messaging off, reason logged", async (t) => {
+  const f = setup(t);
+  const handle = f.net.handle;
+  f.net.handle = async (url, init) => (String(url).includes("/subscribed_apps") ? reply({ error: { code: 200, message: "(#200) pages_messaging" } }, 403) : handle(url, init));
+  assert.match(await f.connect(), /connected=instagram$/);
+  const c = f.row("w1");
+  assert.deepEqual([c.status, c.provider_account_id, c.metadata.messaging, c.metadata.messagingIssue], ["connected", "178001", false, "webhook_subscription_failed"]);
+  assert.ok(f.logs.some((l) => l.includes("instagram_webhook_subscribe_failed")));
+  await assert.rejects(f.meta.sendMetaText("w1", "instagram", "9910001", "Hoi"), (e) => e.status === 409);
+  assert.ok(!f.logs.some((l) => l.includes(PAGE_TOKEN) || l.includes(USER_TOKEN) || l.includes(SECRET)));
+});
+
+test("a failed reconnect never overwrites a working connection", async (t) => {
+  const working = () => fbConnection("w1", "178001", { encrypted_credentials: "kept-credentials", display_name: "@telepizza_nl", scopes: ["instagram_basic"] });
+  // Single account, but the account lookup fails (Meta returns no access to it).
+  const a = setup(t, { connections: [working()] });
+  a.net.handle = ((h) => async (url, init) => (String(url).includes("/me/accounts") && a.net.calls++ ? reply({ error: { code: 10, message: "no" } }, 403) : h(url, init)))(a.net.handle);
+  a.net.calls = 0;
+  assert.match(await a.connect(), /error=permission&provider=instagram$/);
+  assert.deepEqual([a.row("w1").status, a.row("w1").encrypted_credentials, a.row("w1").display_name], ["connected", "kept-credentials", "@telepizza_nl"]);
+
+  // Single account, taken by another workspace: the working connection stays.
+  const b = setup(t, { connections: [working(), fbConnection("w2", "178001")] });
+  b.tables.integration_connections[0].provider_account_id = "178000";
+  assert.match(await b.connect(), /error=instagram_taken&provider=instagram$/);
+  assert.deepEqual([b.row("w1").status, b.row("w1").encrypted_credentials, b.row("w1").provider_account_id], ["connected", "kept-credentials", "178000"]);
+});
+
+test("several accounts next to a working connection: it keeps working until the choice, the parked authorization never reaches the browser", async (t) => {
+  const f = setup(t, { pages: [page("700001", "178001"), page("700002", "178002")], connections: [fbConnection("w1", "178001", { encrypted_credentials: "kept-credentials", display_name: "@telepizza_nl" })] });
+  assert.match(await f.connect(), /select=instagram$/);
+  const c = f.row("w1");
+  assert.deepEqual([c.status, c.provider_account_id, c.encrypted_credentials], ["connected", "178001", "kept-credentials"]);
+  assert.equal(typeof c.metadata.pendingAuth, "string");
+  assert.ok(!c.metadata.pendingAuth.includes(USER_TOKEN), "parked authorization is encrypted");
+  const list = await (await f.action("accounts")).json();
+  assert.deepEqual(list.accounts.map((a) => a.id), ["178001", "178002"]);
+  const overview = await (await f.load("src/app/api/integrations/route.ts").GET()).json();
+  const ig = overview.connections.find((c) => c.provider === "instagram");
+  assert.equal(ig.status, "connected");
+  assert.ok(!("pendingAuth" in ig.metadata), "the parked authorization never reaches the browser");
+  assert.equal((await f.action("select", "POST", { body: { account: "178002" } })).status, 200);
+  const d = f.row("w1");
+  assert.deepEqual([d.status, d.provider_account_id, d.metadata.pendingAuth], ["connected", "178002", undefined]);
+  const creds = f.crypto.decrypt(d.encrypted_credentials, "w1:instagram");
+  assert.equal(creds.user_token, USER_TOKEN);
 });
 
 test("existing connections made with all rights keep messaging", async (t) => {
@@ -335,17 +393,14 @@ test("an Instagram account connected in one workspace cannot be connected in ano
   f.as("u2");
   assert.match(await f.connect(), /error=instagram_taken&provider=instagram$/);
   assert.deepEqual(f.row("w1"), before, "workspace 1 untouched");
-  assert.notEqual(f.row("w2").status, "connected");
-  assert.equal(f.row("w2").provider_account_id, null);
+  assert.equal(f.row("w2"), undefined, "no incomplete record for the refused workspace");
   assert.equal(f.requests.filter((r) => r.url.includes("subscribed_apps")).length, subscribes, "no subscription for the refused workspace");
-  const select = await f.action("select", "POST", { body: { account: "178001" } });
-  assert.equal(select.status, 409);
-  assert.equal((await select.json()).error, "Dit Instagram-account is al gekoppeld aan een andere Mavix-werkruimte. Ontkoppel het daar eerst.");
+  assert.equal((await f.action("select", "POST", { body: { account: "178001" } })).status, 409);
 
   f.as("u1");
   assert.equal((await f.action("disconnect", "POST", { body: {} })).status, 200);
   f.as("u2");
-  assert.equal((await f.action("select", "POST", { body: { account: "178001" } })).status, 200, "free again after disconnect");
+  assert.match(await f.connect(), /connected=instagram$/, "free again after disconnect");
   assert.equal(f.row("w2").status, "connected");
 });
 
@@ -355,10 +410,9 @@ test("a concurrent selection that hits the unique index also returns 409", async
   const from = f.db.from;
   f.db.from = (table) => {
     const q = from(table);
-    const update = q.update;
+    const upsert = q.upsert;
     if (table === "integration_connections")
-      q.update = (values) =>
-        values.provider_account_id ? { eq: () => Promise.resolve({ data: null, error: { code: "23505", message: "duplicate key" } }) } : update(values);
+      q.upsert = (values, o) => (values.provider_account_id ? Promise.resolve({ data: null, error: { code: "23505", message: "duplicate key" } }) : upsert(values, o));
     return q;
   };
   const res = await f.action("select", "POST", { body: { account: "178001" } });
