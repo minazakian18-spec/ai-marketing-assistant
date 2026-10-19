@@ -11,6 +11,13 @@ const legacyRoutes: [string, string][] = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Build workers (page-data collection and static generation). By default
+    // Next uses one per CPU; on the shared Hostinger build host that was 63,
+    // more threads than the host allows ("can't spawn worker thread"). Two
+    // workers build reliably there; the build output is the same.
+    cpus: 2,
+  },
   async redirects() {
     return legacyRoutes.map(([source, destination]) => ({
       source,
