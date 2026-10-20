@@ -4,6 +4,7 @@ import { gmailRequest as gmail, GmailHistoryExpired } from "./gmail-api";
 import { gmailConnection as activeGmailConnection } from "./gmail-credentials";
 import { replyGmailThread } from "./gmail";
 import "server-only";
+import { recordWebhookDiagnostic } from "./webhook-diagnostics";
 import { adminClient } from "./supabase";
 import { HttpError } from "./access";
 import {
@@ -542,6 +543,15 @@ export async function processMetaWebhook(payload: unknown) {
     matchedAccounts: accounts.length - unmatched.length,
     unmatchedAccounts: unmatched.filter((a) => /^\d{1,30}$/.test(a)).slice(0, 3).join(","),
     messages: processed,
+  });
+  // Durable diagnostics (Supabase, administrators only): counts, and the
+  // business account id only when no workspace matched.
+  await recordWebhookDiagnostic(unmatched.length ? "unmatched" : "processed", String(object || ""), {
+    entries: entries.length,
+    parsed: messages.length,
+    statuses: statuses.length,
+    stored: processed,
+    ...(unmatched.length ? { accounts: unmatched.filter((a) => /^\d{1,30}$/.test(a)).slice(0, 3).join(",") } : {}),
   });
   // Occasional pruning of old idempotency keys.
   if (Math.random() < 0.02)

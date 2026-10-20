@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { verifyChallenge, verifyMetaSignature } from "@/lib/inbox/core";
 import { webhookSecrets } from "@/lib/server/meta";
 import { processMetaWebhook } from "@/lib/server/inbox";
+import { recordWebhookDiagnostic } from "@/lib/server/webhook-diagnostics";
 
 // One public webhook for Instagram, Messenger and WhatsApp (Meta).
 // GET: subscription handshake with META_WEBHOOK_VERIFY_TOKEN.
@@ -51,13 +52,18 @@ export async function POST(request: Request) {
   console.info(JSON.stringify({ event: "meta_webhook_received", object: object.slice(0, 40), bytes: raw.length, signature: !signature ? "missing" : valid ? "valid" : "invalid", secrets: secrets.length }));
   if (!valid) {
     console.warn(JSON.stringify({ event: "meta_webhook_rejected", object: object.slice(0, 40) }));
+    // Recorded as rejected only; nothing from an unverified body is trusted or processed.
+    after(() => recordWebhookDiagnostic("rejected", object, { signature: signature ? "invalid" : "missing" }));
     return new Response(null, { status: 401 });
   }
+  after(() => recordWebhookDiagnostic("verified", object, { bytes: raw.length }));
   after(async () => {
     try {
       await processMetaWebhook(payload);
     } catch (e) {
-      console.error(JSON.stringify({ event: "meta_webhook_failed", object, code: (e as { code?: string })?.code || "error" }));
+      const code = String((e as { code?: string })?.code || "error").slice(0, 20);
+      console.error(JSON.stringify({ event: "meta_webhook_failed", object, code }));
+      await recordWebhookDiagnostic("failed", object, { code });
     }
   });
   return new Response(null, { status: 200 });

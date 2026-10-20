@@ -18,6 +18,7 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [diagnostics, setDiagnostics] = useState<{ event: string; at: string }[]>([]);
   const load = useCallback(async () => {
     const r = await fetch("/api/admin/workspaces", { cache: "no-store" });
     const body = await r.json().catch(() => ({}));
@@ -28,6 +29,7 @@ export default function AdminPage() {
     }
     setRows(body.workspaces);
     setAudit(body.audit || []);
+    setDiagnostics(body.webhookDiagnostics || []);
   }, []);
   useEffect(() => {
     void load();
@@ -118,6 +120,25 @@ export default function AdminPage() {
             ))}
           </div>
         </section>
+      )}
+      {!error && rows !== null && (
+      <section className="ui-card admin-card">
+        <header className="admin-card-head">
+          <h2>Meta-webhooks (diagnose)</h2>
+        </header>
+        {diagnostics.length ? (
+          <ul className="admin-audit">
+            {diagnostics.map((d, i) => (
+              <li key={i}>
+                <time dateTime={d.at}>{new Date(d.at).toLocaleString("nl-NL", { dateStyle: "short", timeStyle: "medium" })}</time>
+                <code>{d.event}</code>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted" style={{ padding: "0 16px 16px" }}>Nog geen webhook van Meta ontvangen sinds de diagnose actief is.</p>
+        )}
+      </section>
       )}
       {audit.length > 0 && (
         <section className="ui-card admin-card">

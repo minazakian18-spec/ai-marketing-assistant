@@ -351,6 +351,26 @@ test("webhook diagnostics: received + signature, counts, unmatched business acco
   }
 });
 
+test("durable webhook diagnostics: rejected, unmatched and processed rows without workspace or content", async (t) => {
+  const f = setup(t, { connections: [fbConnection("w1", "178001", { encrypted_credentials: "x" })] });
+  const diag = () => f.tables.audit_logs.filter((a) => String(a.event).startsWith("meta_webhook:"));
+  // Unsigned: recorded as rejected, nothing processed.
+  assert.equal((await f.deliver(dm("178001", "mid.u", "Geheim A", "5550002"), "wrong-secret")).status, 401);
+  // Valid but for an unknown business account.
+  await f.deliver(dm("999000111", "mid.x", "Geheim B", "5550003"));
+  // Valid and for the connected account.
+  await f.deliver(dm("178001", "mid.ok", "Geheim C", "5550004"));
+  const events = diag().map((d) => d.event);
+  assert.ok(events.includes("meta_webhook:instagram:rejected:signature=invalid"), events.join(" | "));
+  assert.ok(events.some((e) => e.startsWith("meta_webhook:instagram:verified:bytes=")));
+  assert.ok(events.includes("meta_webhook:instagram:unmatched:entries=1:parsed=1:statuses=0:stored=0:accounts=999000111"), events.join(" | "));
+  assert.ok(events.includes("meta_webhook:instagram:processed:entries=1:parsed=1:statuses=0:stored=1"), events.join(" | "));
+  for (const d of diag()) {
+    assert.equal(d.workspace_id, null, "never tied to a customer workspace");
+    assert.ok(!/Geheim|555000|sha256|mid\./.test(d.event), "no content, sender, signature or message id: " + d.event);
+  }
+});
+
 // ---------------------------------------------------------------- Account selection
 
 test("several accounts ask for a choice; only accounts Meta returns can be selected", async (t) => {
