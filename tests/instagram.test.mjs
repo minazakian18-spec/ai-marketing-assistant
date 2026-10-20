@@ -333,6 +333,24 @@ test("existing connections made with all rights keep messaging", async (t) => {
   assert.equal(await f.meta.sendMetaText("w1", "instagram", "9910001", "Hoi"), "mid.out1");
 });
 
+test("webhook diagnostics: received + signature, counts, unmatched business account; never content, sender or signature", async (t) => {
+  const f = setup(t, { connections: [fbConnection("w1", "178001", { encrypted_credentials: "x" })] });
+  // Valid signature, but for an Instagram account no workspace has connected.
+  await f.deliver(dm("999000111", "mid.unmatched", "Geheime inhoud", "5550001"));
+  const received = f.logs.map((l) => { try { return JSON.parse(l); } catch { return {}; } });
+  const r = received.find((l) => l.event === "meta_webhook_received");
+  assert.deepEqual([r.object, r.signature], ["instagram", "valid"]);
+  const p = received.find((l) => l.event === "inbox_webhook_processed");
+  assert.deepEqual([p.entries, p.messagingEvents, p.parsedMessages, p.matchedAccounts, p.unmatchedAccounts, p.messages], [1, 1, 1, 0, "999000111", 0]);
+  // Invalid signature: logged as such, still refused.
+  const res = await f.deliver(dm("178001", "mid.bad"), "wrong-secret");
+  assert.equal(res.status, 401);
+  assert.ok(f.logs.some((l) => l.includes("meta_webhook_received") && l.includes("\"invalid\"")));
+  for (const l of f.logs) {
+    assert.ok(!l.includes("Geheime inhoud") && !l.includes("5550001") && !l.includes("sha256="), "no content, customer id or signature in logs: " + l);
+  }
+});
+
 // ---------------------------------------------------------------- Account selection
 
 test("several accounts ask for a choice; only accounts Meta returns can be selected", async (t) => {

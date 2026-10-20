@@ -45,7 +45,11 @@ export async function POST(request: Request) {
   const secrets = webhookSecrets(object);
   if (!secrets.length) return notConfigured("META_CLIENT_SECRET", object.slice(0, 40));
   const signature = request.headers.get("x-hub-signature-256");
-  if (!secrets.some((secret) => verifyMetaSignature(raw, signature, secret))) {
+  // One line per delivery: that Meta sent something and whether the
+  // signature is valid. Never the signature, body or secrets themselves.
+  const valid = secrets.some((secret) => verifyMetaSignature(raw, signature, secret));
+  console.info(JSON.stringify({ event: "meta_webhook_received", object: object.slice(0, 40), bytes: raw.length, signature: !signature ? "missing" : valid ? "valid" : "invalid", secrets: secrets.length }));
+  if (!valid) {
     console.warn(JSON.stringify({ event: "meta_webhook_rejected", object: object.slice(0, 40) }));
     return new Response(null, { status: 401 });
   }

@@ -524,10 +524,24 @@ export async function processMetaWebhook(payload: unknown) {
         )
       )
         await applyStatus(ws, s);
+  // Diagnostics, no content: how many items Meta sent, how many Mavix could
+  // read, and whether they belonged to a connected workspace. Account ids are
+  // business account ids (never a customer's id) and only logged when no
+  // workspace matched, at most three.
+  const entries = Array.isArray((payload as { entry?: unknown[] })?.entry) ? (payload as { entry: { messaging?: unknown[]; changes?: { field?: unknown }[] }[] }).entry : [];
+  const accounts = [...new Set([...messages, ...statuses].map((m) => m.accountId))];
+  const unmatched = accounts.filter((a) => !(cache.get(a) || []).length);
   log("inbox_webhook_processed", {
     provider,
-    messages: processed,
+    entries: entries.length,
+    messagingEvents: entries.reduce((n, e) => n + (Array.isArray(e?.messaging) ? e.messaging.length : 0), 0),
+    changes: entries.reduce((n, e) => n + (Array.isArray(e?.changes) ? e.changes.length : 0), 0),
+    changeFields: [...new Set(entries.flatMap((e) => (Array.isArray(e?.changes) ? e.changes.map((c) => String(c?.field || "")) : [])))].filter((f) => /^[a-z_]{1,40}$/.test(f)).slice(0, 5).join(","),
+    parsedMessages: messages.length,
     statuses: statuses.length,
+    matchedAccounts: accounts.length - unmatched.length,
+    unmatchedAccounts: unmatched.filter((a) => /^\d{1,30}$/.test(a)).slice(0, 3).join(","),
+    messages: processed,
   });
   // Occasional pruning of old idempotency keys.
   if (Math.random() < 0.02)
