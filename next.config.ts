@@ -10,6 +10,13 @@ const legacyRoutes: [string, string][] = [
   ["/contentkalender", "/calendar"],
 ];
 
+const legalRoutes: [string, string][] = [
+  ["/legal/privacy", "/privacy"],
+  ["/legal/voorwaarden", "/voorwaarden"],
+  ["/legal/cookies", "/cookies"],
+  ["/legal/avg", "/privacy"],
+];
+
 const nextConfig: NextConfig = {
   experimental: {
     // Build workers (page-data collection and static generation). By default
@@ -19,11 +26,15 @@ const nextConfig: NextConfig = {
     cpus: 2,
   },
   async redirects() {
-    return legacyRoutes.map(([source, destination]) => ({
-      source,
-      destination,
-      permanent: false,
-    }));
+    return [
+      ...legacyRoutes.map(([source, destination]) => ({
+        source,
+        destination,
+        permanent: false,
+      })),
+      // The legal pages moved from /legal/* to short, stable URLs.
+      ...legalRoutes.map(([source, destination]) => ({ source, destination, permanent: true })),
+    ];
   },
 };
 

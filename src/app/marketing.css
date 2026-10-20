@@ -2391,3 +2391,212 @@
 .mkt-onboarding-note { margin: 18px 0 0; text-align: center; font-size: 14.5px; color: #4a4560; }
 .mkt-onboarding-note a { font-weight: 600; }
 .mkt-pnt-compare { display: inline-block; margin-top: 12px; margin-left: 4px; font-size: 14px; font-weight: 600; color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- Legal pages (/privacy, /voorwaarden, /cookies, /gegevens-verwijderen) ---------- */
+.lg {
+  padding: 120px 0 72px;
+  background: linear-gradient(180deg, #f8f6fd 0, #fff 320px);
+}
+.lg-wrap {
+  max-width: 1080px;
+}
+.lg-head {
+  max-width: 760px;
+}
+.lg-head h1 {
+  margin: 14px 0 0;
+  font-size: clamp(32px, 4.4vw, 44px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--color-primary-dark);
+}
+.lg-intro {
+  margin: 14px 0 0;
+  font-size: 17.5px;
+  line-height: 1.6;
+  color: #3f3a52;
+}
+.lg-meta {
+  margin: 14px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5b5470;
+}
+.lg-draft {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #e9e3f7;
+  border-left: 3px solid var(--color-primary);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #4b4660;
+}
+.lg-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 48px;
+  margin-top: 40px;
+  align-items: start;
+}
+.lg-toc {
+  position: sticky;
+  top: 96px;
+  font-size: 14px;
+}
+.lg-toc p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b6878;
+}
+.lg-toc ol {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lg-toc a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #3f3a52;
+  text-decoration: none;
+}
+.lg-toc a:hover {
+  background: #f3eefe;
+  color: #3b0764;
+}
+.lg-body {
+  max-width: 720px;
+}
+.lg-body section {
+  padding: 4px 0 28px;
+  scroll-margin-top: 96px;
+}
+.lg-body section + section {
+  border-top: 1px solid #eee9f5;
+  padding-top: 28px;
+}
+.lg-body h2 {
+  margin: 0 0 12px;
+  font-size: 21px;
+  line-height: 1.3;
+  color: #1c1533;
+}
+.lg-body h2 span {
+  color: var(--color-primary);
+}
+.lg-body p,
+.lg-body li {
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: #2f2a40;
+}
+.lg-body p {
+  margin: 0 0 12px;
+}
+.lg-body ul,
+.lg-body ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+.lg-body li + li {
+  margin-top: 6px;
+}
+.lg-body a {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.lg-pending {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #78350f;
+  font-size: 14.5px;
+}
+.lg-facts {
+  margin: 8px 0 0;
+  padding: 14px 16px 14px 34px;
+  border: 1px solid #eee9f5;
+  border-radius: 12px;
+  background: #fbfaff;
+}
+.lg-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #eee9f5;
+  border-radius: 12px;
+}
+.lg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+.lg-table th,
+.lg-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee9f5;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.5;
+  color: #2f2a40;
+}
+.lg-table th {
+  background: #faf8ff;
+  font-weight: 700;
+}
+.lg-table tr:last-child td {
+  border-bottom: 0;
+}
+.lg-table td:first-child {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.lg-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid #eee9f5;
+}
+.lg-related a {
+  padding: 8px 14px;
+  border: 1px solid #e3dcf3;
+  border-radius: 999px;
+  color: #3b0764;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.lg-related a:hover {
+  border-color: var(--color-primary);
+  background: #f8f5ff;
+}
+.mkt-auth-legal {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+@media (max-width: 860px) {
+  .lg {
+    padding-top: 96px;
+  }
+  .lg-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .lg-toc {
+    position: static;
+    padding: 14px;
+    border: 1px solid #eee9f5;
+    border-radius: 12px;
+    background: #fff;
+  }
+}

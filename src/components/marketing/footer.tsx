@@ -29,12 +29,12 @@ const columns = [
     ],
   },
   {
-    title: "Legal",
+    title: "Juridisch",
     links: [
-      ["/legal/privacy", "Privacybeleid"],
-      ["/legal/voorwaarden", "Algemene voorwaarden"],
-      ["/legal/cookies", "Cookiebeleid"],
-      ["/legal/avg", "Gegevensverwerking (AVG)"],
+      ["/privacy", "Privacybeleid"],
+      ["/voorwaarden", "Algemene voorwaarden"],
+      ["/cookies", "Cookiebeleid"],
+      ["/gegevens-verwijderen", "Gegevens verwijderen"],
     ],
   },
 ] as const;
@@ -62,9 +62,9 @@ export function MarketingFooter() {
         <div className="mkt-footer-bottom">
           <span>© {new Date().getFullYear()} Mavix. Alle rechten voorbehouden.</span>
           <div className="mkt-footer-legal">
-            <Link href="/legal/privacy">Privacy</Link>
-            <Link href="/legal/voorwaarden">Voorwaarden</Link>
-            <Link href="/legal/cookies">Cookies</Link>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/voorwaarden">Voorwaarden</Link>
+            <Link href="/cookies">Cookies</Link>
           </div>
         </div>
       </div>

@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 // Public marketing pages need no session work: skipping the Supabase call
 // keeps them fast (TTFB) and cacheable for visitors and search engines.
-const isPublic=(p:string)=>p==='/'||p==='/pricing'||p==='/demo'||p==='/aanvragen'||p.startsWith('/aanvragen/')||p.startsWith('/legal/');
+const isPublic=(p:string)=>p==='/'||p==='/pricing'||p==='/demo'||p==='/aanvragen'||p.startsWith('/aanvragen/')||p.startsWith('/legal/')||['/privacy','/voorwaarden','/cookies','/gegevens-verwijderen'].includes(p);
 // Public endpoints that also work for visitors in test mode.
 const publicApi=(p:string)=>p==='/api/applications';
 // One canonical host for search engines: www.<domain> redirects permanently to

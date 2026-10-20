@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { KeyRound, LogOut, Plug, Download, ShieldAlert, ArrowUpRight } from "lucide-react";
+import { KeyRound, LogOut, Plug, Download, ShieldAlert, ArrowUpRight, Trash2 } from "lucide-react";
 import { PageHeading } from "@/components/ui";
 import { downloadFile } from "@/lib/download";
 import { authRequest } from "@/lib/auth-client";
@@ -12,6 +12,7 @@ export default function PrivacyPage() {
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
+  const [requested, setRequested] = useState(false);
   async function action(remove: boolean) {
     setBusy(remove ? "remove" : "export");
     setMessage("");
@@ -100,6 +101,40 @@ export default function PrivacyPage() {
           </div>
           <button type="button" disabled={!!busy} className="button secondary" onClick={() => action(false)}>
             <Download size={15} /> {busy === "export" ? "Bezig…" : "Gegevens downloaden"}
+          </button>
+        </div>
+      </section>
+      <section className="panel account-panel">
+        <div className="section-heading">
+          <div>
+            <h2>
+              <Trash2 size={18} aria-hidden="true" /> Verwijdering aanvragen
+            </h2>
+            <p>
+              Vraag verwijdering van je account en persoonlijke gegevens aan. Je verzoek komt direct bij de beheerders van Mavix binnen; we controleren het en voeren het binnen één maand uit. Zie ook <Link href="/gegevens-verwijderen">Gegevens verwijderen</Link>.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={!!busy || requested}
+            className="button secondary"
+            onClick={async () => {
+              setBusy("deletion");
+              setMessage("");
+              try {
+                const r = await fetch("/api/privacy/deletion", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+                const b = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(b.error || "Je verzoek kon niet worden verstuurd.");
+                setRequested(true);
+                setMessage(b.message);
+              } catch (e) {
+                setMessage(e instanceof Error ? e.message : "Je verzoek kon niet worden verstuurd.");
+              } finally {
+                setBusy("");
+              }
+            }}
+          >
+            {requested ? "Verzoek verstuurd" : busy === "deletion" ? "Bezig…" : "Verwijdering aanvragen"}
           </button>
         </div>
       </section>

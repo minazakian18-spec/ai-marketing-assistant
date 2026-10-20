@@ -124,6 +124,9 @@ function RegisterForm() {
           )}
         </button>
       </form>
+      <p className="mkt-auth-legal">
+        Door een account aan te maken ga je akkoord met de <Link href="/voorwaarden">algemene voorwaarden</Link>. Lees ook ons <Link href="/privacy">privacybeleid</Link>.
+      </p>
       <div className="mkt-auth-divider">of</div>
       <GoogleButton label="Doorgaan met Google" />
     </AuthShell>

@@ -105,7 +105,7 @@ export function ApplicationForm({ kind, initialPlan }: { kind: Kind; initialPlan
       <label className="mkt-consent">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>
-          Mavix mag mijn gegevens gebruiken om contact met mij op te nemen over deze aanvraag. Zie de <Link href="/legal/privacy">privacyverklaring</Link>.
+          Mavix mag mijn gegevens gebruiken om contact met mij op te nemen over deze aanvraag. Zie de <Link href="/privacy">privacyverklaring</Link>.
         </span>
       </label>
       <button className="mkt-btn mkt-btn-primary" disabled={status === "loading"} style={{ width: "100%" }}>
