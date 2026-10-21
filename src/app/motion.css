@@ -1,8 +1,8 @@
 /* Mavix motion layer (loaded last in the app layout).
-   Timings: 150ms for small interactions, 220ms for panels, 9s for the one
-   long decorative loop (the AI input light). Only opacity, transform and
+   Timings: 150ms for small interactions, 220ms for panels, 5.2s for the AI
+   input light (only while typing or thinking). Only opacity, transform and
    stroke-dashoffset are animated; never layout. Under prefers-reduced-motion
-   everything stops except the slow AI input light (product decision). */
+   all of it stops. */
 
 :root {
   --dur-fast: 150ms;
@@ -20,7 +20,7 @@
   isolation: isolate;
   --gb-share: 0.1; /* length of the light, as a share of the perimeter */
   --gb-width: 2px; /* thickness of the line */
-  --gb-speed: 9s; /* one full lap */
+  --gb-speed: 5.2s; /* one full lap (typing and thinking alike: no jump when switching) */
   --gb-line: #8b5cf6;
   --gb-glow: #a78bfa;
   --gb-glow-strength: 0.11;
@@ -61,7 +61,11 @@
   opacity: 0;
   transition: opacity var(--dur-panel) ease;
 }
-.composer > .glow-border[data-ready] {
+/* The light only shows while the composer has text or a real request runs
+   (data-glow, set by AgentComposer). When it stops, the animation is paused,
+   not removed: it resumes from the same spot, so switching between typing
+   and thinking never restarts or jumps. */
+.composer[data-glow] > .glow-border[data-ready] {
   opacity: 1;
 }
 /* Each dash is --gb-part of the full length and centred on the same point;
@@ -75,6 +79,10 @@
   stroke-dasharray: var(--gb-seg) calc(var(--gb-perimeter, 4000px) - var(--gb-seg));
   stroke-dashoffset: var(--gb-shift);
   animation: gb-glide var(--gb-speed) linear infinite;
+  animation-play-state: paused;
+}
+.composer[data-glow]:not([data-paused]) .glow-border rect {
+  animation-play-state: running;
 }
 .gb-line {
   filter: blur(1px);
@@ -100,12 +108,10 @@
     stroke-dashoffset: calc(var(--gb-shift) - var(--gb-perimeter, 4000px));
   }
 }
-/* A real request is running: the same light, a little quicker. */
+/* A real request is running: same speed (a different duration would make the
+   light jump), a slightly brighter glow. */
 .composer[data-busy] {
-  --gb-speed: 5s;
-}
-.composer[data-paused] .glow-border rect {
-  animation-play-state: paused;
+  --gb-glow-strength: 0.17;
 }
 .composer.is-dragging > .glow-border {
   opacity: 0;
@@ -156,6 +162,285 @@
   }
 }
 
+/* ================= Mavi mascot =================
+   components/mavi.tsx MaviMascot. Transform/opacity only. Every state comes
+   from real app state (see useMascotState). */
+.mavi-mascot {
+  display: block;
+  overflow: visible;
+  flex: none;
+}
+.mm-shadow {
+  fill: #3b1a8f;
+  opacity: 0.16;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.mm-figure,
+.mm-eye,
+.mm-arm,
+.mm-face,
+.mm-pupil {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.mm-figure {
+  transform-origin: 50% 100%;
+  transition: transform 320ms var(--ease-out);
+}
+.mm-highlight {
+  fill: #fff;
+  opacity: 0.45;
+}
+.mm-arm {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.mm-arm-l {
+  transform-origin: 100% 0;
+}
+.mm-arm-r {
+  transform-origin: 0 0;
+}
+.mm-cheek {
+  fill: #ff8ccf;
+  opacity: 0.35;
+}
+.mm-mouth {
+  fill: none;
+  stroke: #1d1040;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.mm-flat,
+.mm-sad,
+.mm-happy,
+.mm-dots {
+  opacity: 0;
+}
+.mm-pupil {
+  transition: transform 260ms var(--ease-out);
+}
+.mm-spark {
+  fill: #c4b5fd;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.mm-dots circle {
+  fill: #a78bfa;
+}
+
+/* Placement. Dashboard: next to the greeting, right above the composer.
+   Agent: large in the empty state; in a conversation small, perched on the
+   top edge of the input (above the border, never over text or buttons). */
+.agent-surface-head > .agent-surface-mascot {
+  margin-top: -8px;
+  margin-left: -6px;
+}
+@media (max-width: 560px) {
+  .agent-surface-head > .agent-surface-mascot {
+    width: 56px;
+    height: 56px;
+    margin-top: -4px;
+  }
+}
+.ag-empty .ag-empty-mascot {
+  margin: 0 auto 4px;
+}
+.ag-composer-wrap {
+  position: relative;
+}
+/* Its own strip above the input, so it never covers a message or notice;
+   only its feet rest on the composer's top edge. */
+.ag-composer-wrap.has-mascot {
+  padding-top: 36px;
+}
+.ag-composer-mascot {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 22px;
+  pointer-events: none;
+}
+
+/* Idle: a slow float, a blink every few seconds, the spark twinkles. */
+.mavi-mascot.is-idle .mm-figure {
+  animation: mm-float 4.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.mavi-mascot.is-idle .mm-shadow {
+  animation: mm-shadow 4.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.mavi-mascot:is(.is-idle, .is-typing) .mm-eye {
+  animation: mm-blink 5.6s ease-in-out infinite;
+}
+.mavi-mascot.is-idle .mm-spark {
+  animation: mm-twinkle 3.2s ease-in-out infinite;
+}
+/* Typing: attentive. Leans a little towards the input and looks down at it. */
+.mavi-mascot.is-typing .mm-figure {
+  transform: rotate(-4deg) translateY(1px);
+}
+.mavi-mascot.is-typing .mm-pupil {
+  transform: translate(-0.6px, 1.4px);
+}
+.mavi-mascot.is-typing .mm-spark {
+  opacity: 0.5;
+}
+/* Thinking: looks up, breathes, three dots pulse instead of the spark. */
+.mavi-mascot.is-thinking .mm-figure {
+  animation: mm-breathe 2.2s ease-in-out infinite;
+}
+.mavi-mascot.is-thinking .mm-pupil {
+  transform: translate(1.2px, -1.6px);
+}
+.mavi-mascot.is-thinking .mm-smile {
+  opacity: 0;
+}
+.mavi-mascot.is-thinking .mm-flat {
+  opacity: 1;
+}
+.mavi-mascot.is-thinking .mm-spark {
+  opacity: 0;
+}
+.mavi-mascot.is-thinking .mm-dots {
+  opacity: 1;
+}
+.mavi-mascot.is-thinking .mm-dots circle {
+  animation: mm-dot 1.2s ease-in-out infinite;
+}
+.mavi-mascot.is-thinking .mm-dots circle:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.mavi-mascot.is-thinking .mm-dots circle:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.mavi-mascot.is-thinking .mm-arm-r {
+  animation: mm-wave 2.2s ease-in-out infinite;
+}
+/* Done: one small hop with happy eyes, then back to idle (state change). */
+.mavi-mascot.is-done .mm-figure {
+  animation: mm-hop 700ms var(--ease-out) 1;
+}
+.mavi-mascot.is-done .mm-eyes {
+  opacity: 0;
+}
+.mavi-mascot.is-done .mm-happy {
+  opacity: 1;
+}
+.mavi-mascot.is-done .mm-spark {
+  animation: mm-twinkle 900ms ease-in-out 1;
+}
+/* Error: concerned, a slight droop. Never cheerful. */
+.mavi-mascot.is-error .mm-figure {
+  transform: rotate(3deg) translateY(1.5px);
+}
+.mavi-mascot.is-error .mm-smile,
+.mavi-mascot.is-error .mm-spark,
+.mavi-mascot.is-error .mm-cheek {
+  opacity: 0;
+}
+.mavi-mascot.is-error .mm-sad {
+  opacity: 1;
+}
+.mavi-mascot.is-error .mm-eye {
+  transform: scaleY(0.82);
+}
+.mm-eyes,
+.mm-happy,
+.mm-smile,
+.mm-flat,
+.mm-sad,
+.mm-dots,
+.mm-spark,
+.mm-cheek {
+  transition: opacity 200ms ease;
+}
+@keyframes mm-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+@keyframes mm-shadow {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.16;
+  }
+  50% {
+    transform: scaleX(0.86);
+    opacity: 0.1;
+  }
+}
+@keyframes mm-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes mm-twinkle {
+  0%,
+  100% {
+    transform: scale(0.85) rotate(0deg);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.1) rotate(20deg);
+    opacity: 1;
+  }
+}
+@keyframes mm-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.025, 0.985) translateY(-1px);
+  }
+}
+@keyframes mm-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-1.5px);
+  }
+}
+@keyframes mm-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-14deg);
+  }
+}
+@keyframes mm-hop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-5px) scale(1.02, 0.98);
+  }
+  70% {
+    transform: translateY(0) scale(1.03, 0.97);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* ================= Interaction polish ================= */
 /* One focus ring everywhere, keyboard only. */
 .app-shell :is(a, button, [role="button"], [role="tab"], [role="menuitem"], summary, select, input[type="checkbox"], input[type="radio"]):focus-visible {
@@ -197,15 +482,22 @@
   .mavix-brand .mavix-mark {
     animation: none;
   }
-  /* Product decision: the AI input light keeps gliding, more slowly.
-     !important beats the global animation: none in interactions.css. */
-  .composer {
-    --gb-speed: 14s;
+  /* Reduced motion: no travelling light. While typing or thinking the
+     composer shows a calm, static purple edge instead. */
+  .composer > .glow-border {
+    display: none;
   }
-  .glow-border rect {
-    animation: gb-glide var(--gb-speed) linear infinite !important;
+  .composer[data-glow] {
+    --gb-edge: rgba(109, 40, 217, 0.32);
+    border-color: var(--gb-edge);
   }
 
+  /* Mavi stays still; the state still shows in the face (eyes, mouth). */
+  .mavi-mascot *,
+  .mavi-mascot .mm-figure {
+    animation: none !important;
+    transition: none !important;
+  }
   .mavi-avatar .mavi,
   .mavix-brand .mavix-mark,
   .app-shell .button,

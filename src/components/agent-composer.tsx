@@ -36,6 +36,7 @@ export function AgentComposer({
   suggestions,
   defaultText = "",
   attachments = true,
+  onTypingChange,
 }: {
   onSubmit: (text: string, attachments: AgentAttachment[], options: { webSearch: boolean; deepResearch: boolean }) => void;
   placeholder?: string;
@@ -49,6 +50,8 @@ export function AgentComposer({
   defaultText?: string;
   /** File and image upload; off where the receiver cannot process files. */
   attachments?: boolean;
+  /** Reports whether the user has typed something (e.g. for Mavi's attention). */
+  onTypingChange?: (typing: boolean) => void;
 }) {
   const [text, setText] = useState(defaultText);
   const [suggestion, setSuggestion] = useState("");
@@ -69,6 +72,14 @@ export function AgentComposer({
     io.observe(el);
     return () => io.disconnect();
   }, []);
+  // The border light glides only while there is something to send or a real
+  // request is running; otherwise the composer shows its calm border.
+  const hasContent = !!text.trim() || files.length > 0;
+  const glowing = hasContent || busy;
+  const typing = !!text.trim();
+  useEffect(() => {
+    onTypingChange?.(typing);
+  }, [typing, onTypingChange]);
   const filePicker = useRef<HTMLInputElement>(null);
   const imagePicker = useRef<HTMLInputElement>(null);
   const latest = useRef<AgentAttachment[]>([]);
@@ -139,6 +150,7 @@ export function AgentComposer({
       ref={formRef}
       className={"composer composer-" + size + (dragging ? " is-dragging" : "")}
       data-busy={busy || undefined}
+      data-glow={glowing || undefined}
       data-paused={!inView || undefined}
       onSubmit={submit}
       onDragOver={(e) => drag(e, true)}

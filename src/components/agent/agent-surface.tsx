@@ -1,5 +1,6 @@
 "use client";
-import { MaviAvatar } from "@/components/mavi";
+import { useState } from "react";
+import { MaviMascot, useMascotState } from "@/components/mavi";
 import { AgentComposer } from "@/components/agent-composer";
 import { useAgent } from "./agent-provider";
 import { AgentPrompts } from "./agent-prompts";
@@ -26,10 +27,14 @@ export function AgentSurface({ name }: { name?: string }) {
   const { ask, busy } = useAgent();
   const send = (text: string) => ask(text);
   const hello = greeting(new Date().getHours());
+  const [typing, setTyping] = useState(false);
+  // The dashboard hands the question to the Agent workspace, so there is no
+  // reply here: Mavi listens while you type and thinks while it hands over.
+  const mascot = useMascotState({ typing, busy, outcome: null });
   return (
     <section className="agent-surface" aria-labelledby="agent-surface-title">
       <div className="agent-surface-head">
-        <MaviAvatar size={48} state={busy ? "thinking" : "idle"} />
+        <MaviMascot size={76} state={mascot} className="agent-surface-mascot" />
         <div>
           <p className="agent-surface-eyebrow">
             <span className="agent-surface-dot" aria-hidden="true" />
@@ -47,6 +52,7 @@ export function AgentSurface({ name }: { name?: string }) {
         busy={busy}
         attachments={false}
         onSubmit={(text) => send(text)}
+        onTypingChange={setTyping}
         placeholder="Vraag Mavi iets of geef een opdracht"
         suggestions={SUGGESTIONS}
       />

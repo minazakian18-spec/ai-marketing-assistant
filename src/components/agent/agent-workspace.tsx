@@ -24,7 +24,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { MaviAvatar } from "@/components/mavi";
+import { MaviAvatar, MaviMascot, useMascotState } from "@/components/mavi";
 import { Menu, type MenuItem } from "@/components/menu";
 import { IconButton } from "@/components/ui";
 import { AgentComposer } from "@/components/agent-composer";
@@ -102,6 +102,10 @@ export function AgentWorkspace() {
   const [moreMessages, setMoreMessages] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
+  // Mavi's state: typing in the composer, and the real outcome of the last request.
+  const [typing, setTyping] = useState(false);
+  const [outcome, setOutcome] = useState<{ result: "ok" | "error"; at: number } | null>(null);
+  const mascot = useMascotState({ typing, busy: sending, outcome });
   const [notice, setNotice] = useState("");
   const [draft, setDraft] = useState({ text: "", key: 0 });
 
@@ -249,6 +253,7 @@ export function AgentWorkspace() {
       });
       setSending(false);
       setActivity(r.ok ? "done" : "idle");
+      setOutcome({ result: r.ok && r.body.reply?.status !== "failed" && !!r.body.conversation ? "ok" : "error", at: Date.now() });
       if (r.body.configured === false) {
         setConfigured(false);
         setMessages((m) => m.filter((x) => x.id !== tempId));
@@ -602,7 +607,7 @@ export function AgentWorkspace() {
           <div className="ag-column">
             {empty ? (
               <div className="ag-empty">
-                <MaviAvatar size={60} />
+                <MaviMascot size={92} state={mascot} className="ag-empty-mascot" />
                 <h2>Waar werken we vandaag aan?</h2>
                 <p>Mavi is je marketingassistent. Hij kent je Brand Hub en werkruimte, schrijft teksten en plannen, en wijst je de weg in Mavix. Hij publiceert of verstuurt nooit zelf iets.</p>
                 <ul className="ag-suggestions" aria-label="Voorbeelden">
@@ -725,15 +730,20 @@ export function AgentWorkspace() {
                 De Mavix Agent hoort bij Premium. Je eerdere gesprekken blijven leesbaar; in de andere modules gebruik je AI gewoon binnen je pakket.
               </UpgradeNotice>
             ) : (
-              <AgentComposer
-                key={draft.key}
-                size="large"
-                attachments={false}
-                defaultText={draft.text}
-                busy={sending}
-                onSubmit={(text) => void send(text)}
-                placeholder="Vraag Mavi om een plan, tekst of idee"
-              />
+              <div className={"ag-composer-wrap" + (!empty ? " has-mascot" : "")}>
+                {/* In a conversation, Mavi sits on top of the input (the large one shows in the empty state). */}
+                {!empty && <MaviMascot size={46} state={mascot} className="ag-composer-mascot" />}
+                <AgentComposer
+                  key={draft.key}
+                  size="large"
+                  attachments={false}
+                  defaultText={draft.text}
+                  busy={sending}
+                  onSubmit={(text) => void send(text)}
+                  onTypingChange={setTyping}
+                  placeholder="Vraag Mavi om een plan, tekst of idee"
+                />
+              </div>
             )}
             <p className="ag-disclaimer">Mavi kan fouten maken. Controleer feiten, prijzen en acties voordat je iets publiceert.</p>
           </div>
