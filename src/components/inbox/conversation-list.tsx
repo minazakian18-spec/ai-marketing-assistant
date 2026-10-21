@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { ListFilter, Search, X } from "lucide-react";
 import { Menu, type MenuItem } from "@/components/menu";
 import { BrandIcon } from "@/components/brand-icon";
-import { capabilities, type Channel, type ConversationView } from "@/lib/inbox/shared";
+import type { Channel, ConversationView } from "@/lib/inbox/shared";
 import { CHANNEL_NAME, type SortOrder } from "./channel-rail";
 import { initials, listTime } from "./format";
 
@@ -37,7 +37,6 @@ export function ConversationList({
   hasMore,
   unread,
   sort,
-  onChannel,
   onStatus,
   onSort,
   onQuery,
@@ -55,7 +54,6 @@ export function ConversationList({
   hasMore: boolean;
   unread: number;
   sort: SortOrder;
-  onChannel: (c: Channel | "") => void;
   onStatus: (s: StatusFilter) => void;
   onSort: (s: SortOrder) => void;
   onQuery: (q: string) => void;
@@ -66,7 +64,8 @@ export function ConversationList({
   /** Second-stage paging after the stored list ends (older Gmail). */
   extraMore?: { label: string; busy: boolean; onClick: () => void } | null;
 }) {
-  const filtered = channel !== "" || status !== "open";
+  // The channel is always chosen in the rail; only the folder is a filter here.
+  const filtered = status !== "open";
   // Channels and folders live in the channel rail; on phones this menu offers
   // the folders and the sort order.
   const items: MenuItem[] = [
@@ -81,7 +80,10 @@ export function ConversationList({
     <aside className="ib-list" aria-label="Gesprekken">
       <div className="ib-list-head">
         <div className="ib-list-title">
-          <h2>{channel ? CHANNEL_NAME[channel] : "Alle berichten"}</h2>
+          <h2>
+            {channel && <BrandIcon brand={channel} size={18} />}
+            {channel ? CHANNEL_NAME[channel] : "Inbox"}
+          </h2>
           {unread > 0 && <span className="ib-count">{unread} ongelezen</span>}
         </div>
         <div className="ib-search-row">
@@ -94,19 +96,10 @@ export function ConversationList({
         </div>
         {filtered && (
           <div className="ib-active-filters">
-            {channel && (
-              <button type="button" onClick={() => onChannel("")}>
-                <BrandIcon brand={channel} size={12} />
-                {capabilities[channel].label}
-                <X size={12} aria-label="Kanaalfilter wissen" />
-              </button>
-            )}
-            {status !== "open" && (
-              <button type="button" onClick={() => onStatus("open")}>
-                {STATUS_LABEL[status]}
-                <X size={12} aria-label="Statusfilter wissen" />
-              </button>
-            )}
+            <button type="button" onClick={() => onStatus("open")}>
+              {STATUS_LABEL[status]}
+              <X size={12} aria-label="Statusfilter wissen" />
+            </button>
           </div>
         )}
       </div>

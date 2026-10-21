@@ -13,6 +13,7 @@ import { CHANNEL_NAME, ChannelRail, type ChannelState, type SortOrder } from "@/
 import { Thread, type ConversationPatch, type Detail, type RewriteStyle, type SendPayload, type Template } from "@/components/inbox/thread";
 import { ContextPanel } from "@/components/inbox/context-panel";
 import { DEMO_MEMBERS, demoDetail, demoThreads } from "@/lib/inbox/demo";
+import { defaultChannel, INBOX_CHANNEL_KEY } from "@/lib/inbox/channel-default";
 import "../../inbox.css";
 
 const PROBLEM: Partial<Record<ChannelState["state"], string>> = {
@@ -62,6 +63,7 @@ export default function InboxPage() {
   const [outbox, setOutbox] = useState<Record<string, Outgoing>>({});
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const filterKey = useRef("");
+  const demoUnreadRef = useRef<Partial<Record<Channel, number>>>({});
   // Test mode only: labelled example threads, changed locally, never sent.
   const [demoData, setDemoData] = useState<ReturnType<typeof demoThreads>>([]);
   const [detailsOpen, setDetailsOpen] = useState(true);
@@ -74,6 +76,8 @@ export default function InboxPage() {
   useEffect(() => {
     setDemo(isBrowserDemo());
     setReady(true);
+    // The contact panel starts open only where the conversation keeps enough room.
+    setDetailsOpen(window.matchMedia("(min-width: 1600px)").matches);
   }, []);
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(query.trim()), 300);
@@ -208,6 +212,31 @@ export default function InboxPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, demo, gmailReady]);
+
+  // Channel-first: as soon as the channel states are known, open a sensible
+  // channel (last choice if still connected, else the busiest connected one).
+  // The first, unfiltered request only serves to learn those states.
+  useEffect(() => {
+    if (channel || !channels) return;
+    let remembered: string | null = null;
+    try {
+      remembered = window.localStorage.getItem(INBOX_CHANNEL_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+    setChannel(defaultChannel(channels, demo ? demoUnreadRef.current : unreadByChannel, remembered));
+  }, [channel, channels, unreadByChannel, demo]);
+  function chooseChannel(c: Channel) {
+    setChannel(c);
+    setView("list");
+    setSelected(null);
+    setDetail(null);
+    try {
+      window.localStorage.setItem(INBOX_CHANNEL_KEY, c);
+    } catch {
+      /* storage unavailable */
+    }
+  }
 
   useEffect(() => {
     if (!notice) return;
@@ -421,7 +450,9 @@ export default function InboxPage() {
     for (const t of demoData) if (t.conversation.unread > 0) out[t.conversation.channel] = (out[t.conversation.channel] || 0) + 1;
     return out;
   }, [demoData]);
-  const list = demo ? demoList : conversations;
+  demoUnreadRef.current = demoUnread;
+  // Until a channel is chosen nothing is listed (no mixed, all-channel view).
+  const list = !channel ? [] : demo ? demoList : conversations;
   const unread = demo ? demoData.filter((t) => t.conversation.unread > 0).length : unreadTotal;
   function toggleDetails() {
     if (window.matchMedia("(min-width: 1201px)").matches) setDetailsOpen((o) => !o);
@@ -436,21 +467,19 @@ export default function InboxPage() {
   // Empty states of the conversation list: per channel a connect or repair
   // prompt, so every channel can be opened from the rail.
   const current = channel ? channels?.find((c) => c.channel === channel) : undefined;
-  const listEmpty = demo ? undefined : channel === "" ? (
-    nothingLinked ? (
-      <div className="ib-list-connect">
-        <div className="ib-empty-brands" aria-hidden="true">
-          {(["instagram", "whatsapp", "gmail", "messenger"] as Channel[]).map((c) => (
-            <BrandIcon key={c} brand={c} size={20} />
-          ))}
-        </div>
-        <p>Koppel Instagram, WhatsApp, Gmail of Messenger om je klantgesprekken hier te ontvangen en te beantwoorden.</p>
-        <Link className="button primary" href="/account/integraties">
-          <Plug size={15} />
-          Kanaal koppelen
-        </Link>
+  const listEmpty = demo || channel === "" ? undefined : nothingLinked ? (
+    <div className="ib-list-connect">
+      <div className="ib-empty-brands" aria-hidden="true">
+        {(["instagram", "whatsapp", "gmail", "messenger"] as Channel[]).map((c) => (
+          <BrandIcon key={c} brand={c} size={20} />
+        ))}
       </div>
-    ) : undefined
+      <p>Koppel Instagram, WhatsApp, Gmail of Messenger om je klantgesprekken hier te ontvangen en te beantwoorden.</p>
+      <Link className="button primary" href="/account/integraties">
+        <Plug size={15} />
+        Kanaal koppelen
+      </Link>
+    </div>
   ) : !current || current.state === "not_connected" ? (
     <div className="ib-list-connect">
       <BrandIcon brand={channel} size={22} />
@@ -475,7 +504,7 @@ export default function InboxPage() {
     <p className="ib-list-empty">Nog geen gesprekken via {CHANNEL_NAME[channel]}. Nieuwe berichten verschijnen hier automatisch.</p>
   );
   return (
-    <div className="ib" data-view={view} data-details={detailsOpen ? "open" : "closed"}>
+    <div className="ib" data-view={view} data-details={detailsOpen ? "open" : "closed"} data-open={shown ? "yes" : "no"}>
       <header className="ib-head">
         <div>
           <h1>Inbox</h1>
@@ -516,28 +545,23 @@ export default function InboxPage() {
         <ChannelRail
           channels={channels}
           unreadByChannel={demo ? demoUnread : unreadByChannel}
-          unreadTotal={unread}
           channel={channel}
           status={status}
           sort={sort}
-          onChannel={(c) => {
-            setChannel(c);
-            setView("list");
-          }}
+          onChannel={chooseChannel}
           onStatus={setStatus}
           onSort={setSort}
         />
         <ConversationList
           conversations={list}
-          unread={channel ? (demo ? demoUnread : unreadByChannel)[channel] || 0 : unread}
+          unread={channel ? (demo ? demoUnread : unreadByChannel)[channel] || 0 : 0}
           selectedId={selected}
           channel={channel}
           status={status}
           sort={sort}
           query={query}
-          loading={loading}
-          hasMore={!demo && !!cursor}
-          onChannel={setChannel}
+          loading={loading || !channel}
+          hasMore={!demo && !!channel && !!cursor}
           onStatus={setStatus}
           onSort={setSort}
           onQuery={setQuery}
@@ -545,7 +569,7 @@ export default function InboxPage() {
           onMore={() => void loadList(true)}
           empty={listEmpty}
           extraMore={
-            !demo && gmailConnected && !gmailOlder.done && !debounced && status !== "resolved" && sort === "newest" && (channel === "" || channel === "gmail")
+            !demo && gmailConnected && !gmailOlder.done && !debounced && status !== "resolved" && sort === "newest" && channel === "gmail"
               ? { label: "Oudere e-mails laden", busy: gmailOlder.busy, onClick: () => void loadOlderGmail() }
               : null
           }

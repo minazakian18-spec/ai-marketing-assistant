@@ -82,10 +82,12 @@ export function DashboardTodos({ todos }: { todos: Todo[] }) {
         </div>
       )}
       {(hidden > 0 || showAll) && allOpen.length > 3 && (
-        <button type="button" className="todo-done-toggle" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
-          {showAll ? "Alleen de belangrijkste tonen" : `Nog ${hidden} ${hidden === 1 ? "stap" : "stappen"}`}
-          <ChevronDown size={14} aria-hidden="true" />
-        </button>
+        <div className="todo-more">
+          <button type="button" className="todo-done-toggle" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
+            {showAll ? "Alleen de belangrijkste tonen" : `Nog ${hidden} ${hidden === 1 ? "stap" : "stappen"}`}
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
+        </div>
       )}
       {done.length > 0 && (
         <div className="todo-done">

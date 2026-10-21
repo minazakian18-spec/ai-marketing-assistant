@@ -1,7 +1,8 @@
 "use client";
-import { Archive, ArrowDownWideNarrow, ArrowUpWideNarrow, CircleDot, Inbox, MessagesSquare, UserRound } from "lucide-react";
+import { Archive, ArrowDownWideNarrow, ArrowUpWideNarrow, CircleDot, Inbox, UserRound } from "lucide-react";
 import { BrandIcon } from "@/components/brand-icon";
 import type { Channel } from "@/lib/inbox/shared";
+import { CHANNEL_ORDER } from "@/lib/inbox/channel-default";
 import type { StatusFilter } from "./conversation-list";
 
 // Left column of the Inbox: channels (with connection state and unread
@@ -11,7 +12,7 @@ import type { StatusFilter } from "./conversation-list";
 export type ChannelState = { channel: Channel; state: "not_connected" | "connected" | "reconsent" | "reconnect" | "selection" | "error"; account: string };
 export type SortOrder = "newest" | "oldest";
 
-export const CHANNEL_ORDER: Channel[] = ["instagram", "whatsapp", "gmail", "messenger"];
+export { CHANNEL_ORDER };
 export const CHANNEL_NAME: Record<Channel, string> = {
   instagram: "Instagram Direct",
   whatsapp: "WhatsApp Business",
@@ -47,7 +48,6 @@ function Count({ n, label }: { n: number; label: string }) {
 export function ChannelRail({
   channels,
   unreadByChannel,
-  unreadTotal,
   channel,
   status,
   sort,
@@ -57,11 +57,10 @@ export function ChannelRail({
 }: {
   channels: ChannelState[] | null;
   unreadByChannel: Partial<Record<Channel, number>>;
-  unreadTotal: number;
   channel: Channel | "";
   status: StatusFilter;
   sort: SortOrder;
-  onChannel: (c: Channel | "") => void;
+  onChannel: (c: Channel) => void;
   onStatus: (s: StatusFilter) => void;
   onSort: (s: SortOrder) => void;
 }) {
@@ -71,15 +70,6 @@ export function ChannelRail({
       <div className="ib-rail-group">
         <h3 className="ib-rail-heading">Kanalen</h3>
         <ul className="ib-rail-list">
-          <li>
-            <button type="button" className="ib-rail-item" aria-current={channel === "" ? "true" : undefined} onClick={() => onChannel("")} title="Alle berichten">
-              <span className="ib-rail-icon">
-                <MessagesSquare size={17} aria-hidden="true" />
-              </span>
-              <span className="ib-rail-label">Alle berichten</span>
-              <Count n={unreadTotal} label="ongelezen" />
-            </button>
-          </li>
           {CHANNEL_ORDER.map((c) => {
             const s = state(c);
             return (

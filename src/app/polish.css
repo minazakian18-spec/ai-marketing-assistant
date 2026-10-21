@@ -760,6 +760,14 @@
   font-size: 13px;
   color: var(--app-muted);
 }
+/* "Nog X stappen": same inner padding as the list and the done block, with
+   room above the card edge. */
+.todo-more {
+  margin: 2px 18px 14px;
+}
+.todo-more + .todo-done {
+  margin-top: -4px;
+}
 .todo-done {
   margin: 0 18px 14px;
   padding-top: 10px;
