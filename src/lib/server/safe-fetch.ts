@@ -24,17 +24,41 @@ function privateV4(ip: string) {
     (a === 198 && (b === 18 || b === 19))
   );
 }
+/** IPv6 as 8 numbers, whatever the notation (::, leading zeros, embedded IPv4). */
+function hextets(ip: string): number[] | null {
+  let x = ip.toLowerCase().split("%")[0];
+  const v4 = x.match(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (v4) {
+    const [a, b, c, d] = v4.slice(1).map(Number);
+    x = x.slice(0, v4.index) + ((a << 8) | b).toString(16) + ":" + ((c << 8) | d).toString(16);
+  }
+  const [head, tail] = x.split("::");
+  const h = head ? head.split(":") : [];
+  const t = tail !== undefined && tail ? tail.split(":") : [];
+  const parts = x.includes("::") ? [...h, ...Array(8 - h.length - t.length).fill("0"), ...t] : h;
+  if (parts.length !== 8) return null;
+  return parts.map((p) => parseInt(p, 16));
+}
+const v4of = (hi: number, lo: number) => [hi >> 8, hi & 255, lo >> 8, lo & 255].join(".");
+
 export function isPublicAddress(ip: string) {
   const v = isIP(ip);
   if (v === 4) return !privateV4(ip);
-  if (v === 6) {
-    const x = ip.toLowerCase();
-    if (x === "::" || x === "::1") return false;
-    const mapped = x.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return !privateV4(mapped[1]);
-    return !/^(fc|fd|fe8|fe9|fea|feb|ff)/.test(x);
-  }
-  return false;
+  if (v !== 6) return false;
+  const w = hextets(ip);
+  if (!w || w.some((n) => Number.isNaN(n))) return false;
+  const zero = (from: number, to: number) => w.slice(from, to).every((n) => n === 0);
+  // ::, ::1 and IPv4-compatible ::a.b.c.d
+  if (zero(0, 6)) return false;
+  // IPv4-mapped ::ffff:a.b.c.d and NAT64 64:ff9b::a.b.c.d: judge the IPv4 address.
+  if (zero(0, 5) && w[5] === 0xffff) return !privateV4(v4of(w[6], w[7]));
+  if (w[0] === 0x64 && w[1] === 0xff9b && zero(2, 6)) return !privateV4(v4of(w[6], w[7]));
+  // 6to4 2002:a.b.c.d::/48 embeds an IPv4 address too.
+  if (w[0] === 0x2002) return !privateV4(v4of(w[1], w[2]));
+  // Teredo, unique local fc00::/7, link-local fe80::/10, site-local, multicast.
+  if (w[0] === 0x2001 && w[1] === 0) return false;
+  if ((w[0] & 0xfe00) === 0xfc00 || (w[0] & 0xffc0) === 0xfe80 || (w[0] & 0xffc0) === 0xfec0 || (w[0] & 0xff00) === 0xff00) return false;
+  return true;
 }
 
 async function resolvePublic(host: string) {

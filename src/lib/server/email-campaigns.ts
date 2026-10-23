@@ -103,11 +103,37 @@ export async function sendTest(o: { workspaceId: string; userId: string; email: 
  * once. Records a run and a delivery row per recipient (no addresses stored),
  * then marks the campaign as sent in the workspace.
  */
+const STALE_MS = 15 * 60 * 1000;
+
+/** Close a run that stopped half-way: confirmed e-mails count as sent, the rest as not sent. */
+async function closeInterrupted(run: { id: string; recipients: number }) {
+  const { data: rows } = await db().from("email_deliveries").select("status").eq("run_id", run.id).limit(MAX_RECIPIENTS);
+  const sent = (rows || []).filter((r) => ["sent", "delivered", "opened", "clicked"].includes(r.status as string)).length;
+  const failed = Math.max(0, run.recipients - sent);
+  const status = !sent ? "failed" : failed ? "partial" : "sent";
+  const at = new Date().toISOString();
+  await db().from("email_deliveries").update({ status: "failed", error: "Verzending onderbroken.", updated_at: at }).eq("run_id", run.id).eq("status", "queued");
+  await db()
+    .from("email_campaign_runs")
+    .update({ status, sent, failed, updated_at: at, error: failed ? `Verzending onderbroken: ${failed} e-mail(s) niet verstuurd.` : null })
+    .eq("id", run.id)
+    .eq("status", "sending");
+  console.error(JSON.stringify({ event: "email_campaign_interrupted", sent, failed }));
+  return { status, sent, recipients: run.recipients, repeated: true };
+}
+
 export async function sendCampaign(o: { workspaceId: string; userId: string | null; trigger: "manual" | "automation" }, campaignId: string) {
   const cap = sendingCapability();
   if (!cap.ready) throw new HttpError(409, cap.message);
-  const { data: existing } = await db().from("email_campaign_runs").select("id,status,sent,recipients").eq("workspace_id", o.workspaceId).eq("campaign_id", campaignId).eq("kind", "send").in("status", ["sending", "sent", "partial"]).limit(1);
-  if (existing?.[0]?.status === "sending") throw new HttpError(409, "Deze campagne wordt al verstuurd.");
+  const { data: existing } = await db().from("email_campaign_runs").select("id,status,sent,recipients,updated_at").eq("workspace_id", o.workspaceId).eq("campaign_id", campaignId).eq("kind", "send").in("status", ["sending", "sent", "partial"]).limit(1);
+  if (existing?.[0]?.status === "sending") {
+    // A run updates updated_at after every batch. One that has been silent
+    // for 15 minutes was interrupted (restart, time-out): close it honestly
+    // from what was confirmed. Nothing is sent again, so nobody gets the
+    // campaign twice.
+    if (Date.now() - Date.parse(existing[0].updated_at as string) < STALE_MS) throw new HttpError(409, "Deze campagne wordt al verstuurd.");
+    return closeInterrupted(existing[0] as { id: string; recipients: number });
+  }
   if (existing?.[0]) return { status: existing[0].status as string, sent: existing[0].sent as number, recipients: existing[0].recipients as number, repeated: true };
 
   const { c, profile } = await loadCampaign(o.workspaceId, campaignId);
@@ -164,6 +190,8 @@ export async function sendCampaign(o: { workspaceId: string; userId: string | nu
       failed += chunk.length;
       await db().from("email_deliveries").update({ status: "failed", error: (e instanceof HttpError ? e.message : "Verzenden mislukt.").slice(0, 300), updated_at: new Date().toISOString() }).eq("run_id", run.id).eq("status", "queued");
     }
+    // Heartbeat: shows the run is still alive (see STALE_MS).
+    await db().from("email_campaign_runs").update({ sent, failed, updated_at: new Date().toISOString() }).eq("id", run.id);
   }
   const status = !sent ? "failed" : failed ? "partial" : "sent";
   await db().from("email_campaign_runs").update({ status, sent, failed, updated_at: new Date().toISOString(), error: failed ? `${failed} e-mail(s) niet verstuurd.` : null }).eq("id", run.id);

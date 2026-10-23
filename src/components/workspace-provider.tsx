@@ -151,8 +151,10 @@ export function WorkspaceProvider({
         body: JSON.stringify({ data: next, version: version.current }),
       });
       const result = await response.json().catch(() => ({}));
-      // Another device or tab saved first: never overwrite their work.
-      if (response.status === 409) setConflict(true);
+      // Another device or tab saved first: never overwrite their work. Other
+      // 409s are rules (e.g. an unsubscribed contact): reloading would only
+      // throw away the change, so no reload button for those.
+      if (response.status === 409 && result.code === "version_conflict") setConflict(true);
       if (!response.ok) throw new Error(result.error || "Opslaan mislukt.");
       version.current = result.version;
       setData(next);
@@ -161,7 +163,9 @@ export function WorkspaceProvider({
       setSavedAt(Date.now());
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Opslaan mislukt.");
+      // fetch itself failing (offline, connection reset) gives a browser
+      // message in English; say what happened in plain Dutch.
+      setError(e instanceof TypeError ? "Geen verbinding met Mavix. Je wijziging is niet opgeslagen; probeer het opnieuw." : e instanceof Error ? e.message : "Opslaan mislukt.");
       setSaveState("error");
       return false;
     } finally {

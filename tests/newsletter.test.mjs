@@ -351,3 +351,19 @@ test("forms API: owners create forms; members cannot; double opt-in needs e-mail
   const list = await (await f.formsRoute.GET()).json();
   assert.equal(list.forms.length, 0, "other workspace sees none");
 });
+
+test("save errors: only a real version conflict is reported as 'saved elsewhere'; rule refusals are not", async (t) => {
+  const f = setup(t);
+  const loaded = await (await f.workspaceGet()).json();
+  // Stale version: the one case where reloading is the right advice.
+  const stale = await f.workspacePut(loaded.data, loaded.version - 1);
+  assert.equal(stale.status, 409);
+  assert.equal((await stale.json()).code, "version_conflict");
+  // A rule refusal (forged publication) is a 409 too, but without that code.
+  const forged = { ...loaded.data, posts: [{ id: "p1", status: "published" }] };
+  const refused = await f.workspacePut(forged, loaded.version);
+  assert.equal(refused.status, 409);
+  const body = await refused.json();
+  assert.equal(body.code, undefined);
+  assert.match(body.error, /echte provideractie/);
+});

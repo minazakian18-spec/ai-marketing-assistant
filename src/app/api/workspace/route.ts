@@ -1,5 +1,6 @@
 import {NextResponse} from 'next/server';
 import {workspace,failure,HttpError,sameOrigin,limited} from '@/lib/server/access';
+import {adminClient} from '@/lib/server/supabase';
 import {emptyWorkspace} from '@/lib/storage';
 import {applyContactUnsubscribes,contactConsentGuard,syncNewsletterContacts} from '@/lib/server/newsletter';
 import type {Contact} from '@/lib/types';
@@ -40,4 +41,8 @@ export async function PUT(request:Request){try{sameOrigin(request);const {db,wor
  const wp=await workspacePlan(workspaceId);if(after.length>before.length&&after.length>wp.plan.contacts)throw new HttpError(402,`Je ${wp.plan.name}-abonnement heeft ruimte voor ${wp.plan.contacts.toLocaleString('nl-NL')} contacten. Verwijder contacten of kies een groter abonnement.`);
  // Refuse re-subscribing suppressed addresses; record new unsubscribes first.
  await contactConsentGuard(workspaceId,before,after);await applyContactUnsubscribes(workspaceId,before,after);
- delete data.account;delete data.integrations;delete data.notifications;const {data:updated,error}=await db.from('business_profiles').update({data,version:version+1,updated_at:new Date().toISOString()}).eq('workspace_id',workspaceId).eq('version',version).select('version').maybeSingle();if(error)throw new HttpError(503,'Opslaan is niet gelukt.');if(!updated)throw new HttpError(409,'De werkruimte is elders gewijzigd. Herlaad voor je opnieuw opslaat.');return NextResponse.json(updated);}catch(e){if(e instanceof z.ZodError)return failure(new HttpError(400,'Ongeldige werkruimtegegevens.'));return failure(e);}}
+ delete data.account;delete data.integrations;delete data.notifications;
+ // Written with the service role after every check above: browsers have no direct
+ // write access to business_profiles (202610230002_business_profiles_server_writes.sql).
+ const {data:updated,error}=await adminClient().from('business_profiles').update({data,version:version+1,updated_at:new Date().toISOString()}).eq('workspace_id',workspaceId).eq('version',version).select('version').maybeSingle();if(error)throw new HttpError(503,'Opslaan is niet gelukt.');// The only 409 that means "saved elsewhere": the client offers a reload for this code alone.
+ if(!updated)return NextResponse.json({error:'De werkruimte is elders gewijzigd. Herlaad voor je opnieuw opslaat.',code:'version_conflict'},{status:409});return NextResponse.json(updated);}catch(e){if(e instanceof z.ZodError)return failure(new HttpError(400,'Ongeldige werkruimtegegevens.'));return failure(e);}}

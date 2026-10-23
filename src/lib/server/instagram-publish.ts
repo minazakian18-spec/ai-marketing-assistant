@@ -157,7 +157,10 @@ async function publishToInstagram(workspaceId: string, post: Post) {
   }
 }
 
-export type PublishResult = { status: "published"; mediaId: string; permalink?: string; repeated: boolean };
+/** A claim older than this without result was interrupted (Meta calls take seconds). */
+const STALE_MS = 15 * 60 * 1000;
+
+export type PublishResult ={ status: "published"; mediaId: string; permalink?: string; repeated: boolean };
 
 /**
  * Publishes one approved or scheduled Mavix post to Instagram, at most once.
@@ -166,10 +169,20 @@ export type PublishResult = { status: "published"; mediaId: string; permalink?: 
  */
 export async function publishPost(o: { workspaceId: string; userId: string | null; trigger: "manual" | "automation" }, postId: string): Promise<PublishResult> {
   if (!/^[\w-]{1,80}$/.test(postId)) throw new HttpError(404, "Deze post bestaat niet.");
-  const { data: done } = await db().from("instagram_publications").select("id,status,media_id,permalink").eq("workspace_id", o.workspaceId).eq("post_id", postId).in("status", ["publishing", "published"]).limit(1);
+  const { data: done } = await db().from("instagram_publications").select("id,status,media_id,permalink,updated_at").eq("workspace_id", o.workspaceId).eq("post_id", postId).in("status", ["publishing", "published"]).limit(1);
   const previous = done?.[0];
   if (previous?.status === "published") return { status: "published", mediaId: String(previous.media_id), permalink: previous.permalink || undefined, repeated: true };
-  if (previous?.status === "publishing") throw new HttpError(409, "Deze post wordt al gepubliceerd.");
+  if (previous?.status === "publishing") {
+    if (Date.now() - Date.parse(previous.updated_at as string) < STALE_MS) throw new HttpError(409, "Deze post wordt al gepubliceerd.");
+    // Interrupted (restart, time-out): Mavix cannot know whether Instagram
+    // received it. Release the claim with a warning instead of publishing
+    // again on its own; the user checks Instagram and decides.
+    const message = "Het publiceren is onderbroken. Controleer op Instagram of de post er al staat voordat je opnieuw publiceert.";
+    await db().from("instagram_publications").update({ status: "failed", error: message, updated_at: new Date().toISOString() }).eq("id", previous.id).eq("status", "publishing");
+    await mutateWorkspace(o.workspaceId, (data) => ({ data: { ...data, posts: ((data.posts || []) as Post[]).map((p) => (p.id === postId ? { ...p, failureReason: message } : p)) }, result: null })).catch(() => null);
+    console.error(JSON.stringify({ event: "instagram_publish_interrupted" }));
+    throw new HttpError(409, message);
+  }
 
   const cap = await publishCapability(o.workspaceId);
   if (!cap.ready) throw new HttpError(409, cap.message);

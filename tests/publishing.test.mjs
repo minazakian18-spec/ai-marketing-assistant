@@ -117,6 +117,25 @@ test("Instagram: publishes once through the official API, records media id, clea
   assert.equal(calls.length, n, "no second publication");
 });
 
+test("Instagram: an interrupted publication does not block the post forever and is never retried silently", async (t) => {
+  quiet(t);
+  const env = setup();
+  const calls = graphMock(t);
+  const { publishPost } = env.load("src/lib/server/instagram-publish.ts");
+  const old = new Date(Date.now() - 3600000).toISOString();
+  env.tables.instagram_publications.push({ id: "pub-stuck", workspace_id: "w1", post_id: "p1", status: "publishing", created_at: old, updated_at: old });
+  // First click after the interruption: released with a warning, nothing sent to Meta.
+  await assert.rejects(publishPost({ workspaceId: "w1", userId: "u1", trigger: "manual" }, "p1"), /onderbroken.*Controleer op Instagram/s);
+  assert.equal(calls.length, 0);
+  assert.equal(env.tables.instagram_publications[0].status, "failed");
+  assert.match(env.tables.business_profiles[0].data.posts[0].failureReason, /Controleer op Instagram/);
+  // The user checked and clicks again: now it publishes.
+  assert.equal((await publishPost({ workspaceId: "w1", userId: "u1", trigger: "manual" }, "p1")).mediaId, "179900");
+  // A publication that is still running is left alone.
+  env.tables.instagram_publications.push({ id: "pub-live", workspace_id: "w1", post_id: "p9", status: "publishing", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+  await assert.rejects(publishPost({ workspaceId: "w1", userId: "u1", trigger: "manual" }, "p9"), /wordt al gepubliceerd/);
+});
+
 test("Instagram: drafts are refused, provider refusal leaves the post unpublished with a reason", async (t) => {
   quiet(t);
   const env = setup({ posts: [post(), post({ id: "p2", status: "draft" })] });
@@ -225,6 +244,28 @@ test("e-mail: send reaches only consented, unsuppressed subscribers, once, with 
   const again = await lib.sendCampaign({ workspaceId: "w1", userId: "u1", trigger: "manual" }, "e1");
   assert.equal(again.repeated, true);
   assert.equal(sent.length, n);
+});
+
+test("e-mail: a send interrupted half-way is closed honestly instead of blocking the campaign forever", async (t) => {
+  quiet(t);
+  const { env, sent } = mailEnv(t);
+  const lib = env.load("src/lib/server/email-campaigns.ts");
+  const old = new Date(Date.now() - 3600000).toISOString();
+  env.tables.email_campaign_runs.push({ id: "run-stuck", workspace_id: "w1", campaign_id: "e1", kind: "send", status: "sending", recipients: 2, sent: 0, failed: 0, created_at: old, updated_at: old });
+  env.tables.email_deliveries.push(
+    { id: "d1", run_id: "run-stuck", workspace_id: "w1", email_hash: "h1", status: "sent", provider_message_id: "msg_a" },
+    { id: "d2", run_id: "run-stuck", workspace_id: "w1", email_hash: "h2", status: "queued" },
+  );
+  const r = await lib.sendCampaign({ workspaceId: "w1", userId: "u1", trigger: "manual" }, "e1");
+  assert.deepEqual([r.status, r.sent, r.repeated], ["partial", 1, true]);
+  assert.equal(sent.length, 0, "nothing is sent again: no duplicate e-mails");
+  const run = env.tables.email_campaign_runs.find((x) => x.id === "run-stuck");
+  assert.deepEqual([run.status, run.sent, run.failed], ["partial", 1, 1]);
+  assert.match(run.error, /onderbroken/);
+  assert.equal(env.tables.email_deliveries.find((d) => d.id === "d2").status, "failed");
+  // A send that is still running (recent heartbeat) is left alone.
+  env.tables.email_campaign_runs.push({ id: "run-live", workspace_id: "w1", campaign_id: "e2", kind: "send", status: "sending", recipients: 1, sent: 0, failed: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+  await assert.rejects(lib.sendCampaign({ workspaceId: "w1", userId: "u1", trigger: "manual" }, "e2"), /wordt al verstuurd/);
 });
 
 test("e-mail webhook: only valid signatures; bounces mark the delivery and suppress the address", async (t) => {
