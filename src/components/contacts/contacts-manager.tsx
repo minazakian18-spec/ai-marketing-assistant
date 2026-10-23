@@ -132,12 +132,17 @@ function ContactRowMenu({
 type Filter = "all" | "recent" | string;
 const STATUS_CLASS: Record<Contact["status"], string> = { Ingeschreven: "is-in", "Niet bevestigd": "is-pending", Uitgeschreven: "is-out" };
 const NEWSLETTER_FILTER = "__newsletter";
+const PAGE_ROWS = 100;
 
 export function ContactsManager() {
   const { data, save } = useWorkspace();
   const router = useRouter();
   const contacts = data.contacts;
   const [search, setSearch] = useState("");
+  // Rows drawn at once. Search, filters and "select all" still cover every
+  // contact; only drawing is limited (1,000 rows took 344 ms per click).
+  // Tied to the current search and filters: a new search starts at 100 again.
+  const [paging, setPaging] = useState({ key: "", rows: PAGE_ROWS });
   const [filter, setFilter] = useState<Filter>("all");
   const [source, setSource] = useState<string>("all");
   const [sourcePromptOpen, setSourcePromptOpen] = useState(false);
@@ -186,6 +191,9 @@ export function ContactsManager() {
       );
     });
   }, [contacts, search, filter, source]);
+
+  const viewKey = [search, filter, source].join("|");
+  const shown = paging.key === viewKey ? paging.rows : PAGE_ROWS;
 
   async function persistContacts(next: Contact[], msg: string) {
     if (await save({ ...data, contacts: next })) setMessage(msg);
@@ -539,7 +547,7 @@ export function ContactsManager() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((c) => (
+                {filtered.slice(0, shown).map((c) => (
                   <tr key={c.id}>
                     <td>
                       <input
@@ -611,6 +619,16 @@ export function ContactsManager() {
               </tbody>
             </table>
           </div>
+          {filtered.length > shown && (
+            <div className="contacts-more">
+              <span>
+                {shown} van {filtered.length} getoond
+              </span>
+              <button type="button" className="button secondary" onClick={() => setPaging({ key: viewKey, rows: shown + PAGE_ROWS })}>
+                Meer tonen
+              </button>
+            </div>
+          )}
         </section>
         </div>
       )}

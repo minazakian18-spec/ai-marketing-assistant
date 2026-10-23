@@ -2,7 +2,32 @@
 // customer or the Mavix platform owner), the single next step, missing
 // required permissions and optional extras. Pure; the server supplies facts.
 
-export type ProviderId = "gmail" | "google_calendar" | "google_business" | "google_search_console" | "instagram" | "messenger" | "whatsapp";
+export type ProviderId = "gmail" | "google_calendar" | "google_business" | "google_search_console" | "instagram" | "messenger" | "whatsapp" | "email_sending" | "google_ads";
+
+/**
+ * One status vocabulary for every integration (Integraties, Dashboard):
+ *   connected      = verbonden en werkt;
+ *   limited        = verbonden, maar een benodigde toestemming ontbreekt;
+ *   action         = de klant moet iets kiezen of vernieuwen;
+ *   reconnect      = de toegang is verlopen of ingetrokken;
+ *   waiting        = wacht op goedkeuring van de provider (Google, Meta);
+ *   not_configured = Mavix moet de koppeling nog inrichten;
+ *   coming_soon    = in ontwikkeling;
+ *   not_connected  = kan, maar is nog niet gekoppeld.
+ * A connected account is not proof that every API call is allowed: "limited"
+ * and the extras say what is missing.
+ */
+export type Status = "connected" | "limited" | "action" | "reconnect" | "waiting" | "not_configured" | "coming_soon" | "not_connected";
+export const STATUS_LABEL: Record<Status, string> = {
+  connected: "Verbonden",
+  limited: "Beperkt",
+  action: "Actie nodig",
+  reconnect: "Opnieuw koppelen",
+  waiting: "Wacht op provider",
+  not_configured: "Nog niet ingericht",
+  coming_soon: "Binnenkort",
+  not_connected: "Niet gekoppeld",
+};
 export type HealthFacts = {
   provider: ProviderId;
   /** Mavix has the app credentials for this provider (platform-owner setup). */
@@ -15,6 +40,8 @@ export type Health = {
   provider: ProviderId;
   label: string;
   state: "ready" | "attention" | "not_connected" | "pending_platform" | "pending_approval";
+  status: Status;
+  statusLabel: string;
   summary: string;
   actor: "customer" | "mavix" | "none";
   next: { label: string; href: string } | null;
@@ -31,6 +58,8 @@ const LABEL: Record<ProviderId, string> = {
   instagram: "Instagram",
   messenger: "Facebook Messenger",
   whatsapp: "WhatsApp Business",
+  email_sending: "E-mailcampagnes versturen",
+  google_ads: "Google Ads",
 };
 
 // Required permissions in plain Dutch (any of the listed scope names counts).
@@ -46,7 +75,37 @@ const REQUIRED: Partial<Record<ProviderId, [string[], string][]>> = {
 };
 
 export function healthFor(f: HealthFacts): Health {
+  const h = baseHealth(f);
+  const conn = f.connection?.status || "";
+  const status: Status =
+    h.state === "ready"
+      ? "connected"
+      : h.state === "pending_approval"
+        ? "waiting"
+        : h.state === "pending_platform"
+          ? f.provider === "google_ads"
+            ? "coming_soon"
+            : "not_configured"
+          : h.state === "not_connected"
+            ? "not_connected"
+            : conn === "connected" && h.missing.length
+              ? "limited"
+              : ["reconnect_required", "permission_missing", "error"].includes(conn)
+                ? "reconnect"
+                : "action";
+  return { ...h, status, statusLabel: STATUS_LABEL[status] };
+}
+
+function baseHealth(f: HealthFacts): Omit<Health, "status" | "statusLabel"> {
   const label = LABEL[f.provider];
+  // Google Ads: no API connection exists yet (see /ads); separate from the
+  // Google Business Profile API approval.
+  if (f.provider === "google_ads") return { provider: f.provider, label, state: "pending_platform", summary: "In ontwikkeling: Mavix heeft nog geen koppeling met de Google Ads API.", actor: "mavix", next: { label: "Bekijken", href: "/ads" }, missing: [], extras: [], lastSyncedAt: null };
+  // E-mail sending is a platform service (no customer OAuth): ready, or switched off.
+  if (f.provider === "email_sending")
+    return f.platformReady
+      ? { provider: f.provider, label, state: "ready", summary: "Campagnes kunnen worden verstuurd naar contacten met aantoonbare toestemming.", actor: "none", next: null, missing: [], extras: [], lastSyncedAt: null }
+      : { provider: f.provider, label, state: "pending_platform", summary: f.pendingApproval || "Versturen staat nog uit. Testmails werken wel.", actor: "mavix", next: null, missing: [], extras: [], lastSyncedAt: null };
   const c = f.connection;
   const scopes = c?.scopes || [];
   const missing = c && f.provider !== "whatsapp" && scopes.length ? (REQUIRED[f.provider] || []).filter(([names]) => !names.some((n) => scopes.includes(n))).map(([, l]) => l) : [];

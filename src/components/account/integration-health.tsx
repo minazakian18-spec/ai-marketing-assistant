@@ -6,7 +6,8 @@ import { isBrowserDemo } from "@/lib/demo";
 import type { Health } from "@/lib/integration-health";
 
 // One line per provider: the real state, who has to act, and one next step.
-const ICON = { ready: CheckCircle2, attention: AlertTriangle, not_connected: Plug, pending_platform: Clock, pending_approval: Clock };
+const ICON: Record<Health["status"], typeof Clock> = { connected: CheckCircle2, limited: AlertTriangle, action: AlertTriangle, reconnect: AlertTriangle, waiting: Clock, not_configured: Clock, coming_soon: Clock, not_connected: Plug };
+const ATTENTION: Health["status"][] = ["limited", "action", "reconnect"];
 
 export function IntegrationHealth() {
   const [list, setList] = useState<Health[] | null>(null);
@@ -24,19 +25,21 @@ export function IntegrationHealth() {
   if (isBrowserDemo()) return null;
   if (error) return <p className="int-hint" role="alert">{error}</p>;
   if (!list) return null;
-  const attention = list.filter((h) => h.state === "attention");
+  const attention = list.filter((h) => ATTENTION.includes(h.status));
   return (
     <section className="ih" aria-labelledby="ih-title">
       <h2 id="ih-title">Status van je koppelingen</h2>
       <p className="ih-sub">{attention.length ? `${attention.length} ${attention.length === 1 ? "koppeling vraagt" : "koppelingen vragen"} jouw aandacht.` : "Alles wat gekoppeld is, werkt."}</p>
       <ul className="ih-list">
         {list.map((h) => {
-          const Icon = ICON[h.state];
+          const Icon = ICON[h.status];
           return (
-            <li key={h.provider} className={"ih-item is-" + h.state}>
+            <li key={h.provider} className={"ih-item is-" + h.state + " st-" + h.status}>
               <Icon size={16} aria-hidden="true" />
               <div>
-                <strong>{h.label}</strong>
+                <strong>
+                  {h.label} <em className={"ih-status st-" + h.status}>{h.statusLabel}</em>
+                </strong>
                 <span>{h.summary}</span>
                 {h.actor === "mavix" && <small>Dit regelt Mavix; jij hoeft niets te doen.</small>}
                 {h.extras.length > 0 && (

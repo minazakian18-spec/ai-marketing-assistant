@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import type { Contact } from "./types";
 
 export type MavixField =
@@ -33,6 +32,10 @@ export type ParsedSheet = {
 };
 
 export async function parseContactFile(file: File): Promise<ParsedSheet> {
+  // Loaded only when someone picks a file: the spreadsheet library is the
+  // largest part of the Contacts page otherwise (measured: 309 → 187 KB of
+  // compressed JavaScript on first load).
+  const XLSX = await import("xlsx");
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   const sheetName = workbook.SheetNames[0];
