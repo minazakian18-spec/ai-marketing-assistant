@@ -165,7 +165,7 @@ export function ScheduledContent({
                     : ""}
                 </span>
               </time>
-              <Status status={post.status} />
+              <Status status={post.status} confirmed={!!post.instagram} />
               <button className="button secondary" onClick={() => onEdit(post)}>
                 Bekijken
               </button>

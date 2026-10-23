@@ -31,7 +31,7 @@ export function ChannelIcon({ item }: { item: DashboardItem }) {
 export function ItemStatus({ status }: { status: DashboardItem["status"] }) {
   const labels = {
     review: "Wacht op goedkeuring",
-    scheduled: "Gepland",
+    scheduled: "Ingepland",
     published: "Gepubliceerd",
     sent: "Verzonden",
     approved: "Goedgekeurd",

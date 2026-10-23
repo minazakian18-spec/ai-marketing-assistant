@@ -331,7 +331,7 @@ export function BrandHub() {
       },
     };
     setDraft(profile);
-    if (await persist(profile, "Je merkprofiel is klaar")) setMode("overview");
+    if (await persist(profile, "Je Brand Hub is klaar")) setMode("overview");
   }
 
   async function preview() {

@@ -91,7 +91,7 @@ export function DashboardReview() {
                     {new Date(post.createdAt).toLocaleDateString("nl-NL")}
                   </p>
                 </div>
-                <Status status={post.status} />
+                <Status status={post.status} confirmed={!!post.instagram} />
               </Link>
             ))
         ) : (

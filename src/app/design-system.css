@@ -10,10 +10,11 @@
   --ds-surface-2: #fafafc;
   --ds-border: #e8e7ee;
   --ds-border-strong: #d6d4df;
-  --ds-text: #15141a;
+  /* Aliases of the central tokens (globals.css, typography.css): one source. */
+  --ds-text: var(--text-strong);
   --ds-text-2: #3f3f48;
   --ds-muted: #64636e;
-  --ds-heading: #2e1065;
+  --ds-heading: var(--text-heading);
   --ds-accent: #6d28d9;
   --ds-accent-hover: #5b21b6;
   --ds-accent-soft: #f3effd;
@@ -24,11 +25,11 @@
   --ds-warn-soft: #fff6e0;
   --ds-danger: #b42318;
   --ds-danger-soft: #fdecea;
-  --ds-radius-sm: 8px;
+  --ds-radius-sm: var(--radius-sm);
   --ds-radius: 10px;
   --ds-radius-lg: 14px;
-  --ds-shadow-xs: 0 1px 2px rgba(24, 18, 43, 0.04);
-  --ds-shadow-sm: 0 1px 2px rgba(24, 18, 43, 0.04), 0 3px 10px rgba(24, 18, 43, 0.04);
+  --ds-shadow-xs: var(--shadow-xs);
+  --ds-shadow-sm: var(--shadow-sm);
   --ds-shadow-pop: 0 4px 10px rgba(24, 18, 43, 0.06), 0 16px 36px rgba(24, 18, 43, 0.12);
   --ds-ring: 0 0 0 3px rgba(109, 40, 217, 0.16);
   --ds-ease: cubic-bezier(0.16, 1, 0.3, 1);

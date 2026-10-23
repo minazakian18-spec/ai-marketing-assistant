@@ -72,7 +72,7 @@ export function ResearchSection() {
       const input = {
         businessKind: businessKindOf(profile.industry, profile.description),
         collectedAt: new Date().toISOString(),
-        sources: [{ id: "profile" as const, label: "Bedrijfsprofiel (Brand Hub)", status: "used" as const, note: "Voorbeeldgegevens uit de testmodus." }],
+        sources: [{ id: "profile" as const, label: "Brand Hub", status: "used" as const, note: "Voorbeeldgegevens uit de testmodus." }],
         profile,
         content: contentFacts(data),
         email: emailFacts(data),

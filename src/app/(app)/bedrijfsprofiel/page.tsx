@@ -1,7 +1,6 @@
-import { BrandHub } from "@/components/brand-hub/brand-hub";
-import "../../brand-hub.css";
+import { redirect } from "next/navigation";
 
-// Brand Hub (also served at /brand-hub).
+// Old address of the Brand Hub; kept so bookmarks and links keep working.
 export default function ProfilePage() {
-  return <BrandHub />;
+  redirect("/brand-hub");
 }

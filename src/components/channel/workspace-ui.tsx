@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { publishedLabel, sentLabel } from "@/lib/status-labels";
 import {
   LayoutDashboard,
   PenLine,
@@ -73,6 +74,8 @@ export type ChannelItem = {
   title: string;
   kind: string;
   status: string;
+  /** The provider confirmed publishing or sending (post.instagram, campaign.delivery). */
+  confirmed?: boolean;
   date: string;
   createdAt: string;
   href: string;
@@ -92,10 +95,9 @@ const statusLabel: Record<string, string> = {
   failed: "Mislukt",
   approved: "Goedgekeurd",
   scheduled: "Ingepland",
-  published: "Demo gepubliceerd",
-  sent: "Demo verzonden",
   rejected: "Afgewezen",
 };
+const itemLabel = (i: ChannelItem) => (i.status === "published" ? publishedLabel(!!i.confirmed) : i.status === "sent" ? sentLabel(!!i.confirmed) : statusLabel[i.status]);
 export function ChannelOverview({
   channel,
   root,
@@ -212,7 +214,7 @@ export function ChannelOverview({
                     <ArrowUpRight size={15} />
                   </Link>
                   <p>
-                    {c.kind} · {statusLabel[c.status]} ·{" "}
+                    {c.kind} · {itemLabel(c)} ·{" "}
                     {dateLabel(c.date || c.createdAt)}
                   </p>
                 </>
@@ -283,7 +285,7 @@ export function ContentLibrary({ items }: { items: ChannelItem[] }) {
                 <span>
                   <strong>{i.title}</strong>
                   <small>
-                    {i.kind} · {statusLabel[i.status]}
+                    {i.kind} · {itemLabel(i)}
                   </small>
                 </span>
                 <ArrowUpRight size={16} />

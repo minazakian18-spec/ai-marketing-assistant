@@ -1,3 +1,4 @@
+import { publishedLabel, sentLabel } from "./status-labels.ts";
 import type { EmailCampaign } from "./email-model";
 import type { Post } from "./types";
 export type DashboardItem = {
@@ -243,7 +244,8 @@ export function recentActivity(
     ["published", "sent", "failed", "blocked"].includes(status) && date ? date : createdAt;
   const items: Activity[] = [
     ...posts.map((p) => {
-      const [label, tone] = POST_LABELS[p.status];
+      const [base, tone] = POST_LABELS[p.status];
+      const label = p.status === "published" ? publishedLabel(!!p.instagram) : base;
       return {
         id: "post-" + p.id,
         title: p.prompt || p.caption.slice(0, 80) || "Instagram-post",
@@ -255,7 +257,8 @@ export function recentActivity(
       };
     }),
     ...campaigns.map((c) => {
-      const [label, tone] = EMAIL_LABELS[c.status];
+      const [base, tone] = EMAIL_LABELS[c.status];
+      const label = c.status === "sent" ? sentLabel(!!c.delivery) : base;
       return {
         id: "email-" + c.id,
         title: c.title || c.subject || "E-mailcampagne",

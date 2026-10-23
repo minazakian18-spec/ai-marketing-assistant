@@ -125,7 +125,7 @@ export type ResearchReport = {
 };
 
 export const AREA_LABEL: Record<Area, string> = {
-  profile: "Bedrijfsprofiel",
+  profile: "Brand Hub",
   reviews: "Klanten en reviews",
   google: "Online zichtbaarheid en Google",
   website: "Website en vindbaarheid",

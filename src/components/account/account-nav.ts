@@ -18,7 +18,7 @@ export const accountGroups = [
       ["/account/team", "Team", "Collega's en werkruimtes", Users],
       ["/account/ai", "AI-voorkeuren", "Taal, toon en goedkeuring", Sparkles],
       ["/account/facturatie", "Abonnement en facturatie", "Besloten beta, geen kosten", CreditCard],
-      ["/account/integraties", "Data en koppelingen", "Gekoppelde kanalen en diensten", Plug],
+      ["/account/integraties", "Integraties", "Gekoppelde kanalen en diensten", Plug],
     ],
   },
 ] as const;

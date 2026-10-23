@@ -56,6 +56,7 @@ function Workspace() {
     title: p.prompt,
     kind: p.contentType || "Post",
     status: p.status,
+    confirmed: !!p.instagram,
     date: p.date,
     createdAt: p.createdAt,
     href: "/social?tab=assist&post=" + encodeURIComponent(p.id),

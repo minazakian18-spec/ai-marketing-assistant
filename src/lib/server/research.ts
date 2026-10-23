@@ -169,7 +169,7 @@ export async function runResearch(workspaceId: string, id: string, userId?: stri
     const data = await workspaceData(workspaceId);
     const conns = await connections(workspaceId);
     const connected = (p: string) => conns.find((c) => c.provider === p && c.status === "connected");
-    const sources: SourceInfo[] = [{ id: "profile", label: "Bedrijfsprofiel (Brand Hub)", status: "used", note: "Gegevens uit je Mavix-profiel." }];
+    const sources: SourceInfo[] = [{ id: "profile", label: "Brand Hub", status: "used", note: "Gegevens uit je Mavix-profiel." }];
     const profile = profileFacts(data);
     const input: ResearchInput = {
       businessKind: businessKindOf(profile.industry, profile.description),

@@ -8,6 +8,8 @@ const legacyRoutes: [string, string][] = [
   ["/email-ai", "/email"],
   ["/review-ai", "/reviews"],
   ["/contentkalender", "/calendar"],
+  // The Brand Hub used to live here.
+  ["/bedrijfsprofiel", "/brand-hub"],
 ];
 
 const legalRoutes: [string, string][] = [

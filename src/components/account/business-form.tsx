@@ -38,7 +38,7 @@ export function BusinessForm() {
   const dirty = FIELDS.some(([k]) => profile[k] !== data.profile[k]);
   return (
     <>
-      <PageHeading eyebrow="Werkruimte" title="Bedrijfsinstellingen" description="De gegevens van je bedrijf, gedeeld met je merkprofiel in Mavix." />
+      <PageHeading eyebrow="Werkruimte" title="Bedrijfsinstellingen" description="De gegevens van je bedrijf, gedeeld met je Brand Hub." />
       <form
         noValidate
         onSubmit={async (e) => {

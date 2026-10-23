@@ -30,7 +30,8 @@ export const navigationGroups: NavGroup[] = [
     items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
-    label: "Werkruimte",
+    // Not "Werkruimte": that word means the business account (team, billing).
+    label: "Dagelijks werk",
     items: [
       { href: "/agent", label: "Mavix Agent", icon: Mavi },
       { href: "/studio", label: "Content Studio", icon: PenLine },
@@ -87,4 +88,17 @@ export function navigationPath(path: string) {
 export function isActive(href: string, path: string) {
   if (href === "/account" && path.startsWith("/account/integraties")) return false;
   return path === href || path.startsWith(href + "/");
+}
+
+/**
+ * Name of the page at path, for the top bar and the browser tab: the most
+ * specific matching item, so nested routes (/studio/nieuw, /seo/rapport/…)
+ * keep their module name. extra = further [href, label] pairs (settings pages).
+ */
+export function pageLabel(path: string, extra: readonly (readonly [string, string])[] = []) {
+  // extra first: on equal paths the specific settings name wins (/account).
+  const all = [...extra, ...[...navigationGroups.flatMap((g) => g.items), ...systemNavigation].map((i) => [i.href, i.label] as const), ["/beheer", "Beheer"] as const];
+  const p = navigationPath(path);
+  const match = all.filter(([href]) => p === href || p.startsWith(href + "/")).sort((a, b) => b[0].length - a[0].length)[0];
+  return match?.[1] || "";
 }

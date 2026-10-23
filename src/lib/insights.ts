@@ -69,6 +69,6 @@ export function nextActions(blocks: SourceBlock[], counts: { drafts: number; sch
   if (counts.scheduledNext7 === 0) out.push({ title: "Plan content voor de komende 7 dagen", why: "Gemeten: er staat niets ingepland voor de komende week.", href: "/calendar", cta: "Naar de kalender" });
   const clicks = get("search", "Klikken");
   if (clicks && change(clicks).direction === "down" && (change(clicks).pct ?? 0) <= -15) out.push({ title: "Bekijk waarom je minder klikken uit Google krijgt", why: `Gemeten: ${clicks.value} klikken tegenover ${clicks.previous} in de periode ervoor.`, href: "/seo", cta: "Naar SEO Intelligence" });
-  if (counts.brandScore < 80) out.push({ title: "Vul je Brand Hub verder aan", why: `Gemeten: je merkprofiel is voor ${Math.round(counts.brandScore)}% compleet; Mavix schrijft beter met meer context.`, href: "/brand-hub", cta: "Naar Brand Hub" });
+  if (counts.brandScore < 80) out.push({ title: "Vul je Brand Hub verder aan", why: `Gemeten: je Brand Hub is voor ${Math.round(counts.brandScore)}% compleet; Mavix schrijft beter met meer context.`, href: "/brand-hub", cta: "Naar Brand Hub" });
   return out.slice(0, 3);
 }

@@ -83,6 +83,10 @@ body:has(.app-shell) {
   box-shadow: none;
   transform: none;
 }
+/* Keeps the shared keyboard focus ring (polish.css) visible on the items. */
+.app-shell .sidebar .side-nav .nav-item:focus-visible {
+  box-shadow: var(--focus-ring);
+}
 .app-shell .sidebar .side-nav .nav-item svg {
   flex-shrink: 0;
   color: var(--app-muted);

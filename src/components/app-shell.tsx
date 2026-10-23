@@ -11,20 +11,16 @@ import { AgentProvider } from "@/components/agent/agent-provider";
 import { AgentLauncher } from "@/components/agent/agent-launcher";
 import { AgentPanel } from "@/components/agent/agent-panel";
 import {
-  navigationGroups,
   navigationPath,
-  systemNavigation,
+  pageLabel,
 } from "@/lib/navigation";
 import {
   SidebarNavigation,
   SystemNavigation,
 } from "@/components/sidebar-navigation";
-const links = [
-  ...navigationGroups.flatMap((group) => group.items),
-  ...systemNavigation,
-];
 export function AppShell({ children }: { children: ReactNode }) {
   const path = navigationPath(usePathname());
+  const label = pageLabel(path, accountLinks.map(([href, name]) => [href, name] as const));
   const [open, setOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
   const drawer = useRef<HTMLElement>(null);
@@ -150,13 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="main-shell" inert={mobile && open}>
         <div className="topbar">
           <span>
-            Werkruimte <span className="slash">/</span>{" "}
-            <strong>
-              {links.find((item) => item.href === path)?.label ||
-                accountLinks.find(([href]) => href === path)?.[1] ||
-                (path === "/beheer" ? "Beheer" : "") ||
-                "Mavix"}
-            </strong>
+            {data.profile.name?.trim() || "Mavix"} <span className="slash">/</span> <strong>{label || "Mavix"}</strong>
           </span>
           <div className="topbar-right">
             <AgentLauncher />

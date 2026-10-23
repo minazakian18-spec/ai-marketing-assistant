@@ -26,7 +26,7 @@ export function analyze(input: ResearchInput): Finding[] {
       id: "profile-incomplete",
       area: "profile",
       status: "improve",
-      title: "Bedrijfsprofiel in Mavix is niet compleet",
+      title: "Je Brand Hub is niet compleet",
       found: `Nog niet ingevuld: ${missing.join(", ")}.`,
       why: "Mavix gebruikt deze gegevens voor alle teksten en voor dit onderzoek. Zonder deze basis worden adviezen en content algemener.",
       action: "Vul de ontbrekende onderdelen aan in Brand Hub. Dit kost ongeveer tien minuten.",

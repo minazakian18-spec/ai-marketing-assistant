@@ -52,6 +52,7 @@ function Workspace() {
     title: c.title,
     kind: c.kind.replace("Create ", ""),
     status: c.status,
+    confirmed: !!c.delivery,
     date: c.date,
     createdAt: c.createdAt,
     href: "/email?tab=assist&campaign=" + encodeURIComponent(c.id),

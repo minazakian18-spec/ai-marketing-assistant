@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { Post } from "@/lib/types";
+import { publishedLabel } from "@/lib/status-labels";
 
 // Shared workspace building blocks (styles in workspace.css). Flat, 1px
 // bordered, neutral; purple only for active states and primary actions.
@@ -123,7 +124,7 @@ export function PageHeading({
     </header>
   );
 }
-export function Status({ status }: { status: Post["status"] }) {
+export function Status({ status, confirmed = false }: { status: Post["status"]; confirmed?: boolean }) {
   const labels = {
     draft: "Concept",
     approved: "Goedgekeurd",
@@ -131,7 +132,7 @@ export function Status({ status }: { status: Post["status"] }) {
     rejected: "Afgewezen",
     blocked: "Geblokkeerd",
     failed: "Mislukt",
-    published: "Demo gepubliceerd",
+    published: publishedLabel(confirmed),
   };
   return (
     <span
