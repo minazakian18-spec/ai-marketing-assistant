@@ -41,6 +41,21 @@ test("old addresses keep working: aliases and redirects lead to existing pages",
   assert.equal(nav.navigationPath("/bedrijfsprofiel"), "/brand-hub");
 });
 
+test("the Brand Hub page renders the Brand Hub itself, never the old redirecting address", () => {
+  // Regression (Phase 4): /brand-hub re-exported the /bedrijfsprofiel page;
+  // once that became a redirect to /brand-hub, the Brand Hub was empty.
+  const page = fs.readFileSync("src/app/(app)/brand-hub/page.tsx", "utf8");
+  assert.doesNotMatch(page, /from "\.\.\/bedrijfsprofiel/);
+  assert.match(page, /<BrandHub \/>/);
+  for (const href of nav.navigationGroups.flatMap((g) => g.items).map((i) => i.href)) {
+    const src = fs.readFileSync(path.join("src/app/(app)", href, "page.tsx"), "utf8");
+    const target = src.match(/redirect\("([^"]+)"\)/)?.[1];
+    assert.notEqual(target, href, href + " redirects to itself");
+    const reexport = src.match(/export \{ default \} from "\.\.\/([^/"]+)\/page"/)?.[1];
+    if (reexport) assert.doesNotMatch(fs.readFileSync(path.join("src/app/(app)", reexport, "page.tsx"), "utf8"), new RegExp('redirect\\("' + href + '"\\)'), href + " re-exports a page that redirects back to it");
+  }
+});
+
 test("page names resolve for nested routes and settings pages", () => {
   const settings = [["/account", "Account en profiel"], ["/account/team", "Team"]];
   assert.equal(nav.pageLabel("/studio/nieuw"), "Content Studio");

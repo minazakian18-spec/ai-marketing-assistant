@@ -767,8 +767,10 @@
 
 @media (max-width: 1000px) {
   .cal-shell { grid-template-columns: minmax(0, 1fr); }
-  .cal-sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 70; width: min(290px, 86vw); box-shadow: 8px 0 32px rgba(20, 18, 30, 0.12); transform: translateX(-105%); transition: transform 0.2s ease; }
-  .cal-shell[data-panel="open"] .cal-sidebar { transform: none; }
+  /* Closed: hidden for keyboard and screen readers too (visibility), and no
+     shadow bleeding into the screen. visibility switches after the slide. */
+  .cal-sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 70; width: min(290px, 86vw); transform: translateX(-105%); visibility: hidden; transition: transform 0.2s ease, visibility 0s linear 0.2s; }
+  .cal-shell[data-panel="open"] .cal-sidebar { transform: none; visibility: visible; box-shadow: 8px 0 32px rgba(20, 18, 30, 0.12); transition: transform 0.2s ease, visibility 0s; }
   .cal-sidebar-scrim { position: fixed; inset: 0; z-index: 69; background: rgba(20, 18, 30, 0.2); }
   .cal-sidebar-close, .cal-sidebar-open { display: inline-grid; }
 }

@@ -585,3 +585,14 @@
   font-size: 13px;
   color: var(--color-text-secondary);
 }
+/* Selection checkboxes: big enough to hit with a finger (WCAG 2.5.8). */
+.contacts-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+@media (pointer: coarse) {
+  .contacts-table input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+}
