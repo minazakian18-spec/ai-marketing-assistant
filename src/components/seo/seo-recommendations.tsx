@@ -52,10 +52,10 @@ function Suggestions({ scanId, rec, keyword }: { scanId: string; rec: Recommenda
     try {
       const r = await fetch(`/api/seo/scans/${scanId}/suggest`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, kind }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "Mavi kon geen voorstel maken.");
+      if (!r.ok) throw new Error(d.error || "Mavix kon geen voorstel maken.");
       setItems(d.suggestions);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Mavi kon geen voorstel maken.");
+      setError(e instanceof Error ? e.message : "Mavix kon geen voorstel maken.");
     } finally {
       setBusy(false);
     }
@@ -66,7 +66,7 @@ function Suggestions({ scanId, rec, keyword }: { scanId: string; rec: Recommenda
       <div className="seo-suggest-head">
         <Mavi size={16} state={busy ? "thinking" : "idle"} />
         <span>
-          Laat Mavi {kind === "structure" ? "een betere kopstructuur" : `drie alternatieven voor de ${KIND_TEXT[kind]}`} voorstellen, op basis van de pagina en je Brand Hub
+          Laat Mavix {kind === "structure" ? "een betere kopstructuur" : `drie alternatieven voor de ${KIND_TEXT[kind]}`} voorstellen, op basis van de pagina en je Brand Hub
         </span>
       </div>
       <div className="seo-suggest-row">
@@ -106,7 +106,7 @@ function Suggestions({ scanId, rec, keyword }: { scanId: string; rec: Recommenda
           })}
         </ul>
       )}
-      {items && <p className="seo-note">Dit zijn voorstellen: Mavi past je website niet zelf aan. Kopieer de tekst, plak hem in je websitebouwer en start daarna een nieuwe analyse.</p>}
+      {items && <p className="seo-note">Dit zijn voorstellen: Mavix past je website niet zelf aan. Kopieer de tekst, plak hem in je websitebouwer en start daarna een nieuwe analyse.</p>}
     </div>
   );
 }

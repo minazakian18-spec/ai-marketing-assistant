@@ -77,7 +77,7 @@ export function DashboardTodos({ todos }: { todos: Todo[] }) {
           </span>
           <div>
             <strong>Je bent helemaal bij</strong>
-            <p>Mavi laat het je hier weten zodra er iets nieuws op je wacht.</p>
+            <p>Mavix laat het je hier weten zodra er iets nieuws op je wacht.</p>
           </div>
         </div>
       )}

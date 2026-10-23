@@ -295,3 +295,41 @@ test("pagination: conversations come back newest first in pages", (t) =>
     assert.equal(list.more, false);
     void db;
   }));
+
+test("a new conversation starts directly inside a project; never in another user's or workspace's project", (t) =>
+  withKey(async () => {
+    quiet(t);
+    const { api, tables, session } = setup();
+    const { folder } = await api.newFolder("Zomeractie");
+    // Created inside the project with the first message (no separate move).
+    const r = await api.send({ text: "Bedenk drie posts voor ons terras", folderId: folder.id });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.conversation.folder_id, folder.id);
+    assert.equal(tables.agent_conversations.length, 1);
+    assert.equal(tables.agent_conversations[0].folder_id, folder.id);
+    // Reload: the conversation still belongs to the project, history intact.
+    const reload = await api.get(r.body.conversation.id);
+    assert.equal(reload.body.conversation.folder_id, folder.id);
+    assert.equal(reload.body.messages.length, 2);
+    // Follow-up stays in the project.
+    await api.send({ text: "Maak ze korter", conversationId: r.body.conversation.id });
+    assert.equal(tables.agent_conversations[0].folder_id, folder.id);
+
+    // Another user in the same workspace, and a user of another workspace,
+    // cannot start a conversation in this project: nothing is stored.
+    for (const other of ["u2", "u3"]) {
+      session.user = other;
+      const before = tables.agent_conversations.length;
+      const bad = await api.send({ text: "Probeer het project", folderId: folder.id });
+      assert.equal(bad.status, 404, other);
+      assert.equal(tables.agent_conversations.length, before, "no conversation created for " + other);
+    }
+    session.user = "u1";
+    // Without a project: as before.
+    const loose = await api.send({ text: "Losse vraag" });
+    assert.equal(loose.body.conversation.folder_id, null);
+    // Deleting the project keeps its conversations (without project).
+    assert.equal(await api.deleteFolder(folder.id), 200);
+    assert.equal(tables.agent_conversations.find((c) => c.id === r.body.conversation.id).folder_id, null);
+    assert.equal(tables.agent_messages.filter((m) => m.conversation_id === r.body.conversation.id).length, 4);
+  }));

@@ -428,7 +428,7 @@
 }
 .rp {
   position: absolute;
-  top: 2px;
+  top: var(--composer-text-top, 4px);
   left: 0;
   right: 0;
   overflow: hidden;

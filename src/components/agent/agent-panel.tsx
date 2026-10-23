@@ -67,7 +67,7 @@ export function AgentPanel() {
           </div>
         </div>
         <div className="agent-panel-foot">
-          <AgentComposer size="compact" attachments={false} onSubmit={(text) => ask(text)} placeholder="Vraag Mavi iets" />
+          <AgentComposer size="compact" attachments={false} onSubmit={(text) => ask(text)} placeholder="Vraag Mavix iets" />
         </div>
       </aside>
     </>

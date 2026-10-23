@@ -62,7 +62,7 @@ export function ContextPanel({
     try {
       setSummary((await onSummary()) || "");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Mavi kon geen samenvatting maken.");
+      setError(e instanceof Error ? e.message : "Mavix kon geen samenvatting maken.");
     } finally {
       setBusy(false);
     }
@@ -180,7 +180,7 @@ export function ContextPanel({
         ) : (
           <button type="button" className="button secondary ib-small" disabled={busy} onClick={() => void summarize()}>
             <Mavi size={14} state={busy ? "thinking" : "idle"} />
-            {busy ? "Mavi vat samen…" : "Samenvatten met Mavi"}
+            {busy ? "Mavix vat samen…" : "Samenvatten met Mavix"}
           </button>
         )}
         {error && (

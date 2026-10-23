@@ -79,7 +79,7 @@ export function Mavi({
 export function MaviIdentity({
   size = 40,
   state = "idle",
-  title = "Mavi",
+  title = "Mavix",
   subtitle,
   className = "",
   live = true,
@@ -111,11 +111,11 @@ export function MaviIdentity({
 export type MascotState = "idle" | "typing" | "thinking" | "done" | "error";
 
 const MASCOT_LABEL: Record<MascotState, string> = {
-  idle: "Mavi",
-  typing: "Mavi luistert",
-  thinking: "Mavi denkt na",
-  done: "Mavi is klaar",
-  error: "Mavi kon het niet afronden",
+  idle: "Mavix",
+  typing: "Mavix luistert",
+  thinking: "Mavix denkt na",
+  done: "Mavix is klaar",
+  error: "Mavix kon het niet afronden",
 };
 
 export function MaviMascot({ size = 72, state = "idle", className = "" }: { size?: number; state?: MascotState; className?: string }) {

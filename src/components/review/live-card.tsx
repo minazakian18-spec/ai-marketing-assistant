@@ -145,7 +145,7 @@ export function LiveReviewCard({ review, onChange }: { review: GoogleReview; onC
           <div className="rvl-compose-bar">
             <button type="button" className="button secondary" onClick={() => void suggest()} disabled={!!busy}>
               {busy === "suggest" ? <Loader2 size={14} className="int-spin" aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
-              {busy === "suggest" ? "Mavi denkt mee…" : "Voorstel van Mavi"}
+              {busy === "suggest" ? "Mavix denkt mee…" : "Voorstel van Mavix"}
             </button>
             <span className="rvl-count">{draft.length} / 4096</span>
             <button type="button" className="button secondary" onClick={() => setComposing(false)} disabled={busy === "post"}>
@@ -156,7 +156,7 @@ export function LiveReviewCard({ review, onChange }: { review: GoogleReview; onC
               {busy === "post" ? "Plaatsen bij Google…" : review.reply ? "Bijwerken" : "Plaatsen"}
             </button>
           </div>
-          <p className="rvl-note">Een voorstel van Mavi wordt nooit automatisch geplaatst. Jij controleert en plaatst het antwoord.</p>
+          <p className="rvl-note">Een voorstel van Mavix wordt nooit automatisch geplaatst. Jij controleert en plaatst het antwoord.</p>
         </div>
       ) : (
         !review.reply && (

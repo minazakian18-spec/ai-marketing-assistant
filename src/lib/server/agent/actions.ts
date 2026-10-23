@@ -68,7 +68,7 @@ const COLUMNS = "id,workspace_id,user_id,conversation_id,message_id,kind,payload
 
 function check(error: { code?: string } | null, what: string) {
   if (!error) return;
-  if (notReady(error)) throw new HttpError(503, "Acties via Mavi worden nog ingericht. Probeer het later opnieuw.");
+  if (notReady(error)) throw new HttpError(503, "Acties via Mavix worden nog ingericht. Probeer het later opnieuw.");
   console.error(JSON.stringify({ event: "agent_action_db_error", code: error.code || "error" }));
   throw new HttpError(503, what);
 }
@@ -132,7 +132,7 @@ export async function decideAction(o: { workspaceId: string; userId: string; rol
   const now = new Date().toISOString();
   if (Date.parse(action.expires_at) < Date.now()) {
     await db().from("agent_actions").update({ status: "expired", updated_at: now }).eq("id", id).eq("status", "pending");
-    throw new HttpError(410, "Dit voorstel is verlopen. Vraag Mavi om een nieuw voorstel.");
+    throw new HttpError(410, "Dit voorstel is verlopen. Vraag Mavix om een nieuw voorstel.");
   }
   // Claim the action: only one request can move it out of 'pending'.
   const next = decision === "confirm" ? "executing" : "cancelled";

@@ -67,7 +67,7 @@ export async function runAgentLoop(ctx: AgentCtx, instructions: string, first: R
     const final = step === steps - 1 || toolCalls >= MAX_TOOL_CALLS;
     const r = await aiStep(instructions, input, defs, final);
     if (!r.calls.length || final) {
-      if (!r.text) throw new HttpError(502, "Mavi gaf geen antwoord terug. Probeer het opnieuw.");
+      if (!r.text) throw new HttpError(502, "Mavix gaf geen antwoord terug. Probeer het opnieuw.");
       return { text: r.text, tools: used, proposed: load.proposed };
     }
     input.push(...r.carry);
@@ -101,5 +101,5 @@ export async function runAgentLoop(ctx: AgentCtx, instructions: string, first: R
       input.push({ type: "function_call_output", call_id: call.call_id, output: fitResult(result) });
     }
   }
-  throw new HttpError(502, "Mavi kon deze vraag niet afronden. Probeer het opnieuw.");
+  throw new HttpError(502, "Mavix kon deze vraag niet afronden. Probeer het opnieuw.");
 }

@@ -132,7 +132,7 @@ export function currentInputLimit() {
 export function takeStep() {
   const s = als.getStore();
   if (!s) return;
-  if (s.steps <= 0) throw new HttpError(429, "Mavi heeft te veel stappen nodig voor deze vraag. Maak de vraag kleiner.");
+  if (s.steps <= 0) throw new HttpError(429, "Mavix heeft te veel stappen nodig voor deze vraag. Maak de vraag kleiner.");
   s.steps--;
 }
 
@@ -332,7 +332,7 @@ export async function metered<T>(
     : sum(settled.data) + sum(pending.data) > l.globalMonthlyMicroUsd
       ? new HttpError(503, "Het AI-budget van Mavix voor deze maand is bereikt. Er is niets gegenereerd.")
       : (running.count || 0) > l.concurrentPerUser
-        ? new HttpError(429, "Mavi is nog bezig met je vorige verzoek. Even geduld.")
+        ? new HttpError(429, "Mavix is nog bezig met je vorige verzoek. Even geduld.")
         : creditsUsed > wp.plan.credits
           ? new PlanError(`Je AI-tegoed is op: er ${Math.max(0, wp.plan.credits - (creditsUsed - cost)) === 1 ? "is" : "zijn"} nog ${Math.max(0, wp.plan.credits - (creditsUsed - cost))} van de ${wp.plan.credits} credits over en deze actie kost ${cost}. Je tegoed vernieuwt op ${renews}.${hint}`, upgradeFor(wp.planId, action)?.id || null)
           : max !== undefined && actionUsed > max

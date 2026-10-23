@@ -13,7 +13,7 @@ import { readiness } from "@/lib/instagram-model";
 const PLANNED = [
   ["Campagne-overzicht", "Uitgaven, klikken, CTR, CPC en conversies per campagne, met de vorige periode ernaast."],
   ["Trends", "Hoe je resultaten zich per week ontwikkelen, gemeten door Google Ads."],
-  ["Voorstellen van Mavi", "Advertentieteksten en zoekwoorden op basis van je Brand Hub, als concept dat jij goedkeurt."],
+  ["Voorstellen van Mavix", "Advertentieteksten en zoekwoorden op basis van je Brand Hub, als concept dat jij goedkeurt."],
   ["Veilig beheer", "Mavix wijzigt of start nooit een campagne zonder jouw uitdrukkelijke goedkeuring."],
 ] as const;
 const FUTURE = ["Uitgaven", "Klikken", "CTR", "CPC", "Conversies"];
@@ -25,7 +25,7 @@ export default function AdsPage() {
     { label: "Google Ads API-toegang voor Mavix", state: "mavix", note: "Google moet Mavix eerst toegang geven (developer token). Dit regelt Mavix; jij hoeft niets te doen." },
     { label: "Een Google Ads-account met betaalgegevens", state: "todo", note: "Heb je nog geen account? Maak het aan op ads.google.com. Mavix maakt geen accounts voor je aan." },
     { label: "Website ingevuld in Brand Hub", state: data.profile.website?.trim() ? "done" : "todo", note: "Nodig voor advertenties die naar je site linken.", href: "/brand-hub" },
-    { label: "Brand Hub voor minstens 80% compleet", state: brand >= 80 ? "done" : "todo", note: `Nu ${Math.round(brand)}%. Mavi gebruikt dit voor advertentievoorstellen.`, href: "/brand-hub" },
+    { label: "Brand Hub voor minstens 80% compleet", state: brand >= 80 ? "done" : "todo", note: `Nu ${Math.round(brand)}%. Mavix gebruikt dit voor advertentievoorstellen.`, href: "/brand-hub" },
   ];
   return (
     <div className="ads">

@@ -394,14 +394,14 @@ export default function InboxPage() {
 
   async function ai(action: "reply" | "summary") {
     if (!detail) return null;
-    if (demo) throw new Error("Mavi-voorstellen werken alleen met een echt account.");
+    if (demo) throw new Error("Mavix-voorstellen werken alleen met een echt account.");
     const d = await api<{ text: string }>(`/api/inbox/${detail.conversation.id}/ai`, { method: "POST", body: JSON.stringify({ action }) });
     return d.text;
   }
 
   async function rewrite(draft: string, style: RewriteStyle) {
     if (!detail) return null;
-    if (demo) throw new Error("Mavi-voorstellen werken alleen met een echt account.");
+    if (demo) throw new Error("Mavix-voorstellen werken alleen met een echt account.");
     const d = await api<{ text: string }>(`/api/inbox/${detail.conversation.id}/ai`, { method: "POST", body: JSON.stringify({ action: "rewrite", draft, style }) });
     return d.text;
   }

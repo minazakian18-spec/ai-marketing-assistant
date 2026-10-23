@@ -197,7 +197,7 @@ const IMPROVE_TASK = {
 } as const;
 
 export async function improveBrandText(field: keyof typeof IMPROVE_TASK, text: string, profile: Record<string, unknown>) {
-  if (text.trim().length < 10) throw new HttpError(400, "Schrijf eerst een paar woorden; Mavi verbetert je eigen tekst.");
+  if (text.trim().length < 10) throw new HttpError(400, "Schrijf eerst een paar woorden; Mavix verbetert je eigen tekst.");
   const messages: AiMessage[] = [
     {
       role: "user",
@@ -355,7 +355,7 @@ export async function generateCarouselPlan(o: { brief: string; goal: string; cou
   );
   const slides = (Array.isArray(raw.slides) ? raw.slides : []).slice(0, o.count).map((s) => ({ headline: cut(s.headline, 80), body: cut(s.body, 140), image_brief: cut(s.image_brief, 500) }));
   // The model must return exactly the requested number; never pad with invented slides.
-  if (slides.length !== o.count || slides.some((s) => !s.image_brief)) throw new HttpError(502, "Mavi kon geen volledig carrouselplan maken. Probeer het opnieuw.");
+  if (slides.length !== o.count || slides.some((s) => !s.image_brief)) throw new HttpError(502, "Mavix kon geen volledig carrouselplan maken. Probeer het opnieuw.");
   return {
     title: cut(raw.title, 120) || "Carrousel",
     concept: cut(raw.concept, 400),
@@ -584,7 +584,7 @@ export async function generateEmailText(brief: EmailBrief, profile: Record<strin
   );
   const field = (name: string) => (text.match(new RegExp("^" + name + ":\\s*(.+)$", "m"))?.[1] || "").trim();
   const body = (text.split(/^BODY:\s*$/m)[1] || "").trim();
-  if (!body) throw new HttpError(502, "Mavi gaf geen bruikbare e-mail terug. Probeer het opnieuw.");
+  if (!body) throw new HttpError(502, "Mavix gaf geen bruikbare e-mail terug. Probeer het opnieuw.");
   return { subject: field("SUBJECT").slice(0, 120), preview: field("PREVIEW").slice(0, 150), cta: field("CTA").slice(0, 40), body: body.slice(0, 10000) };
 }
 

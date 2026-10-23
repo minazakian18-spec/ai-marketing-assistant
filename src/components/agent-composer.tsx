@@ -28,7 +28,7 @@ const toAttachment = (file: File): AgentAttachment => {
 // paste), Enter to send and Shift+Enter for a new line.
 export function AgentComposer({
   onSubmit,
-  placeholder = "Vraag Mavi iets of geef een opdracht…",
+  placeholder = "Vraag Mavix iets of geef een opdracht…",
   size = "large",
   busy = false,
   autoFocus = false,
@@ -183,7 +183,7 @@ export function AgentComposer({
         </ul>
       )}
       <label className="sr-only" htmlFor={"composer-" + size}>
-        Bericht aan Mavi
+        Bericht aan Mavix
       </label>
       <div className="composer-field">
         <textarea

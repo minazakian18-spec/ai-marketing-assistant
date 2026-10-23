@@ -231,23 +231,8 @@
   fill: #a78bfa;
 }
 
-/* Placement. Dashboard: next to the greeting, right above the composer.
-   Agent: large in the empty state; in a conversation small, perched on the
-   top edge of the input (above the border, never over text or buttons). */
-.agent-surface-head > .agent-surface-mascot {
-  margin-top: -8px;
-  margin-left: -6px;
-}
-@media (max-width: 560px) {
-  .agent-surface-head > .agent-surface-mascot {
-    width: 56px;
-    height: 56px;
-    margin-top: -4px;
-  }
-}
-.ag-empty .ag-empty-mascot {
-  margin: 0 auto 4px;
-}
+/* Placement: only in an Agent conversation, small, bottom right on the top
+   edge of the input (above the border, never over text or buttons). */
 .ag-composer-wrap {
   position: relative;
 }

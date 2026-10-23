@@ -9,7 +9,8 @@ import { linkActions } from "@/lib/server/agent/actions";
 import { titleFrom } from "@/lib/agent/capabilities";
 
 const input = z.union([
-  z.object({ text: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional() }),
+  // folderId: start the new conversation directly inside this project (checked on the server).
+  z.object({ text: z.string().trim().min(1).max(1500), conversationId: z.string().uuid().optional(), folderId: z.string().uuid().optional() }),
   z.object({ retry: z.literal(true), conversationId: z.string().uuid() }),
 ]);
 const headers = { "Cache-Control": "private, no-store" };
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       question = lastUser.content;
     } else {
       question = body.text;
-      conversation ??= await createConversation(owner, titleFrom(body.text));
+      conversation ??= await createConversation(owner, titleFrom(body.text), body.folderId ?? null);
       userMessage = await addMessage(owner, conversation.id, { role: "user", content: body.text });
     }
 
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
     } catch (e) {
       // The failure is kept in the conversation (user-safe text only) so the
       // user sees what happened after a reload and can retry.
-      const message = e instanceof HttpError ? e.message : "Mavi kon geen antwoord geven. Probeer het opnieuw.";
+      const message = e instanceof HttpError ? e.message : "Mavix kon geen antwoord geven. Probeer het opnieuw.";
       const status = e instanceof HttpError ? e.status : 503;
       const saved = await addMessage(owner, conversation!.id, { role: "assistant", content: message, status: "failed" });
       return NextResponse.json({ configured: true, conversation: await getConversation(owner, conversation!.id), userMessage, reply: saved, error: message }, { status, headers });

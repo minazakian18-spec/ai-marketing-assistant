@@ -249,7 +249,7 @@ export function Thread({
         window.setTimeout(() => input.current?.focus(), 0);
       }
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Mavi kon geen voorstel maken.");
+      setNotice(e instanceof Error ? e.message : "Mavix kon geen voorstel maken.");
     } finally {
       setSuggesting(false);
     }
@@ -268,7 +268,7 @@ export function Thread({
         window.setTimeout(() => input.current?.focus(), 0);
       }
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Mavi kon de tekst niet aanpassen.");
+      setNotice(e instanceof Error ? e.message : "Mavix kon de tekst niet aanpassen.");
     } finally {
       setSuggesting(false);
     }
@@ -544,12 +544,12 @@ export function Thread({
                 )}
                 {!noteMode && (
                   <Menu
-                    label="Tekst aanpassen met Mavi"
+                    label="Tekst aanpassen met Mavix"
                     className="ib-rewrite-menu"
                     trigger={<Wand2 size={16} />}
                     align="start"
                     items={[
-                      { type: "heading", label: draft.trim() ? "Mavi past je tekst aan" : "Schrijf eerst een tekst" },
+                      { type: "heading", label: draft.trim() ? "Mavix past je tekst aan" : "Schrijf eerst een tekst" },
                       ...REWRITE.map(([style, label]) => ({
                         label,
                         disabled: !draft.trim() || suggesting || blocked,

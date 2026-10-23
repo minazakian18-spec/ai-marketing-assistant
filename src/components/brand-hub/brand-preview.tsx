@@ -69,7 +69,7 @@ export function BrandPreview({ profile, ai, compact = false }: { profile: Profil
           </div>
         </div>
       )}
-      {ai ? <p className="bh-preview-note">Voorbeeld geschreven door Mavi met je huidige instellingen.</p> : preset ? <p className="bh-preview-note">Voorbeeldzin bij de toon &quot;{preset.label}&quot;.</p> : null}
+      {ai ? <p className="bh-preview-note">Voorbeeld geschreven door Mavix met je huidige instellingen.</p> : preset ? <p className="bh-preview-note">Voorbeeldzin bij de toon &quot;{preset.label}&quot;.</p> : null}
     </div>
   );
 }

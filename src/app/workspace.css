@@ -715,11 +715,21 @@ body:has(.app-shell) {
   border-color: var(--app-accent);
   border-style: dashed;
 }
+.composer {
+  /* Text inset shared by the textarea and the example prompt over it, so the
+     caret, typed text, placeholder and example sit on the same line. */
+  --composer-text-top: 4px;
+}
 .composer textarea {
   width: 100%;
-  min-height: 26px;
-  padding: 2px 0;
+  min-height: 30px;
+  /* The global form rule (input, textarea, select) adds margin: 7px 0 18px;
+     inside the composer that pushed the caret 7px below the example prompt
+     and left 18px of dead space under the text. */
+  margin: 0;
+  padding: var(--composer-text-top) 0;
   border: 0;
+  border-radius: 0;
   outline: none;
   background: transparent;
   font: inherit;
@@ -729,7 +739,8 @@ body:has(.app-shell) {
   resize: none;
 }
 .composer-large textarea {
-  min-height: 52px;
+  /* Two lines of text plus the inset, so empty and typed states keep one height. */
+  min-height: calc(2 * 1.5em + 2 * var(--composer-text-top));
 }
 .composer textarea::placeholder {
   color: #8d8d97;

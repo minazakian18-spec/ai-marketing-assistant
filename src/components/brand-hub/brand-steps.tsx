@@ -169,11 +169,11 @@ function Improve({
         }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "Mavi kon geen voorstel maken.");
+      if (!r.ok) throw new Error(d.error || "Mavix kon geen voorstel maken.");
       setSuggestion(d.suggestion);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Mavi kon geen voorstel maken.",
+        e instanceof Error ? e.message : "Mavix kon geen voorstel maken.",
       );
     } finally {
       setBusy(false);
@@ -192,7 +192,7 @@ function Improve({
         ) : (
           <Sparkles size={13} aria-hidden="true" />
         )}
-        Verbeter met Mavi
+        Verbeter met Mavix
       </button>
       {error && <p className="bh-error">{error}</p>}
       {suggestion && (
@@ -299,7 +299,7 @@ export function StepIdentity({
       <Field
         label="Wat maakt jou anders dan anderen?"
         optional
-        hint="Je unieke kenmerken (USP's). Mavi gebruikt ze om je content onderscheidend te maken."
+        hint="Je unieke kenmerken (USP's). Mavix gebruikt ze om je content onderscheidend te maken."
       >
         <textarea
           rows={3}
@@ -458,7 +458,7 @@ export function StepVoice({
         <Field
           label="Woorden of uitdrukkingen om te vermijden"
           optional
-          hint="Mavi gebruikt deze woorden nooit."
+          hint="Mavix gebruikt deze woorden nooit."
         >
           <input
             value={v.avoidWords}
@@ -472,7 +472,7 @@ export function StepVoice({
         <div className="bh-tone-preview-head">
           <div>
             <strong>Zo klinkt je merk</strong>
-            <p>Laat Mavi een voorbeeld schrijven met deze instellingen.</p>
+            <p>Laat Mavix een voorbeeld schrijven met deze instellingen.</p>
           </div>
           <button
             type="button"
@@ -901,7 +901,7 @@ export function StepGoals({
         <Field
           label="Lopende aanbiedingen"
           optional
-          hint="Eén per regel, met voorwaarden. Mavi verzint nooit zelf aanbiedingen."
+          hint="Eén per regel, met voorwaarden. Mavix verzint nooit zelf aanbiedingen."
         >
           <textarea
             rows={3}

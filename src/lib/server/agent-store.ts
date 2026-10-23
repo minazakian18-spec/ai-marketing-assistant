@@ -85,11 +85,14 @@ export async function getConversation(o: Owner, conversationId: string) {
   return data as ConversationRow;
 }
 
-export async function createConversation(o: Owner, title: string) {
+/** A new conversation, optionally created directly inside one of the caller's own projects. */
+export async function createConversation(o: Owner, title: string, folderId: string | null = null) {
+  // Only into a project of this workspace and this user (throws 404 otherwise).
+  if (folderId) await getFolder(o, folderId);
   const now = new Date().toISOString();
   const { data, error } = await db()
     .from("agent_conversations")
-    .insert({ workspace_id: o.workspaceId, user_id: o.userId, title: title.slice(0, 120) || "Nieuw gesprek", folder_id: null, pinned: false, archived: false, message_count: 0, created_at: now, updated_at: now, last_message_at: now })
+    .insert({ workspace_id: o.workspaceId, user_id: o.userId, title: title.slice(0, 120) || "Nieuw gesprek", folder_id: folderId, pinned: false, archived: false, message_count: 0, created_at: now, updated_at: now, last_message_at: now })
     .select(CONV_COLUMNS)
     .single();
   check(error, "Het gesprek kon niet worden aangemaakt.");

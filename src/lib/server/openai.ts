@@ -51,7 +51,7 @@ export async function aiText(instructions: string, messages: AiMessage[], tier: 
   // Hard input cap (about 3 characters per token, conservative for Dutch):
   // a request can never cost more than the budget reservation assumed.
   const chars = instructions.length + messages.reduce((s, m) => s + m.content.reduce((t, c) => t + c.text.length, 0), 0);
-  if (chars > currentInputLimit() * 3) throw new HttpError(413, "Deze opdracht is te lang voor Mavi. Maak hem korter.");
+  if (chars > currentInputLimit() * 3) throw new HttpError(413, "Deze opdracht is te lang voor Mavix. Maak hem korter.");
   takeStep();
   try {
     const response = await openai().responses.create({
@@ -65,8 +65,8 @@ export async function aiText(instructions: string, messages: AiMessage[], tier: 
     const usage = response.usage;
     if (usage) recordTokens(model, usage.input_tokens || 0, usage.output_tokens || 0);
     const text = (response.output_text || "").trim();
-    if (response.status === "incomplete" && !text) throw new HttpError(502, "Mavi kreeg geen volledig antwoord. Probeer een kortere opdracht.");
-    if (!text) throw new HttpError(502, "Mavi gaf geen voorstel terug. Probeer het opnieuw.");
+    if (response.status === "incomplete" && !text) throw new HttpError(502, "Mavix kreeg geen volledig antwoord. Probeer een kortere opdracht.");
+    if (!text) throw new HttpError(502, "Mavix gaf geen voorstel terug. Probeer het opnieuw.");
     // output_tokens already includes reasoning tokens (billed as output).
     console.info(JSON.stringify({ event: "ai_generated", model, input: usage?.input_tokens || 0, output: usage?.output_tokens || 0, reasoning: usage?.output_tokens_details?.reasoning_tokens || 0 }));
     return text;
@@ -84,7 +84,7 @@ export async function aiText(instructions: string, messages: AiMessage[], tier: 
 export async function aiJson<T>(instructions: string, messages: AiMessage[], schema: { name: string; schema: Record<string, unknown> }, tier: AiTier = "standard"): Promise<T> {
   const model = modelFor(tier);
   const chars = instructions.length + messages.reduce((s, m) => s + m.content.reduce((t, c) => t + c.text.length, 0), 0);
-  if (chars > currentInputLimit() * 3) throw new HttpError(413, "Deze opdracht is te lang voor Mavi. Maak hem korter.");
+  if (chars > currentInputLimit() * 3) throw new HttpError(413, "Deze opdracht is te lang voor Mavix. Maak hem korter.");
   takeStep();
   try {
     const response = await openai().responses.create({
@@ -99,12 +99,12 @@ export async function aiJson<T>(instructions: string, messages: AiMessage[], sch
     const usage = response.usage;
     if (usage) recordTokens(model, usage.input_tokens || 0, usage.output_tokens || 0);
     const text = (response.output_text || "").trim();
-    if (response.status === "incomplete" || !text) throw new HttpError(502, "Mavi kreeg geen volledig antwoord. Probeer een kortere opdracht.");
+    if (response.status === "incomplete" || !text) throw new HttpError(502, "Mavix kreeg geen volledig antwoord. Probeer een kortere opdracht.");
     console.info(JSON.stringify({ event: "ai_generated", model, input: usage?.input_tokens || 0, output: usage?.output_tokens || 0, format: schema.name }));
     try {
       return JSON.parse(text) as T;
     } catch {
-      throw new HttpError(502, "Mavi gaf een onbruikbaar antwoord. Probeer het opnieuw.");
+      throw new HttpError(502, "Mavix gaf een onbruikbaar antwoord. Probeer het opnieuw.");
     }
   } catch (e) {
     throw aiError(e);
@@ -151,8 +151,8 @@ export async function aiStep(instructions: string, input: ResponseInputItem[], t
     const carry = output.filter((o) => o.type === "function_call" || o.type === "reasoning") as ResponseInputItem[];
     const text = (response.output_text || "").trim();
     if (!calls.length && !text) {
-      if (response.status === "incomplete") throw new HttpError(502, "Mavi kreeg geen volledig antwoord. Probeer een kortere vraag.");
-      throw new HttpError(502, "Mavi gaf geen antwoord terug. Probeer het opnieuw.");
+      if (response.status === "incomplete") throw new HttpError(502, "Mavix kreeg geen volledig antwoord. Probeer een kortere vraag.");
+      throw new HttpError(502, "Mavix gaf geen antwoord terug. Probeer het opnieuw.");
     }
     console.info(JSON.stringify({ event: "ai_step", model, input: usage?.input_tokens || 0, output: usage?.output_tokens || 0, tools: calls.map((c) => c.name) }));
     return { text, calls, carry };
@@ -212,7 +212,7 @@ export async function aiImage(o: { prompt: string; size: string; photo?: { data:
     if (usage) recordTokens(model, usage.input_tokens || 0, usage.output_tokens || 0);
     else worstCase();
     const b64 = response.data?.[0]?.b64_json;
-    if (!b64) throw new HttpError(502, "Mavi kon geen afbeelding maken. Probeer een andere beschrijving.");
+    if (!b64) throw new HttpError(502, "Mavix kon geen afbeelding maken. Probeer een andere beschrijving.");
     console.info(JSON.stringify({ event: "ai_image", model, mode: o.photo ? "edit" : "generate", input: usage?.input_tokens || 0, output: usage?.output_tokens || 0 }));
     return Buffer.from(b64, "base64");
   } catch (e) {
@@ -223,7 +223,7 @@ export async function aiImage(o: { prompt: string; size: string; photo?: { data:
       return Promise.reject(new HttpError(504, "Het maken van de afbeelding duurde te lang. Probeer het opnieuw; dit verzoek is voor de zekerheid meegeteld in je AI-tegoed."));
     }
     // Refused by the provider's safety system: say so plainly.
-    if (e instanceof OpenAI.BadRequestError && /safety|moderation/i.test(String((e as { code?: string }).code || e.message))) return Promise.reject(new HttpError(400, "Deze beschrijving kan Mavi niet als afbeelding maken. Pas de beschrijving aan."));
+    if (e instanceof OpenAI.BadRequestError && /safety|moderation/i.test(String((e as { code?: string }).code || e.message))) return Promise.reject(new HttpError(400, "Deze beschrijving kan Mavix niet als afbeelding maken. Pas de beschrijving aan."));
     throw aiError(e);
   }
 }
@@ -236,12 +236,12 @@ export function aiError(e: unknown): unknown {
     console.error(JSON.stringify({ event: "ai_failed", status: e.status ?? 0, code }));
     if (code === "insufficient_quota" || code === "billing_hard_limit_reached")
       return new HttpError(503, "Het AI-tegoed van Mavix is op. Er is niets gegenereerd; probeer het later opnieuw.");
-    if (e instanceof OpenAI.RateLimitError) return new HttpError(429, "Mavi is even druk. Probeer het over een minuut opnieuw.");
+    if (e instanceof OpenAI.RateLimitError) return new HttpError(429, "Mavix is even druk. Probeer het over een minuut opnieuw.");
     if (e instanceof OpenAI.AuthenticationError || e instanceof OpenAI.PermissionDeniedError) return new HttpError(503, "AI is nog niet goed geconfigureerd. Er is niets gegenereerd.");
     if (e instanceof OpenAI.NotFoundError) return new HttpError(503, "Het ingestelde AI-model is niet beschikbaar. Er is niets gegenereerd.");
-    if (e instanceof OpenAI.APIConnectionError) return new HttpError(503, "Mavi is tijdelijk niet bereikbaar. Probeer het opnieuw.");
-    if (e instanceof OpenAI.BadRequestError) return new HttpError(502, "Mavi kon geen voorstel maken voor deze opdracht.");
-    return new HttpError(503, "Mavi is tijdelijk niet beschikbaar. Probeer het opnieuw.");
+    if (e instanceof OpenAI.APIConnectionError) return new HttpError(503, "Mavix is tijdelijk niet bereikbaar. Probeer het opnieuw.");
+    if (e instanceof OpenAI.BadRequestError) return new HttpError(502, "Mavix kon geen voorstel maken voor deze opdracht.");
+    return new HttpError(503, "Mavix is tijdelijk niet beschikbaar. Probeer het opnieuw.");
   }
   return e;
 }

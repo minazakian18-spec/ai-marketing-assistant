@@ -10,6 +10,7 @@ import {
   Folder,
   FolderInput,
   FolderPlus,
+  Plus,
   Menu as MenuIcon,
   MoreHorizontal,
   PanelLeftClose,
@@ -98,6 +99,9 @@ export function AgentWorkspace() {
   const [searching, setSearching] = useState(false);
 
   const [activeId, setActiveId] = useState<string | null>(search.get("c"));
+  // Project for a new conversation that does not exist yet: sent with the
+  // first message, so the server creates the conversation inside the project.
+  const [draftFolder, setDraftFolder] = useState<string | null>(search.get("c") ? null : search.get("project"));
   const [messages, setMessages] = useState<Message[]>([]);
   const [moreMessages, setMoreMessages] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -123,6 +127,9 @@ export function AgentWorkspace() {
   const handoffDone = useRef(false);
 
   const active = conversations.find((c) => c.id === activeId) || null;
+  // The project shown in the header: the open conversation's, or the one a new conversation will start in.
+  const projectId = active ? active.folder_id : activeId ? null : draftFolder;
+  const project = projectId ? folders.find((f) => f.id === projectId) || null : null;
 
   // The mobile drawer closes with Escape.
   useEffect(() => {
@@ -177,11 +184,14 @@ export function AgentWorkspace() {
   }, [query, archivedView, demo]);
 
   const openConversation = useCallback(
-    async (id: string | null) => {
+    async (id: string | null, folderId: string | null = null) => {
       setActiveId(id);
       setNotice("");
       setDrawer(false);
-      router.replace(id ? "/agent?c=" + id : "/agent", { scroll: false });
+      // A new conversation can start inside a project; an existing one shows its own project.
+      setDraftFolder(id ? null : folderId);
+      if (!id && folderId) setOpenFolders((o) => ({ ...o, [folderId]: true }));
+      router.replace(id ? "/agent?c=" + id : folderId ? "/agent?project=" + folderId : "/agent", { scroll: false });
       if (!id) {
         setMessages([]);
         setMoreMessages(false);
@@ -201,6 +211,14 @@ export function AgentWorkspace() {
     },
     [router],
   );
+
+  // A project from the URL that is not (or no longer) one of the user's own:
+  // start without a project instead of failing on the first message.
+  useEffect(() => {
+    if (loadingList || !draftFolder || folders.some((f) => f.id === draftFolder)) return;
+    setDraftFolder(null);
+    if (!activeId) router.replace("/agent", { scroll: false });
+  }, [loadingList, draftFolder, folders, activeId, router]);
 
   // Conversation from the URL after a reload.
   useEffect(() => {
@@ -249,7 +267,7 @@ export function AgentWorkspace() {
       const r = await api<{ configured: boolean; conversation?: Conversation; userMessage?: Message | null; reply?: Message }>("/api/agent", {
         method: "POST",
         headers: { "Idempotency-Key": crypto.randomUUID() },
-        json: retry ? { retry: true, conversationId: activeId } : { text, conversationId: activeId || undefined },
+        json: retry ? { retry: true, conversationId: activeId } : { text, conversationId: activeId || undefined, folderId: !activeId && draftFolder ? draftFolder : undefined },
       });
       setSending(false);
       setActivity(r.ok ? "done" : "idle");
@@ -271,12 +289,14 @@ export function AgentWorkspace() {
       const conv = r.body.conversation;
       if (!activeId) {
         setActiveId(conv.id);
+        setDraftFolder(null);
+        if (conv.folder_id) setOpenFolders((o) => ({ ...o, [conv.folder_id as string]: true }));
         router.replace("/agent?c=" + conv.id, { scroll: false });
       }
       upsert(conv);
       setMessages((m) => [...m.filter((x) => x.id !== tempId), ...(r.body.userMessage ? [r.body.userMessage] : []), ...(r.body.reply ? [r.body.reply] : [])]);
     },
-    [sending, configured, demo, activeId, router, setActivity],
+    [sending, configured, demo, activeId, draftFolder, router, setActivity],
   );
 
   // Prompt handed over from the dashboard or the quick panel.
@@ -287,6 +307,7 @@ export function AgentWorkspace() {
     if (!q) return;
     router.replace("/agent", { scroll: false });
     setActiveId(null);
+    setDraftFolder(null);
     setMessages([]);
     void send(q);
   }, [configured, takeHandoff, send, router]);
@@ -312,6 +333,9 @@ export function AgentWorkspace() {
     if (!r.ok) return setNotice(r.body.error || "Het project kon niet worden aangemaakt.");
     setFolders((f) => [...f, r.body.folder].sort((a, b) => a.name.localeCompare(b.name)));
     setOpenFolders((o) => ({ ...o, [r.body.folder.id]: true }));
+    // Start working in the new project right away: the next conversation is created inside it.
+    await openConversation(null, r.body.folder.id);
+    setNotice(`Project “${r.body.folder.name}” is aangemaakt. Je eerste vraag start een gesprek in dit project.`);
   }
   async function renameFolder(id: string, name: string) {
     const r = await api<{ folder: FolderRow }>("/api/agent/folders/" + id, { method: "PATCH", json: { name } });
@@ -323,12 +347,14 @@ export function AgentWorkspace() {
     if (!r.ok) return setNotice(r.body.error || "Het project kon niet worden verwijderd.");
     setFolders((f) => f.filter((x) => x.id !== id));
     setConversations((list) => list.map((c) => (c.folder_id === id ? { ...c, folder_id: null } : c)));
+    // A new conversation that was about to start in this project starts without one.
+    if (draftFolder === id) void openConversation(null);
   }
   async function saveInstructions(id: string, value: string) {
     const r = await api<{ folder: FolderRow }>("/api/agent/folders/" + id, { method: "PATCH", json: { instructions: value } });
     if (!r.ok) return setNotice(r.body.error || "De instructies konden niet worden opgeslagen.");
     setFolders((f) => f.map((x) => (x.id === id ? r.body.folder : x)));
-    setNotice("Projectinstructies opgeslagen. Mavi gebruikt ze in de gesprekken van dit project.");
+    setNotice("Projectinstructies opgeslagen. Mavix gebruikt ze in de gesprekken van dit project.");
   }
   // Confirm or cancel a change Mavi proposed. Only this click changes the workspace.
   async function decide(messageId: string, proposal: Proposal, decision: "confirm" | "cancel") {
@@ -525,6 +551,7 @@ export function AgentWorkspace() {
                               className="ag-conv-menu"
                               trigger={<MoreHorizontal size={15} />}
                               items={[
+                                { label: "Nieuw gesprek in dit project", icon: <SquarePen size={14} />, onSelect: () => void openConversation(null, f.id) },
                                 { label: "Project hernoemen", icon: <Pencil size={14} />, onSelect: () => setRenaming({ kind: "folder", id: f.id, value: f.name }) },
                                 { label: f.instructions ? "Instructies bewerken" : "Instructies toevoegen", icon: <ScrollText size={14} />, onSelect: () => setInstructions({ id: f.id, name: f.name, value: f.instructions || "" }) },
                                 { label: "Project verwijderen", icon: <Trash2 size={14} />, danger: true, onSelect: () => setConfirm({ kind: "folder", id: f.id, name: f.name }) },
@@ -532,7 +559,20 @@ export function AgentWorkspace() {
                             />
                           </div>
                         )}
-                        {open && (items.length ? <ul className="ag-folder-items">{items.map(row)}</ul> : <p className="ag-muted ag-small ag-indent">Dit project heeft nog geen gesprekken.</p>)}
+                        {open && (
+                          <>
+                            {items.length ? <ul className="ag-folder-items">{items.map(row)}</ul> : <p className="ag-muted ag-small ag-indent">Dit project heeft nog geen gesprekken.</p>}
+                            <button
+                              type="button"
+                              className={"ag-folder-new" + (!activeId && draftFolder === f.id ? " is-active" : "")}
+                              aria-current={!activeId && draftFolder === f.id ? "page" : undefined}
+                              onClick={() => void openConversation(null, f.id)}
+                            >
+                              <Plus size={13} aria-hidden="true" />
+                              Nieuw gesprek in dit project
+                            </button>
+                          </>
+                        )}
                       </li>
                     );
                   })}
@@ -596,7 +636,18 @@ export function AgentWorkspace() {
           <IconButton label="Gesprekken tonen" className="ag-drawer-btn" onClick={() => setDrawer(true)}>
             <MenuIcon size={17} />
           </IconButton>
-          <h1 className="ag-main-title">{active ? active.title : "Mavix Agent"}</h1>
+          <h1 className="ag-main-title">{active ? active.title : project ? "Nieuw gesprek" : "Mavix Agent"}</h1>
+          {project && (
+            <span className="ag-project-chip" title={"Project: " + project.name}>
+              <Folder size={13} aria-hidden="true" />
+              <span>{project.name}</span>
+              {!active && (
+                <button type="button" aria-label="Gesprek zonder project starten" onClick={() => void openConversation(null)}>
+                  <X size={12} aria-hidden="true" />
+                </button>
+              )}
+            </span>
+          )}
           {active && <Menu label="Acties voor dit gesprek" trigger={<MoreHorizontal size={16} />} items={conversationMenu(active)} />}
         </header>
 
@@ -607,9 +658,14 @@ export function AgentWorkspace() {
           <div className="ag-column">
             {empty ? (
               <div className="ag-empty">
-                <MaviMascot size={92} state={mascot} className="ag-empty-mascot" />
+                {project && (
+                  <p className="ag-empty-project">
+                    <Folder size={14} aria-hidden="true" /> Nieuw gesprek in <strong>{project.name}</strong>
+                    {project.instructions ? " · Mavix volgt de instructies van dit project." : ""}
+                  </p>
+                )}
                 <h2>Waar werken we vandaag aan?</h2>
-                <p>Mavi is je marketingassistent. Hij kent je Brand Hub en werkruimte, schrijft teksten en plannen, en wijst je de weg in Mavix. Hij publiceert of verstuurt nooit zelf iets.</p>
+                <p>Mavix is je marketingassistent. Hij kent je Brand Hub en werkruimte, schrijft teksten en plannen, en wijst je de weg in Mavix. Hij publiceert of verstuurt nooit zelf iets.</p>
                 <ul className="ag-suggestions" aria-label="Voorbeelden">
                   {AGENT_SUGGESTIONS.map((s) => (
                     <li key={s.prompt}>
@@ -644,7 +700,7 @@ export function AgentWorkspace() {
                       <div className="ag-msg-body">
                         {m.status === "failed" ? <p role="alert">{m.content}</p> : <Markdown text={m.content} />}
                         {m.action?.proposal && m.status === "ok" && (
-                          <div className="ag-proposal" role="group" aria-label="Voorstel van Mavi">
+                          <div className="ag-proposal" role="group" aria-label="Voorstel van Mavix">
                             <strong>Voorstel: concepten opslaan</strong>
                             <p>{m.action.proposal.summary}</p>
                             {m.action.proposal.status === "pending" ? (
@@ -690,7 +746,7 @@ export function AgentWorkspace() {
                   ),
                 )}
                 {sending && (
-                  <div className="ag-msg is-assistant" aria-label="Mavi schrijft een antwoord">
+                  <div className="ag-msg is-assistant" aria-label="Mavix schrijft een antwoord">
                     <MaviAvatar size={28} state="thinking" />
                     <div className="ag-msg-body">
                       <div className="ag-typing" aria-hidden="true">
@@ -699,7 +755,7 @@ export function AgentWorkspace() {
                         <span />
                       </div>
                       <p className="ag-progress" role="status">
-                        Mavi zoekt de gegevens op die nodig zijn en schrijft een antwoord…
+                        Mavix zoekt de gegevens op die nodig zijn en schrijft een antwoord…
                       </p>
                     </div>
                   </div>
@@ -731,7 +787,7 @@ export function AgentWorkspace() {
               </UpgradeNotice>
             ) : (
               <div className={"ag-composer-wrap" + (!empty ? " has-mascot" : "")}>
-                {/* In a conversation, Mavi sits on top of the input (the large one shows in the empty state). */}
+                {/* The one mascot placement: small, bottom right on the input, in a conversation. */}
                 {!empty && <MaviMascot size={46} state={mascot} className="ag-composer-mascot" />}
                 <AgentComposer
                   key={draft.key}
@@ -741,11 +797,11 @@ export function AgentWorkspace() {
                   busy={sending}
                   onSubmit={(text) => void send(text)}
                   onTypingChange={setTyping}
-                  placeholder="Vraag Mavi om een plan, tekst of idee"
+                  placeholder="Vraag Mavix om een plan, tekst of idee"
                 />
               </div>
             )}
-            <p className="ag-disclaimer">Mavi kan fouten maken. Controleer feiten, prijzen en acties voordat je iets publiceert.</p>
+            <p className="ag-disclaimer">Mavix kan fouten maken. Controleer feiten, prijzen en acties voordat je iets publiceert.</p>
           </div>
         </div>
       </section>
@@ -780,7 +836,7 @@ export function AgentWorkspace() {
         }}
       >
         <label className="ag-instructions">
-          <span>Mavi volgt deze instructies in alle gesprekken van dit project, bijvoorbeeld de toon, het onderwerp of wat je wilt vermijden.</span>
+          <span>Mavix volgt deze instructies in alle gesprekken van dit project, bijvoorbeeld de toon, het onderwerp of wat je wilt vermijden.</span>
           <textarea
             value={instructions?.value || ""}
             maxLength={2000}

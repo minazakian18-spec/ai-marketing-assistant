@@ -734,3 +734,72 @@
     scroll-behavior: auto;
   }
 }
+
+/* ---------- Project conversations ---------- */
+.ag-project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 40%;
+  padding: 3px 6px 3px 9px;
+  border: 1px solid #e4ddf6;
+  border-radius: 999px;
+  background: #f7f4fe;
+  color: #4c1d95;
+  font-size: 12.5px;
+  font-weight: 600;
+  flex: none;
+}
+.ag-project-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ag-project-chip button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.ag-project-chip button:hover {
+  background: #ede6fc;
+}
+.ag-folder-new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 22px);
+  margin: 2px 0 6px 22px;
+  padding: 6px 8px;
+  border: 1px dashed #ddd5f2;
+  border-radius: 8px;
+  background: none;
+  color: #5b21b6;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.ag-folder-new:hover,
+.ag-folder-new.is-active {
+  border-style: solid;
+  border-color: #c9b8f5;
+  background: #f7f4fe;
+}
+.ag-empty-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 auto 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #f7f4fe;
+  color: #4c1d95;
+  font-size: 13px;
+}

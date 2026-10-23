@@ -87,8 +87,8 @@ export function buildTodos(i: TodoInput): Todo[] {
       title: "Brand Hub aanvullen",
       detail:
         i.brandScore >= 100
-          ? "Je merkprofiel is compleet. Mavi schrijft in jouw stem."
-          : "Hoe completer je merkprofiel, hoe beter Mavi in jouw stem schrijft.",
+          ? "Je merkprofiel is compleet. Mavix schrijft in jouw stem."
+          : "Hoe completer je merkprofiel, hoe beter Mavix in jouw stem schrijft.",
       href: "/brand-hub",
       cta: "Aanvullen",
       done: i.brandScore >= 100,

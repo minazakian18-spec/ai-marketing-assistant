@@ -76,7 +76,7 @@ export function ResearchReportView({
       setQa((list) => [...list, { q: q.trim(), a }]);
       setQuestion("");
     } catch (err) {
-      setAskError(err instanceof Error ? err.message : "Mavi kon de vraag niet beantwoorden.");
+      setAskError(err instanceof Error ? err.message : "Mavix kon de vraag niet beantwoorden.");
     } finally {
       setAsking(false);
     }
@@ -198,14 +198,14 @@ export function ResearchReportView({
         )}
         <p className="rs-note">
           Gemeten gegevens komen rechtstreeks uit je gekoppelde bronnen. &ldquo;Waarom belangrijk&rdquo; en de adviezen zijn de interpretatie van Mavix.
-          {report.summarySource === "ai" ? " De samenvatting is geschreven door Mavi op basis van deze bevindingen." : ""}
+          {report.summarySource === "ai" ? " De samenvatting is geschreven door Mavix op basis van deze bevindingen." : ""}
         </p>
       </section>
 
       {onAsk && (
         <section className="rs-block rs-ask" aria-labelledby="rs-ask-title">
           <h3 id="rs-ask-title">
-            <Mavi size={16} /> Vraag Mavi over dit onderzoek
+            <Mavi size={16} /> Vraag Mavix over dit onderzoek
           </h3>
           {qa.map((x, i) => (
             <div className="rs-qa" key={i}>
@@ -231,7 +231,7 @@ export function ResearchReportView({
               <ArrowUp size={16} />
             </button>
           </form>
-          {asking && <p className="rs-note">Mavi denkt na…</p>}
+          {asking && <p className="rs-note">Mavix denkt na…</p>}
           {askError && (
             <p className="rs-error" role="alert">
               {askError}

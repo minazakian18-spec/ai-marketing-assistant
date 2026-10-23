@@ -21,8 +21,8 @@ export function ReplyPreferences({ settings, onChange }: { settings: ReviewAutoR
           setSaved(true);
         }}
       >
-        <h2>Antwoordstijl voor Mavi</h2>
-        <p>Mavi gebruikt dit bij het voorstellen van een antwoord. Jij controleert en plaatst elk antwoord zelf.</p>
+        <h2>Antwoordstijl voor Mavix</h2>
+        <p>Mavix gebruikt dit bij het voorstellen van een antwoord. Jij controleert en plaatst elk antwoord zelf.</p>
         <label>
           Toon
           <textarea rows={3} maxLength={300} value={tone} onChange={(e) => (setTone(e.target.value), setSaved(false))} />
@@ -43,7 +43,7 @@ export function ReplyPreferences({ settings, onChange }: { settings: ReviewAutoR
           <Building2 size={18} aria-hidden="true" />
           <span>
             <strong>Brand Hub</strong>
-            <small>Bedrijfsnaam en merkstem die Mavi in antwoorden gebruikt.</small>
+            <small>Bedrijfsnaam en merkstem die Mavix in antwoorden gebruikt.</small>
           </span>
           <ArrowUpRight size={15} aria-hidden="true" />
         </Link>

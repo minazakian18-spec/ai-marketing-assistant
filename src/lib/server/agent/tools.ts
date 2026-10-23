@@ -291,7 +291,7 @@ const campaigns: AgentTool<Record<string, never>> = {
       total: list.length,
       campaigns: list.slice(0, 15).map((c) => {
         const s = campaignSummary(ws, c);
-        return { title: cut(c.title, 120), goal: cut(c.goal, 240), created: c.createdAt.slice(0, 10), made_by: c.source === "agent" ? "Mavi" : "Content Studio", items: s.total, drafts: s.drafts, approved: s.approved, scheduled: s.scheduled, published_simulated: s.done };
+        return { title: cut(c.title, 120), goal: cut(c.goal, 240), created: c.createdAt.slice(0, 10), made_by: c.source === "agent" ? "Mavix" : "Content Studio", items: s.total, drafts: s.drafts, approved: s.approved, scheduled: s.scheduled, published_simulated: s.done };
       }),
     };
   },

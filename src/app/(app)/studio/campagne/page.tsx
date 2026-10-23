@@ -151,7 +151,7 @@ function NewCampaign() {
           <button type="button" className="button primary" onClick={() => void generate()} disabled={!!busy || !channels.length}>
             {busy === "all" ? <Loader2 size={15} className="seo-spin" /> : <Sparkles size={15} />} {draft ? "Opnieuw maken" : "Campagne maken"}
           </button>
-          <small className="cp-muted">Mavi gebruikt je Brand Hub en verzint geen prijzen, kortingen of openingstijden.</small>
+          <small className="cp-muted">Mavix gebruikt je Brand Hub en verzint geen prijzen, kortingen of openingstijden.</small>
         </div>
         {error && (
           <p className="cp-error" role="alert">

@@ -52,16 +52,16 @@ const DRAFT_KEY = "mavix.brandhub.draft.v1";
 const ICONS = [Building2, Megaphone, Palette, Target];
 const WHY: Record<number, { title: string; text: string; points: string[] }> = {
   1: {
-    title: "Zo leert Mavi je bedrijf kennen",
-    text: "Met je naam, branche en omschrijving begrijpt Mavi wat je doet. Je unieke kenmerken maken content onderscheidend in plaats van algemeen.",
+    title: "Zo leert Mavix je bedrijf kennen",
+    text: "Met je naam, branche en omschrijving begrijpt Mavix wat je doet. Je unieke kenmerken maken content onderscheidend in plaats van algemeen.",
     points: [
       "Wordt gebruikt in posts, e-mails, antwoorden op berichten en reviews",
-      "Mavi noemt alleen wat jij hier invult; er worden geen feiten verzonnen",
+      "Mavix noemt alleen wat jij hier invult; er worden geen feiten verzonnen",
     ],
   },
   2: {
     title: "Je merkstem in elke tekst",
-    text: "Toon, aanspreekvorm en persoonlijkheid bepalen hoe Mavi schrijft. Woorden die je wilt vermijden, gebruikt Mavi nooit.",
+    text: "Toon, aanspreekvorm en persoonlijkheid bepalen hoe Mavix schrijft. Woorden die je wilt vermijden, gebruikt Mavix nooit.",
     points: [
       "Geldt voor Instagram, e-mail, Inbox-antwoorden en reviewreacties",
       "Een kanaal met eigen instellingen (zoals reviewtoon) gaat voor",
@@ -77,7 +77,7 @@ const WHY: Record<number, { title: string; text: string; points: string[] }> = {
   },
   4: {
     title: "Content met een doel",
-    text: "Je hoofddoel en kanalen bepalen waar Mavi de nadruk op legt. De call-to-action wordt standaard gebruikt als je per post niets anders kiest.",
+    text: "Je hoofddoel en kanalen bepalen waar Mavix de nadruk op legt. De call-to-action wordt standaard gebruikt als je per post niets anders kiest.",
     points: [
       "Lopende aanbiedingen worden alleen genoemd zoals jij ze invult",
       "Je kunt je doelen altijd aanpassen",
@@ -364,12 +364,12 @@ export function BrandHub() {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok)
-        throw new Error(d.error || "Mavi kon geen voorbeeld schrijven.");
+        throw new Error(d.error || "Mavix kon geen voorbeeld schrijven.");
       setAi(d);
       setPreviewProfile(draft);
     } catch (e) {
       setPreviewError(
-        e instanceof Error ? e.message : "Mavi kon geen voorbeeld schrijven.",
+        e instanceof Error ? e.message : "Mavix kon geen voorbeeld schrijven.",
       );
     } finally {
       setPreviewBusy(false);
@@ -389,7 +389,7 @@ export function BrandHub() {
       <PageHeading
         eyebrow="Merk"
         title="Brand Hub"
-        description="Het geheugen van je merk. Mavi gebruikt dit in al je posts, e-mails en antwoorden."
+        description="Het geheugen van je merk. Mavix gebruikt dit in al je posts, e-mails en antwoorden."
       />
 
       {restored && (
@@ -763,7 +763,7 @@ function Overview({
             <h2>{profile.name || "Je merk"}</h2>
             <p>
               {profile.description ||
-                "Vertel in Brand Hub wat je bedrijf doet, zodat Mavi in jouw stem kan schrijven."}
+                "Vertel in Brand Hub wat je bedrijf doet, zodat Mavix in jouw stem kan schrijven."}
             </p>
             {c.percent < 100 && (
               <p className="bh-hint">
@@ -849,7 +849,7 @@ function Overview({
           <ImageIcon size={16} aria-hidden="true" /> Verdieping
         </h2>
         <p className="bh-hint">
-          Doelgroepsegmenten en productkaarten geven Mavi nog meer houvast,
+          Doelgroepsegmenten en productkaarten geven Mavix nog meer houvast,
           bijvoorbeeld voor posts over één product of één klantgroep.
         </p>
         <SegmentsManager />

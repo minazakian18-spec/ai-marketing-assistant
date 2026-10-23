@@ -502,7 +502,7 @@ export function analyze(input: ResearchInput): Finding[] {
       title: "Klantvragen wachten langer dan een dag",
       found: `${ib.waitingOver24h} gesprek(ken) in je Inbox wachten al meer dan 24 uur op antwoord.`,
       why: "Wie geen snel antwoord krijgt, reserveert vaak ergens anders.",
-      action: "Beantwoord openstaande berichten dagelijks; Mavi kan antwoorden voorstellen.",
+      action: "Beantwoord openstaande berichten dagelijks; Mavix kan antwoorden voorstellen.",
       priority: "high",
       impact: 4,
       sources: ["inbox"],

@@ -49,7 +49,7 @@ export function AiPreferences() {
       <PageHeading
         eyebrow="Werkruimte"
         title="AI-voorkeuren"
-        description="Geef Mavi een vaste basis. Per bericht of kanaal kun je hiervan afwijken."
+        description="Geef Mavix een vaste basis. Per bericht of kanaal kun je hiervan afwijken."
       />
       <form
         onChange={() => setMessage("")}
@@ -80,7 +80,7 @@ export function AiPreferences() {
             );
             setMessage(
               ok
-                ? "Opgeslagen. Mavi gebruikt deze voorkeuren voor nieuwe content."
+                ? "Opgeslagen. Mavix gebruikt deze voorkeuren voor nieuwe content."
                 : "Opslaan is niet gelukt. Je wijzigingen staan nog in het formulier.",
             );
           } finally {
