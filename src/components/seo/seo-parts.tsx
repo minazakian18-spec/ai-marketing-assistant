@@ -69,8 +69,10 @@ export function ScoreRing({ value, size = 120, stroke = 10, caption }: { value: 
           />
         )}
       </svg>
+      {/* A layer over the whole ring; the inner span is trimmed to the digits'
+          own height, so 7, 75, 100 and the dash all sit in the exact centre. */}
       <span className="seo-ring-number" style={{ fontSize: Math.round(size * 0.3) }}>
-        {value === null ? "—" : shown}
+        <span>{value === null ? "—" : shown}</span>
       </span>
       {caption && <span className="seo-ring-caption">{caption}</span>}
     </div>
