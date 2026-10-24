@@ -74,3 +74,27 @@ test("workspace data is only written by the server after its checks; the direct 
   assert.match(sql, /ROLLBACK/);
   assert.doesNotMatch(sql, /drop policy if exists business_read/, "reading stays allowed for members");
 });
+/* ---------------- Image input: only JPEG/PNG/WebP bytes reach sharp ---------------- */
+test("image signatures: JPEG, PNG and WebP pass; SVG, PDF, TIFF and disguised files never reach the image library", () => {
+  const { sniffImage } = serverLoader({})("src/lib/server/image-sniff.ts");
+  assert.equal(sniffImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0])), "jpeg");
+  assert.equal(sniffImage(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0])), "png");
+  assert.equal(sniffImage(Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(4), Buffer.from("WEBPVP8 ")])), "webp");
+  for (const bad of ['<svg xmlns="http://www.w3.org/2000/svg"></svg>', '<?xml version="1.0"?><svg/>', "%PDF-1.7", "II*\u0000", "GIF89a", ""]) assert.equal(sniffImage(Buffer.from(bad, "latin1")), null, JSON.stringify(bad));
+  // The sharp call sites check the signature before calling sharp.
+  for (const f of ["src/lib/server/image-input.ts", "src/lib/server/instagram-publish.ts"]) {
+    const src = fs.readFileSync(f, "utf8");
+    assert.ok(src.indexOf("sniffImage(") > 0 && src.indexOf("sniffImage(") < src.indexOf("sharp("), f + " checks the signature before sharp");
+  }
+});
+test("an SVG disguised as a PNG data URL is refused before sharp is called", async () => {
+  let sharpCalls = 0;
+  const load = serverLoader({
+    sharp: { default: () => (sharpCalls++, { metadata: async () => ({ format: "svg", width: 900, height: 900 }) }) },
+    [path.resolve("src/lib/server/library.ts")]: { readImage: async () => { throw new Error("not used"); } },
+  });
+  const { loadImageInput } = load("src/lib/server/image-input.ts");
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900"></svg>').toString("base64");
+  await assert.rejects(loadImageInput("w1", "data:image/png;base64," + svg), (e) => e.status === 400 && /JPG-, PNG- of WebP/.test(e.message));
+  assert.equal(sharpCalls, 0, "sharp never saw the SVG");
+});

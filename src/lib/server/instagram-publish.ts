@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { sniffImage } from "./image-sniff";
 import { adminClient } from "./supabase";
 import { HttpError } from "./access";
 import { graph, igGraph, metaConfigured, metaConnection } from "./meta";
@@ -85,6 +86,11 @@ async function toJpeg(workspaceId: string, src: string): Promise<Buffer> {
     if (!m) throw new HttpError(400, "Gebruik JPG-, PNG- of WebP-foto's.");
     bytes = Buffer.from(m[2], "base64");
   }
+  // The declared type is not trusted: real JPEG/PNG/WebP bytes only, checked
+  // before sharp parses anything (no SVG through librsvg).
+  const real = sniffImage(bytes);
+  if (!real) throw new HttpError(400, "Gebruik JPG-, PNG- of WebP-foto's.");
+  m = ["", real, ""];
   type Sharp = (b: Buffer) => { metadata(): Promise<{ width?: number; height?: number }>; jpeg(o: { quality: number }): { toBuffer(): Promise<Buffer> } };
   // sharp ships with Next.js for image optimisation; without it only JPEG is accepted.
   const sharp = await import("sharp").then((m) => m.default as unknown as Sharp).catch(() => null as Sharp | null);

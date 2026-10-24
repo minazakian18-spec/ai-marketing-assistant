@@ -1,5 +1,6 @@
 import "server-only";
 import { HttpError } from "./access";
+import { sniffImage } from "./image-sniff";
 import { readImage } from "./library";
 import { mediaIdOf } from "../media-ref";
 
@@ -37,6 +38,8 @@ export async function loadImageInput(workspaceId: string, src: string, label = "
   if (!ref && !m) throw new HttpError(400, `${label} moet een JPG-, PNG- of WebP-afbeelding zijn.`);
   const img = ref ? await readImage(workspaceId, ref) : { data: Buffer.from(m![2], "base64"), mime: "image/" + m![1] };
   if (img.data.length > MAX_BYTES) throw new HttpError(413, `${label} is groter dan 8 MB.`);
+  // Real JPEG/PNG/WebP bytes only: SVG and other formats never reach sharp.
+  if (!sniffImage(img.data)) throw new HttpError(400, `${label} moet een JPG-, PNG- of WebP-afbeelding zijn.`);
   try {
     const sharp = (await import("sharp")).default;
     const meta = await sharp(img.data).metadata();
