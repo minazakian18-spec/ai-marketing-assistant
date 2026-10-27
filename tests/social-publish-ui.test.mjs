@@ -41,7 +41,7 @@ test("the briefing is the image brief; extra image and post settings are folded 
 test("AI actions in the editor are locked synchronously against double clicks", () => {
   const create = fs.readFileSync("src/components/instagram/create.tsx", "utf8");
   for (const fn of ["generate", "regenerateImageOnly", "makeImage", "editImage", "edit"]) {
-    const body = create.match(new RegExp("async function " + fn + "\\([\\s\\S]*?\\n  }\\n"))[0];
+    const body = create.match(new RegExp("async function " + fn + "\\([\\s\\S]*?\\r?\\n  }\\r?\\n"))[0];
     assert.match(body, /lockAi\(\)/, fn + " takes the lock");
     assert.match(body, /finally \{\s*aiLock\.current = false;/, fn + " releases the lock");
   }
