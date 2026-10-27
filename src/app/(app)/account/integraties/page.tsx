@@ -95,7 +95,8 @@ const NOTICES: Record<string, string> = {
   "error=meta": "Meta heeft de koppeling afgebroken. Controleer of je de juiste Facebook-pagina en het Instagram-account hebt geselecteerd en probeer het opnieuw. Blijft dit gebeuren, neem dan contact op met de beheerder.",
   "connected=google_business": "Google Bedrijfsprofiel is gekoppeld. Je reviews staan nu onder Reviews.",
   "select=google_business": "Google-account gekoppeld. Kies hieronder je bedrijfslocatie.",
-  "error=no_locations": "Google-account gekoppeld, maar er is geen bedrijfslocatie gevonden die je mag beheren.",
+  "error=location_access": "Google-account gekoppeld, maar dit account mag de reviews van de gekozen locatie niet lezen. Kies een andere locatie of koppel het account dat eigenaar of beheerder is.",
+  "error=no_locations":"Google-account gekoppeld, maar er is geen bedrijfslocatie gevonden die je mag beheren.",
   "error=api_access": "Google-account gekoppeld, maar Google geeft het project van Mavix nog geen toegang tot de Business Profile API. De reden staat hieronder bij Google Bedrijfsprofiel.",
 };
 

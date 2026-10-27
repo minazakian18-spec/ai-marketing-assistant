@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from "node:fs";
 import { serverLoader, memoryDb } from "./helpers/server-loader.mjs";
 import { normalizeReview, normalizeReviewsPage, matchesFilter, loadedStats } from "../src/lib/reviews/google.ts";
 
@@ -159,7 +160,7 @@ test("no locations: account stays linked with a clear notice", async (t) => {
 
 test("API access not approved (quota 0 or disabled API) is api_access_required, never a disconnect", async (t) => {
   for (const [body, expected] of [
-    [{ error: { status: "RESOURCE_EXHAUSTED", details: [{ reason: "RATE_LIMIT_EXCEEDED", metadata: { quota_limit_value: "0" } }] } }, /nog geen toegang \(quotum\)/],
+    [{ error: { status: "RESOURCE_EXHAUSTED", details: [{ reason: "RATE_LIMIT_EXCEEDED", metadata: { quota_limit_value: "0" } }] } }, /nog geen quotum voor de/],
     [{ error: { status: "PERMISSION_DENIED", message: "My Business Account Management API has not been used in project 123 before or it is disabled.", details: [{ reason: "SERVICE_DISABLED", metadata: { service: "mybusinessaccountmanagement.googleapis.com" } }] } }, /staat de My Business Account Management API nog uit/],
   ]) {
     const f = setup(t);
@@ -215,7 +216,7 @@ test("reviews: normalized, paginated, Google summary on page one only", async (t
   assert.deepEqual([page.averageRating, page.totalReviewCount, page.nextPageToken], [4.4, 87, "page-2"]);
   assert.deepEqual(page.reviews.map((r) => [r.id, r.rating, !!r.reply]), [["r1", 4, false], ["r2", 2, true]]);
   assert.equal(page.reviews[0].reviewer.photoUrl, "https://lh3.googleusercontent.com/a/photo");
-  const call = new URL(f.requests.find((r) => r.url.includes("/reviews?")).url);
+  const call = new URL(f.requests.filter((r) => r.url.includes("/reviews?")).at(-1).url); // after the read-only check (pageSize 1)
   assert.equal(call.pathname, "/v4/accounts/1/locations/11/reviews");
   assert.equal(call.searchParams.get("pageSize"), "25");
   const next = await (await f.reviews("route.ts").GET(f.request("/api/reviews?pageToken=page-2"))).json();
@@ -311,4 +312,137 @@ test("Google error kinds: disabled API, zero quota, missing permission and norma
   assert.equal(apiAccessProblem(403, { error: { status: "PERMISSION_DENIED", details: [{ reason: "ACCESS_TOKEN_SCOPE_INSUFFICIENT" }] } }), null, "missing scope is a permission problem, not API access");
   assert.equal(apiAccessProblem(403, { error: { status: "PERMISSION_DENIED", message: "The caller does not have permission" } }), null, "no access to a location is not API access");
   assert.equal(apiAccessProblem(429, { error: { status: "RESOURCE_EXHAUSTED", details: [{ metadata: { quota_limit_value: "300" } }] } }), null, "an approved project that is briefly busy is not blocked");
+});
+
+// ---------------------------------------------------------------- Connection loop (Reviews <-> Integraties)
+
+// Google fixture with switches: which API refuses, which locations exist.
+function google(f, o = {}) {
+  const s = { reviewsOff: false, infoOff: false, quotaZero: false, reviews403: false, consumer: "1012009830290", grant: "ok", scope: "openid email " + MANAGE, ...o };
+  const off = (service) => reply({ error: { status: "PERMISSION_DENIED", message: "Google My Business API has not been used in project " + s.consumer + " before or it is disabled.", details: [{ reason: "SERVICE_DISABLED", metadata: { service, consumer: "projects/" + s.consumer } }] } }, 403);
+  f.network.handle = async (url) => {
+    if (url.includes("oauth2.googleapis.com/token")) return s.grant === "ok" ? reply(f.token({ scope: s.scope })) : reply({ error: "invalid_grant" }, 400);
+    if (url.includes("/userinfo")) return reply({ sub: "g-account", email: "owner@restaurant.nl", email_verified: true });
+    if (url.startsWith("https://mybusinessaccountmanagement.googleapis.com/")) return reply({ accounts: [{ name: "accounts/1" }] });
+    if (url.includes("mybusinessbusinessinformation.googleapis.com")) return s.infoOff ? off("mybusinessbusinessinformation.googleapis.com") : reply({ locations: f.network.locations });
+    if (url.startsWith("https://mybusiness.googleapis.com/v4/")) {
+      if (s.quotaZero) return reply({ error: { status: "RESOURCE_EXHAUSTED", details: [{ metadata: { quota_limit_value: "0", service: "mybusiness.googleapis.com", consumer: "projects/" + s.consumer } }] } }, 429);
+      if (s.reviewsOff) return off("mybusiness.googleapis.com");
+      if (s.reviews403) return reply({ error: { status: "PERMISSION_DENIED", message: "The caller does not have permission" } }, 403);
+      return reply({ reviews: [review("r1")], averageRating: 4, totalReviewCount: 1 });
+    }
+    throw Error("Unexpected fixture request " + url);
+  };
+  return s;
+}
+const check = async (f) => {
+  const r = await f.action("check", "POST");
+  return { status: r.status, body: await r.json() };
+};
+const consent = (f) => f.requests.filter((r) => r.url.startsWith("https://accounts.google.com")).length + f.tables.oauth_states.length;
+
+test("loop fix: reviews API off stays blocked although the location list works; recovers without new OAuth", async (t) => {
+  const f = setup(t);
+  const s = google(f, { reviewsOff: true });
+  const { res, c } = await f.connect();
+  assert.match(res.headers.get("location"), /error=api_access/, "callback proves reviews, not just locations");
+  assert.equal(c.status, "api_access_required");
+  assert.equal(c.metadata.location, "locations/11", "the single location is remembered");
+  const st = await (await f.action("status")).json();
+  assert.equal(st.apiKind, "disabled");
+  assert.match(st.apiMessage, /Google My Business API \(reviews\) nog uit/);
+  assert.match(st.apiMessage, /project 1012009830290/);
+  const before = consent(f);
+  // The old "Opnieuw controleren" listed locations, flipped to connected and looped.
+  assert.equal((await f.action("locations")).status, 200);
+  assert.equal(c.status, "api_access_required", "a working location list does not lift a reviews block");
+  let r = await check(f);
+  assert.deepEqual([r.status, r.body.state], [200, "api_access_required"]);
+  assert.equal(c.status, "api_access_required", "never blindly connected");
+  s.reviewsOff = false; // the owner switches the API on
+  r = await check(f);
+  assert.deepEqual([r.body.state, r.body.location.name], ["connected", "Trattoria Gouda"]);
+  assert.equal(c.status, "connected");
+  assert.equal(c.metadata.apiProblem, undefined);
+  const page = await f.reviews("route.ts").GET(f.request("/api/reviews?pageSize=25"));
+  assert.equal(page.status, 200);
+  assert.equal((await page.json()).reviews.length, 1);
+  assert.equal(consent(f), before, "no new Google consent was needed");
+});
+
+test("zero quota and a wrong Cloud project are told apart", async (t) => {
+  process.env.GOOGLE_CLOUD_PROJECT_NUMBER = "1012009830290";
+  t.after(() => delete process.env.GOOGLE_CLOUD_PROJECT_NUMBER);
+  const f = setup(t);
+  const s = google(f, { quotaZero: true });
+  await f.connect();
+  let st = await (await f.action("status")).json();
+  assert.deepEqual([st.status, st.apiKind], ["api_access_required", "quota"]);
+  assert.match(st.apiMessage, /nog geen quotum voor de Google My Business API/);
+  s.quotaZero = false;
+  s.reviewsOff = true;
+  s.consumer = "555000111";
+  const r = await check(f);
+  assert.equal(r.body.apiKind, "project");
+  assert.match(r.body.message, /project 555000111.*project 1012009830290/);
+});
+
+test("check: selection without location picks the only usable one; several locations ask; an earlier valid choice is kept", async (t) => {
+  const f = setup(t, { locations: [location(11, "Gouda"), location(12, "Delft")] });
+  google(f);
+  const { c } = await f.connect();
+  assert.equal(c.status, "selection_required");
+  let r = await check(f);
+  assert.equal(r.body.state, "selection_required");
+  assert.deepEqual(r.body.locations.map((l) => l.title), ["Gouda", "Delft"]);
+  const sel = await (await f.action("select", "POST", "", { account: "accounts/1", location: "locations/12" })).json();
+  assert.deepEqual([sel.ok, sel.state], [true, "connected"], "selection proves reviews load");
+  r = await check(f);
+  assert.deepEqual([r.body.state, c.metadata.location], ["connected", "locations/12"], "earlier choice kept");
+  // One location closes: the only usable one is picked automatically.
+  const g = setup(t, { locations: [location(11, "Gouda", { openInfo: { status: "CLOSED_PERMANENTLY" } }), location(12, "Delft")] });
+  google(g);
+  await g.connect();
+  assert.deepEqual([g.tables.integration_connections[0].status, g.tables.integration_connections[0].metadata.location], ["connected", "locations/12"]);
+});
+
+test("check: expired login and missing permission ask to reconnect; no access to the location is its own state", async (t) => {
+  const f = setup(t);
+  const s = google(f);
+  const { c } = await f.connect();
+  c.expires_at = new Date(Date.now() - 1000).toISOString();
+  s.grant = "revoked";
+  let r = await check(f);
+  assert.equal(r.status, 409);
+  assert.equal(c.status, "reconnect_required");
+  assert.equal((await (await f.action("status")).json()).status, "reconnect_required");
+
+  const g = setup(t);
+  google(g);
+  const gc = (await g.connect()).c;
+  gc.scopes = ["openid", "email"];
+  r = await check(g);
+  assert.equal(r.status, 403);
+  assert.equal(gc.status, "permission_missing");
+
+  const h = setup(t);
+  google(h, { reviews403: true });
+  const hc = (await h.connect()).c;
+  assert.notEqual(hc.status, "connected", "not connected while reviews are refused");
+  r = await check(h);
+  assert.equal(r.body.state, "location_access");
+  assert.match(r.body.message, /geen toegang tot deze bedrijfslocatie/);
+});
+
+test("Reviews page: real reason, 'Opnieuw controleren' on the page, no generic waiting text, no OAuth loop", () => {
+  const src = fs.readFileSync("src/components/review/live.tsx", "utf8");
+  assert.doesNotMatch(src, /Wacht op toegang van Google/);
+  assert.doesNotMatch(src, /Bekijk koppeling/);
+  assert.match(src, /s\.apiMessage/);
+  assert.match(src, /base \+ "check"/);
+  for (const title of ["Google-account gekoppeld — locatie kiezen", "Google API nog niet ingeschakeld", "Google heeft nog geen API-quota beschikbaar", "Koppeling verlopen — opnieuw verbinden", "Geen toegang tot deze bedrijfslocatie"])
+    assert.ok(src.includes(title), title);
+  // Only expired / missing permission / not connected lead to Google consent.
+  const gate = src.match(/export function gateContent[\s\S]*?\r?\n}\r?\n/)[0];
+  assert.equal((gate.match(/connect: null/g) || []).length, 2, "location choice and API problems never send the user through OAuth");
 });

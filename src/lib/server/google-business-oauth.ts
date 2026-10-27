@@ -14,6 +14,8 @@ import {
   GBP_MANAGE,
   GBP_SCOPES,
   businessConnection,
+  checkBusinessConnection,
+  type CheckResult,
   exchangeBusinessToken,
   listBusinessLocations,
   saveLocation,
@@ -33,6 +35,16 @@ const json = (value: unknown) => NextResponse.json(value, { headers });
 const back = (query: string) =>
   new NextResponse(null, { status: 303, headers: { ...headers, Location: appUrl() + "/account/integraties?" + query } });
 const selection = z.object({ account: z.string().max(60), location: z.string().max(60) }).strict();
+// What the browser needs after a check: the state, a Dutch reason, and the
+// locations to choose from (never tokens).
+const checkView = (r: CheckResult) => ({
+  state: r.state,
+  ...(r.state === "connected" ? { location: { name: r.location.title, address: r.location.address } } : {}),
+  ...(r.state === "selection_required" ? { locations: r.locations } : {}),
+  ...(r.state === "api_access_required" ? { message: r.message, apiKind: r.problem.kind } : {}),
+  ...(r.state === "location_access" ? { message: r.message } : {}),
+  ...(r.state === "no_locations" ? { message: "Dit Google-account beheert geen bedrijfslocatie. Koppel het Google-account dat eigenaar of beheerder is van je bedrijfsprofiel." } : {}),
+});
 
 export async function handleBusinessIntegration(request: Request, action: string) {
   const method = request.method;
@@ -60,6 +72,7 @@ export async function handleBusinessIntegration(request: Request, action: string
         location: m.location ? { name: m.locationTitle || "", address: m.locationAddress || "" } : null,
         // Why Google still refuses (API switched off vs. no quota), in plain Dutch.
         apiMessage: status === "api_access_required" ? apiAccessMessage(m.apiProblem) : null,
+        apiKind: status === "api_access_required" ? m.apiProblem?.kind || "quota" : null,
       });
     }
 
@@ -171,19 +184,20 @@ export async function handleBusinessIntegration(request: Request, action: string
 
       // Discover locations: one usable location is selected automatically, an
       // earlier choice is kept when Google still returns it.
-      const conn = { id: saved[0].id as string, connection_generation: generation, metadata };
+      // Same chain as "Opnieuw controleren"; "connected" only after reviews load.
       try {
-        const locations = await listBusinessLocations(auth.workspaceId);
-        const previous = locations.find((l) => l.location === (metadata as { location?: string }).location);
-        const usable = locations.filter((l) => !l.closed);
-        const pick = previous || (usable.length === 1 ? usable[0] : locations.length === 1 ? locations[0] : null);
-        if (pick) {
-          await saveLocation(auth.workspaceId, conn, pick);
-          return back("connected=" + provider);
-        }
-        if (sameAccount && (metadata as { location?: string }).location)
-          await db.from("integration_connections").update({ metadata: {}, display_name: null }).eq("id", conn.id).eq("connection_generation", generation);
-        return back((locations.length ? "select=" : "error=no_locations&provider=") + provider);
+        const r = await checkBusinessConnection(auth.workspaceId);
+        return back(
+          r.state === "connected"
+            ? "connected=" + provider
+            : r.state === "selection_required"
+              ? "select=" + provider
+              : r.state === "no_locations"
+                ? "error=no_locations&provider=" + provider
+                : r.state === "api_access_required"
+                  ? "error=api_access&provider=" + provider
+                  : "error=location_access&provider=" + provider,
+        );
       } catch (e) {
         if (e instanceof ApiAccessError) return back("error=api_access&provider=" + provider);
         // Temporary Google trouble: the account is linked; the location can be chosen later.
@@ -197,6 +211,13 @@ export async function handleBusinessIntegration(request: Request, action: string
       return json({ locations: await listBusinessLocations(auth.workspaceId) });
     }
 
+    // ---------- check ("Opnieuw controleren": stored connection, no new consent)
+    if (action === "check" && method === "POST") {
+      const r = await checkBusinessConnection(auth.workspaceId);
+      console.info(JSON.stringify({ event: "gbp_check", state: r.state, ...(r.state === "api_access_required" ? { kind: r.problem.kind, service: r.problem.service || null } : {}) }));
+      return json(checkView(r));
+    }
+
     // ---------- select
     if (action === "select" && method === "POST") {
       const input = selection.parse(await request.json());
@@ -206,7 +227,9 @@ export async function handleBusinessIntegration(request: Request, action: string
       if (fresh.connection_generation !== c.connection_generation) throw new HttpError(409, "De koppeling is gewijzigd. Probeer opnieuw.");
       await saveLocation(auth.workspaceId, fresh, location);
       await audit(auth.workspaceId, auth.user.id, "integration_connected");
-      return json({ ok: true, location: { name: location.title, address: location.address } });
+      // Prove reviews really load for this location (read-only).
+      const r = await checkBusinessConnection(auth.workspaceId);
+      return json({ ok: r.state === "connected", location: { name: location.title, address: location.address }, ...checkView(r) });
     }
 
     // ---------- disconnect (nothing at Google is deleted)

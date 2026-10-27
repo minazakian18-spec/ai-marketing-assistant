@@ -991,6 +991,61 @@
   line-height: 1.55;
   color: var(--app-text-2);
 }
+.rvl-gate .rvl-gate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  font-size: 12.5px;
+  color: var(--app-text-3, var(--app-text-2));
+}
+.rvl-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.rvl-gate-picker {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  max-width: 460px;
+  margin: 4px 0;
+  padding: 0;
+  border: 0;
+  text-align: left;
+}
+.rvl-gate-picker legend {
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.rvl-gate-picker label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border, #e5e3ec);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.rvl-gate-picker label:has(input:checked) {
+  border-color: var(--app-accent, #6d28d9);
+}
+.rvl-gate-picker input {
+  width: auto;
+  margin-top: 3px;
+}
+.rvl-gate-picker span {
+  display: grid;
+  gap: 2px;
+}
+.rvl-gate-picker small {
+  color: var(--app-text-2);
+}
+.rvl-gate-picker .button {
+  justify-self: start;
+}
 .rvl-summary {
   display: flex;
   flex-wrap: wrap;

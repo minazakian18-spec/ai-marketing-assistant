@@ -168,6 +168,7 @@ export function GoogleIntegrationCard({
   const [view, setView] = useState<View>({ kind: "loading" });
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
   const [manage, setManage] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -204,6 +205,26 @@ export function GoogleIntegrationCard({
     }
   }, [request, load]);
 
+  // "Opnieuw controleren" with the stored connection (no Google consent):
+  // accounts, locations, the chosen location and one read-only reviews call.
+  const checkAgain = useCallback(async () => {
+    if (!config.locations) return openLocations();
+    setManage(false);
+    setError("");
+    setChecking(true);
+    try {
+      const r = await request<{ state: string; message?: string; locations?: BusinessLocation[]; location?: { name: string } }>("check", "POST");
+      if (r.state === "connected") onNotice((r.location?.name || config.name) + " werkt. Je reviews staan onder Reviews.");
+      else if (r.state === "selection_required" && r.locations) setPicker({ loading: false, error: "", list: r.locations, choice: "", saving: false });
+      else if (r.message) setError(r.message);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setChecking(false);
+      void load();
+    }
+  }, [config.locations, config.name, openLocations, request, onNotice, load]);
+
   useEffect(() => {
     // The page learns about test mode after mount, so check the cookie here too.
     if (isBrowserDemo()) setView({ kind: "disconnected" });
@@ -231,9 +252,11 @@ export function GoogleIntegrationCard({
     if (!pick) return setPicker({ ...picker, error: "Kies eerst een locatie." });
     setPicker({ ...picker, saving: true, error: "" });
     try {
-      await request("select", "POST", { account: pick.account, location: pick.location });
+      const r = await request<{ state?: string; message?: string }>("select", "POST", { account: pick.account, location: pick.location });
       setPicker(null);
-      onNotice(pick.title + " is gekoppeld. Je reviews staan nu onder Reviews.");
+      // The location is saved; say honestly whether reviews really load.
+      if (!r.state || r.state === "connected") onNotice(pick.title + " is gekoppeld. Je reviews staan nu onder Reviews.");
+      else setError(pick.title + " is opgeslagen, maar Google geeft de reviews nog niet vrij. " + (r.message || ""));
       void load();
     } catch (e) {
       setPicker({ ...picker, saving: false, error: (e as Error).message });
@@ -359,9 +382,9 @@ export function GoogleIntegrationCard({
           </>
         ) : view.kind === "api" ? (
           <>
-            <button type="button" className="button secondary" onClick={() => void openLocations()} disabled={demo || busy}>
-              <RefreshCw size={14} aria-hidden="true" />
-              Opnieuw controleren
+            <button type="button" className="button primary" onClick={() => void checkAgain()} disabled={demo || busy || checking}>
+              {checking ? <Loader2 size={14} className="int-spin" aria-hidden="true" /> : <RefreshCw size={14} aria-hidden="true" />}
+              {checking ? "Controleren…" : "Opnieuw controleren"}
             </button>
             {disconnectButton}
           </>

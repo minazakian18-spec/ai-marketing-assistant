@@ -4,12 +4,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { BrandIcon } from "@/components/brand-icon";
 import { API_ACCESS_TEXT } from "@/components/account/google-integration-card";
-import { REVIEW_FILTERS, loadedStats, matchesFilter, monthlyTrend, replyQueue, type GoogleReview, type ReviewFilter, type ReviewsPage } from "@/lib/reviews/google";
+import { REVIEW_FILTERS, type BusinessLocation, loadedStats, matchesFilter, monthlyTrend, replyQueue, type GoogleReview, type ReviewFilter, type ReviewsPage } from "@/lib/reviews/google";
 import { StarRating } from "./shared";
 import { LiveReviewCard } from "./live-card";
 
-type Status = { status: string; connected: boolean; accountEmail: string | null; location: { name: string; address: string } | null };
+type Status = {
+  status: string;
+  connected: boolean;
+  accountEmail: string | null;
+  location: { name: string; address: string } | null;
+  apiMessage?: string | null;
+  apiKind?: "disabled" | "quota" | "project" | null;
+};
 type Data = { reviews: GoogleReview[]; next: string | null; average: number | null; total: number | null };
+type Check = { state: string; message?: string; locations?: BusinessLocation[]; location?: { name: string; address: string } };
 
 async function get<T>(url: string): Promise<T> {
   const r = await fetch(url, { cache: "no-store" });
@@ -17,28 +25,131 @@ async function get<T>(url: string): Promise<T> {
   if (!r.ok) throw new Error(d.error || "Er ging iets mis. Probeer het opnieuw.");
   return d as T;
 }
+async function post<T>(url: string, body: unknown = {}): Promise<T> {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Er ging iets mis. Probeer het opnieuw.");
+  return d as T;
+}
 
-// Connection states shown instead of reviews (never sample data).
-function Gate({ status }: { status: Status | null }) {
-  const s = status?.status || "disconnected";
-  const content =
-    s === "selection_required"
-      ? { title: "Kies je bedrijfslocatie", text: "Je Google-account is gekoppeld. Kies welke locatie Mavix beheert.", cta: "Locatie kiezen", href: "/account/integraties?select=google_business" }
-      : s === "api_access_required"
-        ? { title: "Wacht op toegang van Google", text: API_ACCESS_TEXT, cta: "Bekijk koppeling", href: "/account/integraties" }
-        : s === "reconnect_required" || s === "permission_missing" || s === "error"
-          ? { title: "Koppel Google Bedrijfsprofiel opnieuw", text: "De koppeling is verlopen of mist toestemming. Na opnieuw koppelen zie je je reviews weer.", cta: "Opnieuw koppelen", href: "/account/integraties" }
-          : { title: "Koppel Google Bedrijfsprofiel", text: "Beheer je bedrijfsprofiel en reviews rechtstreeks vanuit Mavix. Met één koppeling zie en beantwoord je al je Google-reviews.", cta: "Koppelen", href: "/account/integraties" };
+/** Title and text per connection state; only a missing or expired login needs Google consent again. */
+export function gateContent(s: Status): { title: string; text: string; check: boolean; connect: string | null } {
+  switch (s.status) {
+    case "selection_required":
+      return { title: "Google-account gekoppeld — locatie kiezen", text: "Kies welke bedrijfslocatie Mavix beheert. Daarna laden je reviews.", check: true, connect: null };
+    case "api_access_required":
+      return {
+        title: s.apiKind === "disabled" ? "Google API nog niet ingeschakeld" : s.apiKind === "project" ? "Verkeerd Google Cloud-project" : "Google heeft nog geen API-quota beschikbaar",
+        text: s.apiMessage || API_ACCESS_TEXT,
+        check: true,
+        connect: null,
+      };
+    case "reconnect_required":
+    case "error":
+      return { title: "Koppeling verlopen — opnieuw verbinden", text: "Google accepteert de opgeslagen toegang niet meer. Verbind je Google-account opnieuw; je locatiekeuze blijft bewaard.", check: false, connect: "Opnieuw verbinden" };
+    case "permission_missing":
+      return { title: "Toestemming ontbreekt — opnieuw verbinden", text: "Mavix mist de toestemming om je bedrijfsprofiel te beheren. Verbind opnieuw en vink de toestemming voor Google Bedrijfsprofiel aan.", check: false, connect: "Opnieuw verbinden" };
+    default:
+      return { title: "Koppel Google Bedrijfsprofiel", text: "Beheer je bedrijfsprofiel en reviews rechtstreeks vanuit Mavix. Met één koppeling zie en beantwoord je al je Google-reviews.", check: false, connect: "Koppelen" };
+  }
+}
+
+// Connection states shown instead of reviews (never sample data). Existing
+// connections are checked again with the stored access ("Opnieuw
+// controleren"); Google consent is only asked for when it is really needed.
+function Gate({ status, onConnected }: { status: Status; onConnected: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Check | null>(null);
+  const [error, setError] = useState("");
+  const [choice, setChoice] = useState("");
+  const content = gateContent(status);
+  const base = "/api/integrations/google_business/";
+
+  async function run(fn: () => Promise<Check>) {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fn();
+      setResult(r);
+      if (r.state === "connected") onConnected();
+      else if (r.locations?.length) setChoice(r.locations.length === 1 ? r.locations[0].location : "");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const check = () => run(() => post<Check>(base + "check"));
+  const choose = () => {
+    const pick = result?.locations?.find((l) => l.location === choice);
+    if (!pick) return setError("Kies eerst een locatie.");
+    void run(() => post<Check>(base + "select", { account: pick.account, location: pick.location }));
+  };
+  // The latest check wins over the stored status text.
+  const title =
+    result?.state === "api_access_required" || result?.state === "location_access" || result?.state === "no_locations"
+      ? result.state === "location_access"
+        ? "Geen toegang tot deze bedrijfslocatie"
+        : result.state === "no_locations"
+          ? "Geen bedrijfslocatie gevonden"
+          : content.title
+      : content.title;
+  const text = result?.message || content.text;
+
   return (
-    <section className="ui-card rvl-gate">
+    <section className="ui-card rvl-gate" aria-busy={busy}>
       <span className="rvl-gate-icon" aria-hidden="true">
         <BrandIcon brand="google_business" size={24} />
       </span>
-      <h2>{content.title}</h2>
-      <p>{content.text}</p>
-      <Link className="button primary" href={content.href}>
-        {content.cta}
-      </Link>
+      <h2>{busy ? "Google-koppeling controleren…" : title}</h2>
+      <p>{text}</p>
+      {(status.accountEmail || status.location) && (
+        <p className="rvl-gate-meta">
+          {status.accountEmail && <span>Google-account: {status.accountEmail}</span>}
+          {status.location && <span>Locatie: {status.location.name}</span>}
+        </p>
+      )}
+      {result?.locations && result.locations.length > 0 && (
+        <fieldset className="rvl-gate-picker">
+          <legend>Kies je bedrijfslocatie</legend>
+          {result.locations.map((l) => (
+            <label key={l.location}>
+              <input type="radio" name="gbp-location" value={l.location} checked={choice === l.location} onChange={() => setChoice(l.location)} disabled={busy} />
+              <span>
+                <strong>{l.title}</strong>
+                {l.address && <small>{l.address}</small>}
+                {l.closed && <small>Gesloten</small>}
+              </span>
+            </label>
+          ))}
+          <button type="button" className="button primary" onClick={choose} disabled={busy || !choice}>
+            Deze locatie gebruiken
+          </button>
+        </fieldset>
+      )}
+      {error && (
+        <p role="alert" className="rvl-error">
+          {error}
+        </p>
+      )}
+      <div className="rvl-gate-actions">
+        {content.check && !result?.locations?.length && (
+          <button type="button" className="button primary" onClick={() => void check()} disabled={busy}>
+            <RefreshCw size={14} aria-hidden="true" />
+            {busy ? "Controleren…" : status.status === "selection_required" ? "Locaties ophalen" : "Opnieuw controleren"}
+          </button>
+        )}
+        {content.connect && (
+          <Link className="button primary" href="/account/integraties">
+            {content.connect}
+          </Link>
+        )}
+        {content.check && (
+          <Link className="button secondary" href="/account/integraties">
+            Koppeling bekijken
+          </Link>
+        )}
+      </div>
     </section>
   );
 }
@@ -70,7 +181,7 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
     }
   }, []);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     get<Status>("/api/integrations/google_business/status")
       .then((s) => {
         setStatus(s);
@@ -78,6 +189,7 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
       })
       .catch((e) => setStatusError((e as Error).message));
   }, [load]);
+  useEffect(() => refresh(), [refresh]);
 
   const reviews = useMemo(() => data?.reviews || [], [data]);
   const stats = useMemo(() => loadedStats(reviews), [reviews]);
@@ -100,7 +212,7 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
         <span />
       </div>
     );
-  if (!status.connected) return <Gate status={status} />;
+  if (!status.connected) return <Gate status={status} onConnected={refresh} />;
 
   const errorBox = error && (
     <div className={"rvl-banner" + (error === API_ACCESS_TEXT ? " is-warn" : " is-error")} role="alert">

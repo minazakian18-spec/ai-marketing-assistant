@@ -23,19 +23,36 @@ export const GBP_MANAGE = "https://www.googleapis.com/auth/business.manage";
 // Why Google refuses the Business Profile APIs for Mavix's Cloud project:
 //   disabled = access is approved, but one of the three APIs is not switched
 //              on in the Cloud Console (Google's "SERVICE_DISABLED");
-//   quota    = the project has no quota yet (not approved, or another project).
-// The message names what to do; the customer cannot fix either, Mavix can.
-export type ApiProblem = { kind: "disabled" | "quota"; service?: string };
+//   quota    = the project has no quota yet (not approved, or another project);
+//   project  = Google reports a different Cloud project than the approved one
+//              (GOOGLE_CLOUD_PROJECT_NUMBER), i.e. the OAuth client belongs to
+//              another project.
+// `service` is the API that refused: an API block is only lifted by a
+// successful call to that same API (the reviews API is separate from the
+// account and location APIs, so a working location list proves nothing about
+// reviews). The message names what to do; the customer cannot fix it, Mavix can.
+export type ApiProblem = { kind: "disabled" | "quota" | "project"; service?: string; project?: string };
 const API_NAMES: Record<string, string> = {
   "mybusinessaccountmanagement.googleapis.com": "My Business Account Management API",
   "mybusinessbusinessinformation.googleapis.com": "My Business Business Information API",
-  "mybusiness.googleapis.com": "Google My Business API",
+  "mybusiness.googleapis.com": "Google My Business API (reviews)",
 };
 export function apiAccessMessage(p?: ApiProblem | null) {
+  const api = API_NAMES[p?.service || ""] || "Business Profile API";
+  const where = p?.project ? ` (Google Cloud-project ${p.project})` : "";
+  if (p?.kind === "project")
+    return `Google meldt dat Mavix het Google Cloud-project ${p.project} gebruikt, maar de goedkeuring geldt voor project ${process.env.GOOGLE_CLOUD_PROJECT_NUMBER}. De Google-inloggegevens (OAuth-client) van Mavix moeten uit het goedgekeurde project komen.`;
   if (p?.kind === "disabled")
-    return `Google heeft Mavix toegang gegeven, maar in het Google Cloud-project van Mavix staat de ${API_NAMES[p.service || ""] || "Business Profile API"} nog uit. Zodra die aanstaat, werkt koppelen meteen: klik dan op Opnieuw controleren.`;
-  return "Google heeft het Google Cloud-project van Mavix nog geen toegang (quotum) gegeven voor de Business Profile API. Zodra dat rond is, klik je op Opnieuw controleren.";
+    return `In het Google Cloud-project van Mavix${where} staat de ${api} nog uit. Zet die aan in Google Cloud Console en klik daarna op Opnieuw controleren.`;
+  return `Google geeft het Google Cloud-project van Mavix${where} nog geen quotum voor de ${api}. Controleer in Google Cloud Console (Quota) of de goedkeuring voor dit project geldt, en klik daarna op Opnieuw controleren.`;
 }
+const serviceOf = (url: string) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
+};
 /** Kept for callers that only need a default text. */
 export const API_ACCESS_MESSAGE = apiAccessMessage();
 const PROVIDER = "google_business";
@@ -205,11 +222,18 @@ export function apiAccessProblem(status: number, body: GoogleError): ApiProblem 
   const reasons = [...details.map((d) => String(d.reason || "")), ...(e.errors || []).map((x) => String(x.reason || ""))];
   const meta = (d: Record<string, unknown>) => (d.metadata || {}) as Record<string, unknown>;
   const service = String(details.map(meta).find((m) => m.service)?.service || (e.message || "").match(/([a-z]+\.googleapis\.com)/)?.[1] || "") || undefined;
-  if (reasons.some((r) => ["SERVICE_DISABLED", "API_DISABLED", "accessNotConfigured"].includes(r))) return { kind: "disabled", service };
-  if (status === 403 && /has not been used in project|is disabled|not been enabled|API has not been enabled/i.test(e.message || "")) return { kind: "disabled", service };
+  // The project Google billed the call to ("projects/123" or "project 123").
+  const project =
+    String(details.map(meta).find((m) => m.consumer)?.consumer || "").match(/projects\/(\d{5,20})/)?.[1] || (e.message || "").match(/project (\d{5,20})/)?.[1] || undefined;
+  const expected = process.env.GOOGLE_CLOUD_PROJECT_NUMBER;
+  let kind: ApiProblem["kind"] | null = null;
+  if (reasons.some((r) => ["SERVICE_DISABLED", "API_DISABLED", "accessNotConfigured"].includes(r))) kind = "disabled";
+  else if (status === 403 && /has not been used in project|is disabled|not been enabled|API has not been enabled/i.test(e.message || "")) kind = "disabled";
   // Unapproved projects get a quota of 0.
-  if (details.some((d) => String(meta(d).quota_limit_value ?? "") === "0")) return { kind: "quota", service };
-  return null;
+  else if (details.some((d) => String(meta(d).quota_limit_value ?? "") === "0")) kind = "quota";
+  if (!kind) return null;
+  if (expected && project && project !== expected) kind = "project";
+  return { kind, ...(service ? { service } : {}), ...(project ? { project } : {}) };
 }
 export const isApiAccessProblem = (status: number, body: GoogleError) => !!apiAccessProblem(status, body);
 
@@ -235,8 +259,12 @@ export async function businessRequest(workspaceId: string, url: string, init: Re
       );
     }
     if (response.ok) {
-      // A working call clears an earlier "API access required" state.
-      if (auth.c.status === "api_access_required")
+      // A working call to the API that refused clears the "API access" state.
+      // A call to another API (e.g. the location list while the reviews API
+      // is still off) proves nothing and keeps the block: otherwise Mavix
+      // would flip to "connected", fail on reviews again, and loop.
+      const blocked = (auth.c.metadata as { apiProblem?: ApiProblem } | null)?.apiProblem;
+      if (auth.c.status === "api_access_required" && (!blocked?.service || blocked.service === serviceOf(url)))
         await markBusinessConnection(auth.c, (auth.c.metadata as { location?: string } | null)?.location ? "connected" : "selection_required");
       return response.status === 204 ? {} : await response.json().catch(() => ({}));
     }
@@ -313,11 +341,11 @@ export async function verifiedLocation(workspaceId: string, account: string, loc
   return found;
 }
 
-export async function saveLocation(workspaceId: string, c: Pick<Connection, "id" | "connection_generation" | "metadata">, l: BusinessLocation) {
+export async function saveLocation(workspaceId: string, c: Pick<Connection, "id" | "connection_generation" | "metadata">, l: BusinessLocation, status = "connected") {
   const { data, error } = await adminClient()
     .from("integration_connections")
     .update({
-      status: "connected",
+      status,
       display_name: l.title,
       metadata: { ...(c.metadata || {}), account: l.account, location: l.location, locationTitle: l.title, locationAddress: l.address },
     })
@@ -328,6 +356,68 @@ export async function saveLocation(workspaceId: string, c: Pick<Connection, "id"
     .select("id");
   if (error) throw new HttpError(503, "De locatie kon niet worden opgeslagen.");
   if (!data?.length) throw new HttpError(409, "De koppeling is gewijzigd. Probeer opnieuw.");
+}
+
+// ---------------------------------------------------------------- Check
+
+export type CheckResult =
+  | { state: "connected"; location: BusinessLocation }
+  | { state: "selection_required"; locations: BusinessLocation[] }
+  | { state: "no_locations" }
+  | { state: "api_access_required"; problem: ApiProblem; message: string }
+  | { state: "location_access"; message: string };
+
+/**
+ * "Opnieuw controleren": walks the whole chain with the stored connection,
+ * without a new Google consent. Stored credentials → accounts → locations →
+ * keep the earlier location if Google still returns it, else pick the only
+ * usable one → one read-only reviews request. The status only becomes
+ * "connected" after that reviews request really succeeded. Expired or
+ * missing permissions throw (the caller reports "reconnect").
+ */
+export async function checkBusinessConnection(workspaceId: string): Promise<CheckResult> {
+  const blocked = (e: unknown): CheckResult | null => (e instanceof ApiAccessError ? { state: "api_access_required", problem: e.problem, message: e.message } : null);
+  let locations: BusinessLocation[];
+  try {
+    locations = await listBusinessLocations(workspaceId);
+  } catch (e) {
+    const b = blocked(e);
+    if (b) return b;
+    throw e;
+  }
+  const c = await businessConnection(workspaceId);
+  const m = (c.metadata || {}) as { location?: string };
+  const usable = locations.filter((l) => !l.closed);
+  const pick = locations.find((l) => l.location === m.location) || (usable.length === 1 ? usable[0] : locations.length === 1 ? locations[0] : null);
+  if (!pick) {
+    // The earlier location is gone (or there never was one): choose again.
+    if (c.status !== "selection_required" || m.location) {
+      const { location: _l, locationTitle: _t, locationAddress: _a, account: _ac, apiProblem: _p, ...rest } = (c.metadata || {}) as Record<string, unknown>;
+      void [_l, _t, _a, _ac, _p];
+      await adminClient()
+        .from("integration_connections")
+        .update({ status: "selection_required", metadata: rest, display_name: null })
+        .eq("id", c.id)
+        .eq("workspace_id", workspaceId)
+        .eq("provider", PROVIDER)
+        .eq("connection_generation", c.connection_generation);
+    }
+    return locations.length ? { state: "selection_required", locations } : { state: "no_locations" };
+  }
+  // Remember the location (keeps an API block in place until reviews work).
+  // "connected" is only written after the reviews request below succeeds.
+  if (m.location !== pick.location) await saveLocation(workspaceId, c, pick, c.status === "connected" ? "connected" : c.status);
+  try {
+    await rawReviewsPage(workspaceId, "", 1);
+  } catch (e) {
+    const b = blocked(e);
+    if (b) return b;
+    if (e instanceof HttpError && e.status === 403) return { state: "location_access", message: e.message };
+    throw e;
+  }
+  const fresh = await businessConnection(workspaceId);
+  if (fresh.status !== "connected") await markBusinessConnection(fresh, "connected");
+  return { state: "connected", location: pick };
 }
 
 // ---------------------------------------------------------------- Reviews
