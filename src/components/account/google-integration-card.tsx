@@ -16,6 +16,8 @@ type Status = {
   mine?: boolean;
   lastSyncedAt?: string | null;
   location?: { name: string; address: string } | null;
+  /** Why Google still refuses the Business Profile APIs (server text). */
+  apiMessage?: string | null;
 };
 type Place = { name: string; address: string } | null;
 type View =
@@ -25,7 +27,7 @@ type View =
   | { kind: "connected"; email: string; lastSyncedAt?: string | null; place: Place }
   | { kind: "team" }
   | { kind: "selection"; email: string | null }
-  | { kind: "api"; email: string | null }
+  | { kind: "api"; email: string | null; message: string }
   | { kind: "reconnect"; reason: "expired" | "permission" | "other"; email: string | null };
 
 export type GoogleCardConfig = {
@@ -48,7 +50,7 @@ export type GoogleCardConfig = {
 };
 
 export const API_ACCESS_TEXT =
-  "Google Bedrijfsprofiel is nog niet beschikbaar voor dit Mavix-project. API-toegang moet eerst door Google worden goedgekeurd.";
+  "Google geeft het Google Cloud-project van Mavix nog geen toegang tot de Business Profile API. Klik op Opnieuw controleren zodra dat geregeld is.";
 
 export const CALENDAR_CARD: GoogleCardConfig = {
   provider: "google_calendar",
@@ -138,7 +140,7 @@ function viewOf(s: Status): View {
   if (s.status === "disconnected") return { kind: "disconnected" };
   if (s.connected) return { kind: "connected", email: s.accountEmail || "", lastSyncedAt: s.lastSyncedAt, place: s.location || null };
   if (s.status === "selection_required") return { kind: "selection", email: s.accountEmail };
-  if (s.status === "api_access_required") return { kind: "api", email: s.accountEmail };
+  if (s.status === "api_access_required") return { kind: "api", email: s.accountEmail, message: s.apiMessage || API_ACCESS_TEXT };
   if (s.status === "connected" && s.mine === false) return { kind: "team" };
   return {
     kind: "reconnect",
@@ -281,7 +283,7 @@ export function GoogleIntegrationCard({
         : view.kind === "selection"
           ? "Google-account gekoppeld. Kies je bedrijfslocatie."
           : view.kind === "api"
-            ? API_ACCESS_TEXT
+            ? view.message
             : view.kind === "reconnect"
               ? view.reason === "expired"
                 ? config.copy.expired
@@ -456,7 +458,7 @@ export function GoogleIntegrationCard({
                   <span />
                 </div>
               ) : picker.error && !picker.list.length ? (
-                <p role="alert" className={picker.error === API_ACCESS_TEXT ? "int-hint int-warn" : "int-error"}>
+                <p role="alert" className={/Google Cloud-project van Mavix/.test(picker.error) ? "int-hint int-warn" : "int-error"}>
                   {picker.error}
                 </p>
               ) : !picker.list.length ? (

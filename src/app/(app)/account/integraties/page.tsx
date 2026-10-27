@@ -96,7 +96,7 @@ const NOTICES: Record<string, string> = {
   "connected=google_business": "Google Bedrijfsprofiel is gekoppeld. Je reviews staan nu onder Reviews.",
   "select=google_business": "Google-account gekoppeld. Kies hieronder je bedrijfslocatie.",
   "error=no_locations": "Google-account gekoppeld, maar er is geen bedrijfslocatie gevonden die je mag beheren.",
-  "error=api_access": "Google Bedrijfsprofiel is nog niet beschikbaar voor dit Mavix-project. API-toegang moet eerst door Google worden goedgekeurd.",
+  "error=api_access": "Google-account gekoppeld, maar Google geeft het project van Mavix nog geen toegang tot de Business Profile API. De reden staat hieronder bij Google Bedrijfsprofiel.",
 };
 
 type State = "connected" | "disconnected" | "reconnect" | "permission" | "selection" | "error" | "planned";

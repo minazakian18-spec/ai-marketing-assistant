@@ -94,6 +94,19 @@ test("Instagram: without the publish permission nothing is sent to Meta", async 
   assert.equal(env.tables.business_profiles[0].data.posts[0].status, "approved");
 });
 
+test("Instagram with Facebook Login: instagram_content_publish is the publish permission; Page token on graph.facebook.com", async (t) => {
+  quiet(t);
+  const basicOnly = setup({ scopes: ["instagram_basic", "pages_show_list"] });
+  assert.equal((await basicOnly.load("src/lib/server/instagram-publish.ts").publishCapability("w1")).code, "permission_missing");
+  const env = setup({ scopes: ["instagram_basic", "pages_show_list", "pages_read_engagement", "instagram_content_publish"] });
+  env.tables.integration_connections[0].metadata = { authMode: "facebook" };
+  const calls = graphMock(t);
+  const { publishPost, publishCapability } = env.load("src/lib/server/instagram-publish.ts");
+  assert.equal((await publishCapability("w1")).code, "ready");
+  await publishPost({ workspaceId: "w1", userId: "u1", trigger: "manual" }, "p1");
+  assert.ok(calls.length && calls.every((c) => c.url.startsWith("https://graph.facebook.com/")), "Facebook Login connections publish via graph.facebook.com");
+});
+
 test("Instagram: publishes once through the official API, records media id, cleans temporary files, repeat is idempotent", async (t) => {
   quiet(t);
   const env = setup();
@@ -330,6 +343,20 @@ test("automation: permission requires a working integration; review auto reply c
   assert.equal((await cron.POST(new Request(origin + "/api/automation/cron", { method: "POST" }))).status, 401);
   const status = await auto.automationStatus("w1");
   assert.equal(status.find((s) => s.id === "instagram_publish_scheduled").state, "running");
+  // Never twice: a second run leaves the published post alone.
+  const published = calls.filter((c) => String(c.url ?? c).endsWith("/media_publish")).length;
+  assert.equal(published, 1);
+  const due = env.tables.business_profiles[0].data.posts[0].date;
+  env.tables.business_profiles[0].data.posts.push(post({ id: "draft1", status: "draft", date: due }));
+  await auto.runScheduled();
+  assert.equal(calls.filter((c) => String(c.url ?? c).endsWith("/media_publish")).length, 1, "no second publish, drafts are never published");
+  assert.equal(env.tables.business_profiles[0].data.posts.find((p) => p.id === "draft1").status, "draft");
+  // Disabled: a new due scheduled post stays unpublished.
+  await auto.setPermission({ workspaceId: "w1", userId: "u1" }, "instagram_publish_scheduled", false);
+  env.tables.business_profiles[0].data.posts.push(post({ id: "p9", status: "scheduled", date: due }));
+  await auto.runScheduled();
+  assert.equal(env.tables.business_profiles[0].data.posts.find((p) => p.id === "p9").status, "scheduled");
+  assert.equal(calls.filter((c) => String(c.url ?? c).endsWith("/media_publish")).length, 1);
 });
 
 test("reviews: urgent first, monthly trend only from loaded data; calendar marks simulated publications", () => {

@@ -35,8 +35,10 @@ import { InstagramOverview } from "./overview";
 import { CreateStudio } from "./create";
 import { AutopilotSettings } from "./autopilot";
 import { ApprovalQueue, ScheduledContent } from "./queues";
+import { publishStatusText, usePublishCapability } from "./publish";
 function Workspace() {
   const { data, ready, save } = useWorkspace();
+  const publishCap = usePublishCapability();
   const search = useSearchParams();
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -223,7 +225,7 @@ function Workspace() {
               ? "Automatisering aan"
               : "Automatisering uit"}
           </span>
-          <small>Publiceren naar Instagram is nog niet gekoppeld</small>
+          <small>{publishStatusText(publishCap)}</small>
         </div>
       )}
       <p role="status" className="ig-feedback ig-top-feedback">

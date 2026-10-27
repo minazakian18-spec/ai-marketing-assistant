@@ -59,3 +59,15 @@ export function scheduleProblems(date: string, now = new Date()) {
 
 /** Whether a "published" post was really published (not the earlier simulation). */
 export const reallyPublished = (p: Pick<Post, "status" | "instagram">) => p.status === "published" && !!p.instagram?.mediaId;
+
+/** What the publish capability means for the user, in one short line (Social header). */
+export type PublishCapabilityView = { ready: boolean; code: string; message: string; account?: string };
+export function publishStatusText(cap: PublishCapabilityView | null) {
+  if (!cap) return "Instagram-status laden…";
+  if (cap.ready) return "Publiceren naar " + (cap.account ? "@" + cap.account.replace(/^@/, "") : "Instagram") + " staat klaar";
+  if (cap.code === "demo") return "Testmodus: er wordt niets gepubliceerd";
+  if (cap.code === "not_connected") return "Instagram is nog niet gekoppeld";
+  if (cap.code === "permission_missing") return "Instagram gekoppeld, publiceren wacht op toestemming van Meta";
+  if (cap.code === "reconnect") return "Koppel Instagram opnieuw";
+  return cap.message;
+}

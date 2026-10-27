@@ -9,6 +9,8 @@ import { hash, encrypt, decrypt } from "./crypto";
 import { oauthStateMatches } from "../security";
 import {
   ApiAccessError,
+  apiAccessMessage,
+  type ApiProblem,
   GBP_MANAGE,
   GBP_SCOPES,
   businessConnection,
@@ -46,7 +48,7 @@ export async function handleBusinessIntegration(request: Request, action: string
     if (reading) {
       const { data: c, error } = await query();
       if (error) throw new HttpError(503, "De verbinding kon niet worden geladen.");
-      const m = (c?.metadata || {}) as { location?: string; locationTitle?: string; locationAddress?: string };
+      const m = (c?.metadata || {}) as { location?: string; locationTitle?: string; locationAddress?: string; apiProblem?: ApiProblem };
       let status = !c || c.status === "disconnected" ? "disconnected" : (c.status as string);
       if (status === "connected" && !c?.encrypted_credentials) status = "reconnect_required";
       if (status === "connected" && !(c?.scopes || []).includes(GBP_MANAGE)) status = "permission_missing";
@@ -56,6 +58,8 @@ export async function handleBusinessIntegration(request: Request, action: string
         connected: status === "connected",
         accountEmail: status === "disconnected" ? null : c?.account_email || null,
         location: m.location ? { name: m.locationTitle || "", address: m.locationAddress || "" } : null,
+        // Why Google still refuses (API switched off vs. no quota), in plain Dutch.
+        apiMessage: status === "api_access_required" ? apiAccessMessage(m.apiProblem) : null,
       });
     }
 

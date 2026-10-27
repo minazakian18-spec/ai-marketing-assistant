@@ -20,15 +20,31 @@ import {
 
 export const GBP_SCOPES = ["openid", "email", "https://www.googleapis.com/auth/business.manage"];
 export const GBP_MANAGE = "https://www.googleapis.com/auth/business.manage";
-export const API_ACCESS_MESSAGE =
-  "Google Bedrijfsprofiel is nog niet beschikbaar voor dit Mavix-project. API-toegang moet eerst door Google worden goedgekeurd.";
+// Why Google refuses the Business Profile APIs for Mavix's Cloud project:
+//   disabled = access is approved, but one of the three APIs is not switched
+//              on in the Cloud Console (Google's "SERVICE_DISABLED");
+//   quota    = the project has no quota yet (not approved, or another project).
+// The message names what to do; the customer cannot fix either, Mavix can.
+export type ApiProblem = { kind: "disabled" | "quota"; service?: string };
+const API_NAMES: Record<string, string> = {
+  "mybusinessaccountmanagement.googleapis.com": "My Business Account Management API",
+  "mybusinessbusinessinformation.googleapis.com": "My Business Business Information API",
+  "mybusiness.googleapis.com": "Google My Business API",
+};
+export function apiAccessMessage(p?: ApiProblem | null) {
+  if (p?.kind === "disabled")
+    return `Google heeft Mavix toegang gegeven, maar in het Google Cloud-project van Mavix staat de ${API_NAMES[p.service || ""] || "Business Profile API"} nog uit. Zodra die aanstaat, werkt koppelen meteen: klik dan op Opnieuw controleren.`;
+  return "Google heeft het Google Cloud-project van Mavix nog geen toegang (quotum) gegeven voor de Business Profile API. Zodra dat rond is, klik je op Opnieuw controleren.";
+}
+/** Kept for callers that only need a default text. */
+export const API_ACCESS_MESSAGE = apiAccessMessage();
 const PROVIDER = "google_business";
 const context = (workspaceId: string) => workspaceId + ":" + PROVIDER;
 
-/** Google has not (yet) granted this Cloud project access to the APIs. */
+/** Google refuses the APIs for this Cloud project (see ApiProblem). */
 export class ApiAccessError extends HttpError {
-  constructor() {
-    super(403, API_ACCESS_MESSAGE);
+  constructor(public problem: ApiProblem = { kind: "quota" }) {
+    super(403, apiAccessMessage(problem));
   }
 }
 
@@ -111,11 +127,15 @@ export async function businessConnection(workspaceId: string): Promise<Connectio
 }
 
 /** Status changes are guarded by generation and ciphertext (no stale writes). */
-export async function markBusinessConnection(c: Connection, status: string) {
-  if (c.status === status) return;
+export async function markBusinessConnection(c: Connection, status: string, meta?: Record<string, unknown>) {
+  const { apiProblem: _old, ...rest } = (c.metadata || {}) as Record<string, unknown>;
+  void _old;
+  // The API problem is only kept while access is blocked.
+  const metadata = status === "api_access_required" ? { ...rest, ...meta } : rest;
+  if (c.status === status && JSON.stringify(metadata) === JSON.stringify(c.metadata || {})) return;
   const { error } = await adminClient()
     .from("integration_connections")
-    .update({ status })
+    .update({ status, metadata })
     .eq("id", c.id)
     .eq("workspace_id", c.workspace_id)
     .eq("provider", PROVIDER)
@@ -178,16 +198,20 @@ export async function businessToken(
 
 type GoogleError = { error?: { status?: string; message?: string; details?: Record<string, unknown>[]; errors?: { reason?: string }[] } };
 
-/** Detects "this Cloud project has no Business Profile API access (yet)". */
-export function isApiAccessProblem(status: number, body: GoogleError) {
+/** Detects "this Cloud project cannot use the Business Profile APIs" and why. */
+export function apiAccessProblem(status: number, body: GoogleError): ApiProblem | null {
   const e = body?.error || {};
   const details = e.details || [];
   const reasons = [...details.map((d) => String(d.reason || "")), ...(e.errors || []).map((x) => String(x.reason || ""))];
-  const quotaZero = details.some((d) => String((d.metadata as Record<string, unknown> | undefined)?.quota_limit_value ?? "") === "0");
-  if (quotaZero) return true; // Unapproved projects get a quota of 0.
-  if (reasons.some((r) => ["SERVICE_DISABLED", "API_DISABLED", "accessNotConfigured"].includes(r))) return true;
-  return status === 403 && /has not been used in project|is disabled|not been enabled|API has not been enabled/i.test(e.message || "");
+  const meta = (d: Record<string, unknown>) => (d.metadata || {}) as Record<string, unknown>;
+  const service = String(details.map(meta).find((m) => m.service)?.service || (e.message || "").match(/([a-z]+\.googleapis\.com)/)?.[1] || "") || undefined;
+  if (reasons.some((r) => ["SERVICE_DISABLED", "API_DISABLED", "accessNotConfigured"].includes(r))) return { kind: "disabled", service };
+  if (status === 403 && /has not been used in project|is disabled|not been enabled|API has not been enabled/i.test(e.message || "")) return { kind: "disabled", service };
+  // Unapproved projects get a quota of 0.
+  if (details.some((d) => String(meta(d).quota_limit_value ?? "") === "0")) return { kind: "quota", service };
+  return null;
 }
+export const isApiAccessProblem = (status: number, body: GoogleError) => !!apiAccessProblem(status, body);
 
 export async function businessRequest(workspaceId: string, url: string, init: RequestInit = {}, generation?: string) {
   let auth = await businessToken(workspaceId);
@@ -225,9 +249,12 @@ export async function businessRequest(workspaceId: string, url: string, init: Re
       await markBusinessConnection(auth.c, "reconnect_required");
       throw new HttpError(409, "Je koppeling met Google Bedrijfsprofiel is verlopen. Koppel opnieuw.");
     }
-    if (isApiAccessProblem(response.status, body)) {
-      await markBusinessConnection(auth.c, "api_access_required");
-      throw new ApiAccessError();
+    const problem = apiAccessProblem(response.status, body);
+    if (problem) {
+      await markBusinessConnection(auth.c, "api_access_required", { apiProblem: problem });
+      // Names the API (never tokens) so the platform owner knows what to switch on.
+      console.error(JSON.stringify({ event: "gbp_api_access", kind: problem.kind, service: problem.service || null }));
+      throw new ApiAccessError(problem);
     }
     const reason = [...(body.error?.details || []).map((d) => String(d.reason || "")), ...(body.error?.errors || []).map((x) => String(x.reason || ""))].join(" ");
     if (response.status === 403 && /ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficientPermissions/i.test(reason + " " + (body.error?.status || ""))) {

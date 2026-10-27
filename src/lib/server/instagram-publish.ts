@@ -42,7 +42,7 @@ export async function publishCapability(workspaceId: string): Promise<PublishCap
       ready: false,
       code: "permission_missing",
       account: c.display_name || undefined,
-      message: "Je Instagram-koppeling heeft nog geen toestemming om te publiceren. Dit vraagt een extra Meta-toestemming (instagram_content_publish) die Meta eerst moet goedkeuren; daarna koppel je Instagram opnieuw.",
+      message: "Je Instagram-koppeling heeft nog geen toestemming om te publiceren. Dit vraagt een extra Meta-toestemming (instagram_content_publish, met pages_read_engagement) die Meta eerst moet goedkeuren; daarna koppel je Instagram opnieuw.",
     };
   return { ready: true, code: "ready", message: "Klaar om te publiceren.", account: c.display_name || undefined };
 }

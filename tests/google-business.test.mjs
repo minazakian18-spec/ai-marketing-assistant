@@ -158,9 +158,9 @@ test("no locations: account stays linked with a clear notice", async (t) => {
 });
 
 test("API access not approved (quota 0 or disabled API) is api_access_required, never a disconnect", async (t) => {
-  for (const body of [
-    { error: { status: "RESOURCE_EXHAUSTED", details: [{ reason: "RATE_LIMIT_EXCEEDED", metadata: { quota_limit_value: "0" } }] } },
-    { error: { status: "PERMISSION_DENIED", message: "API has not been used in project 123 before or it is disabled.", details: [{ reason: "SERVICE_DISABLED" }] } },
+  for (const [body, expected] of [
+    [{ error: { status: "RESOURCE_EXHAUSTED", details: [{ reason: "RATE_LIMIT_EXCEEDED", metadata: { quota_limit_value: "0" } }] } }, /nog geen toegang \(quotum\)/],
+    [{ error: { status: "PERMISSION_DENIED", message: "My Business Account Management API has not been used in project 123 before or it is disabled.", details: [{ reason: "SERVICE_DISABLED", metadata: { service: "mybusinessaccountmanagement.googleapis.com" } }] } }, /staat de My Business Account Management API nog uit/],
   ]) {
     const f = setup(t);
     f.network.handle = async (url) =>
@@ -172,9 +172,38 @@ test("API access not approved (quota 0 or disabled API) is api_access_required, 
     assert.ok(c.encrypted_credentials, "credentials are kept so access works once Google approves");
     const list = await f.action("locations");
     assert.equal(list.status, 403);
-    assert.match((await list.json()).error, /API-toegang moet eerst door Google worden goedgekeurd/);
+    assert.match((await list.json()).error, expected);
+    // The card gets the same specific reason from the status endpoint.
+    const status = await (await f.action("status")).json();
+    assert.match(status.apiMessage, expected);
     t.mock.restoreAll();
   }
+});
+
+test("after access is approved and the APIs are switched on, 'Opnieuw controleren' clears the blocked state", async (t) => {
+  const f = setup(t);
+  let enabled = false;
+  f.network.handle = async (url) =>
+    url.includes("/token")
+      ? reply(f.token())
+      : url.includes("/userinfo")
+        ? reply({ sub: "g", email: "o@r.nl", email_verified: true })
+        : !enabled
+          ? reply({ error: { status: "PERMISSION_DENIED", message: "has not been used in project", details: [{ reason: "SERVICE_DISABLED", metadata: { service: "mybusinessbusinessinformation.googleapis.com" } }] } }, 403)
+          : url.includes("/accounts") && !url.includes("/locations")
+            ? reply({ accounts: [{ name: "accounts/1", accountName: "Telepizza" }] })
+            : reply({ locations: [{ name: "locations/9", title: "Telepizza Amstelveen" }] });
+  await f.complete(await f.start());
+  assert.equal(f.tables.integration_connections[0].status, "api_access_required");
+  assert.match((await (await f.action("status")).json()).apiMessage, /Business Information API nog uit/);
+  enabled = true; // the owner switched the API on in Google Cloud
+  const list = await f.action("locations");
+  assert.equal(list.status, 200);
+  assert.equal((await list.json()).locations.length, 1);
+  const c = f.tables.integration_connections[0];
+  assert.equal(c.status, "selection_required");
+  assert.equal(c.metadata.apiProblem, undefined, "the old reason is cleared");
+  assert.equal((await (await f.action("status")).json()).apiMessage, null);
 });
 
 test("reviews: normalized, paginated, Google summary on page one only", async (t) => {
@@ -273,4 +302,13 @@ test("pure helpers: safe photos, anonymous reviewers, filters and loaded-only st
   const page = normalizeReviewsPage({ reviews: [{ reviewId: "a", starRating: "ONE" }, { reviewId: "b", starRating: "THREE", reviewReply: { comment: "ok" } }] }, "l", true);
   assert.deepEqual(["low", "mid", "unanswered", "answered"].map((f) => page.reviews.filter((x) => matchesFilter(x, f)).length), [1, 1, 1, 1]);
   assert.deepEqual(loadedStats([r], Date.parse("2026-10-07T00:00:00Z")), { loaded: 1, unanswered: 1, urgent: r.rating !== null && r.rating <= 2 ? 1 : 0, lastThirtyDays: 1 });
+});
+
+test("Google error kinds: disabled API, zero quota, missing permission and normal rate limits stay distinct", () => {
+  const { apiAccessProblem } = serverLoader({})("src/lib/server/google-business.ts");
+  assert.deepEqual(apiAccessProblem(403, { error: { status: "PERMISSION_DENIED", details: [{ reason: "SERVICE_DISABLED", metadata: { service: "mybusinessreviews.googleapis.com" } }] } }), { kind: "disabled", service: "mybusinessreviews.googleapis.com" });
+  assert.equal(apiAccessProblem(429, { error: { status: "RESOURCE_EXHAUSTED", details: [{ metadata: { quota_limit_value: "0" } }] } }).kind, "quota");
+  assert.equal(apiAccessProblem(403, { error: { status: "PERMISSION_DENIED", details: [{ reason: "ACCESS_TOKEN_SCOPE_INSUFFICIENT" }] } }), null, "missing scope is a permission problem, not API access");
+  assert.equal(apiAccessProblem(403, { error: { status: "PERMISSION_DENIED", message: "The caller does not have permission" } }), null, "no access to a location is not API access");
+  assert.equal(apiAccessProblem(429, { error: { status: "RESOURCE_EXHAUSTED", details: [{ metadata: { quota_limit_value: "300" } }] } }), null, "an approved project that is briefly busy is not blocked");
 });

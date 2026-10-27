@@ -1,9 +1,10 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ExternalLink, Send } from "lucide-react";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
 import { isBrowserDemo } from "@/lib/demo";
-import { publishProblems, reallyPublished } from "@/lib/instagram-publish";
+import { publishProblems, publishStatusText, reallyPublished } from "@/lib/instagram-publish";
 import type { Post } from "@/lib/types";
 
 // Real Instagram publishing (POST /api/social/publish). The button is only
@@ -31,6 +32,85 @@ export function usePublishCapability() {
     };
   }, []);
   return cap;
+}
+
+// Short, honest status for the Social header (replaces a fixed "not connected" text).
+export { publishStatusText };
+
+/**
+ * Where publishing stands for this workspace, the one next step, and (when it
+ * works) the choice to publish scheduled posts automatically. Automatic
+ * publishing is the existing permission "instagram_publish_scheduled": it is
+ * only switched on after a confirmation, by an owner or admin.
+ */
+export function InstagramPublishPanel({ capability }: { capability: Capability | null }) {
+  const [auto, setAuto] = useState<{ configured: boolean; state: string } | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!capability?.ready) return;
+    let live = true;
+    fetch("/api/automation", { cache: "no-store" })
+      .then(async (r) => (r.ok ? (await r.json()).workflows : []))
+      .then((list: { id: string; configured: boolean; state: string }[]) => {
+        const w = list.find((x) => x.id === "instagram_publish_scheduled");
+        if (live && w) setAuto({ configured: w.configured, state: w.state });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [capability?.ready]);
+
+  async function toggle() {
+    setConfirm(false);
+    setBusy(true);
+    setError("");
+    const r = await fetch("/api/automation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workflow: "instagram_publish_scheduled", enabled: !auto?.configured, confirm: true }) });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setError(d.error || "Wijzigen is niet gelukt.");
+    const w = (d.workflows || []).find((x: { id: string }) => x.id === "instagram_publish_scheduled");
+    if (w) setAuto({ configured: w.configured, state: w.state });
+  }
+
+  if (!capability) return <p className="ig-pubbar">Instagram-status laden…</p>;
+  if (!capability.ready)
+    return (
+      <div className={"ig-pubbar" + (capability.code === "demo" ? "" : " is-blocked")}>
+        <Send size={14} aria-hidden="true" />
+        <span>{capability.code === "demo" ? capability.message : capability.message + " Tot die tijd plan je posts in Mavix en plaats je ze zelf, bijvoorbeeld met Kopiëren."}</span>
+        {["not_connected", "reconnect", "permission_missing"].includes(capability.code) && (
+          <Link className="button secondary" href="/account/integraties">
+            {capability.code === "not_connected" ? "Instagram koppelen" : capability.code === "reconnect" ? "Opnieuw koppelen" : "Bekijk koppeling"}
+          </Link>
+        )}
+      </div>
+    );
+  return (
+    <div className="ig-pubbar is-ready">
+      <Send size={14} aria-hidden="true" />
+      <span>
+        <strong>{publishStatusText(capability)}.</strong> Na goedkeuren publiceer je met <em>Nu publiceren</em>
+        {auto?.configured ? ", en ingeplande posts gaan automatisch live op hun moment." : ", of laat ingeplande posts automatisch publiceren."}
+      </span>
+      {auto && (
+        <label className="ig-pubbar-switch">
+          <input type="checkbox" checked={auto.configured} disabled={busy} onChange={() => (auto.configured ? void toggle() : setConfirm(true))} />
+          <span>Ingeplande posts automatisch publiceren</span>
+        </label>
+      )}
+      {error && (
+        <small className="field-error" role="alert">
+          {error}
+        </small>
+      )}
+      <ConfirmDialog open={confirm} onClose={() => setConfirm(false)} title="Ingeplande posts automatisch publiceren?" confirmLabel="Toestaan" onConfirm={() => void toggle()}>
+        {`Goedgekeurde en ingeplande posts worden op het geplande moment automatisch op ${capability.account ? "@" + capability.account.replace(/^@/, "") : "je Instagram-account"} geplaatst, zonder dat je nog op een knop drukt. Concepten die niet zijn goedgekeurd worden nooit gepubliceerd. Je kunt dit altijd weer uitzetten.`}
+      </ConfirmDialog>
+    </div>
+  );
 }
 
 /** Status line for a post: real publication, simulation, or ready/blocked. */
