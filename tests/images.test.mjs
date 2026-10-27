@@ -239,3 +239,23 @@ test("closed live test: other approved workspaces cannot generate images; defaul
     process.env.AI_IMAGE_WORKSPACES = "w1";
   }
 });
+test("a retried image request with the same Idempotency-Key never calls OpenAI twice", async (t) => {
+  quiet(t);
+  const e = env({});
+  // Production: unique index ai_usage_request_key (workspace_id, request_key).
+  const from = e.db.from.bind(e.db);
+  e.db.from = (table) => {
+    const q = from(table);
+    if (table !== "ai_usage") return q;
+    const insert = q.insert.bind(q);
+    q.insert = (v) => (v.request_key && e.tables.ai_usage.some((r) => r.workspace_id === v.workspace_id && r.request_key === v.request_key) ? { select: () => ({ single: async () => ({ data: null, error: { code: "23505" } }) }) } : insert(v));
+    return q;
+  };
+  const route = e.load("src/app/api/generate/image/route.ts");
+  const send = () => route.POST(new Request(origin + "/api/generate/image", { method: "POST", headers: { origin, "Content-Type": "application/json", "Idempotency-Key": "retry-key-123456" }, body: JSON.stringify({ mode: "generate", brief: "een pizza op tafel" }) }));
+  const first = await send();
+  const retry = await send();
+  assert.equal(first.status, 200);
+  assert.equal(retry.status, 409, "the retry is refused, not generated again");
+  assert.equal(e.calls.length, 1, "one paid OpenAI call for one key");
+});

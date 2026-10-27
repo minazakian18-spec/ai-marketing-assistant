@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   ImagePlus,
   Image as ImageIcon,
-  Type,
   Lightbulb,
   RefreshCw,
   Save,
@@ -21,7 +20,6 @@ import {
   X,
   CalendarClock,
   Images,
-  Plug,
 } from "lucide-react";
 import { GenerationSkeleton, previewMock } from "@/components/generation-skeleton";
 import { Mavi } from "@/components/mavi";
@@ -32,13 +30,14 @@ import type { Post, Profile } from "@/lib/types";
 import type { ContentType } from "@/lib/instagram-model";
 import { generateInstagramContent, editContentText, generateImage, CONTENT_EDIT_LABELS, type ContentEditAction } from "@/lib/api-client";
 import { readImages } from "@/lib/local-images";
+import { InstagramPublishPanel, PublishButton, usePublishCapability } from "./publish";
+import { AUTO_IMAGE_TYPES, generateWithImage, linkedImage, regenerateImage } from "@/lib/post-image";
 import { isBrowserDemo } from "@/lib/demo";
 import { mediaRef } from "@/lib/media-ref";
 import { usePlan } from "@/components/plan-gate";
 import { InspirationPicker } from "./inspiration-picker";
 import { CarouselStudio } from "./carousel-studio";
 import { instagramGoals, type InstagramGoal } from "@/lib/ai/instagram-instruction";
-import { PostVisual } from "./shared";
 import { PlanningNotice } from "@/components/calendar/planning-notice";
 import { LibraryPicker } from "@/components/library/library-picker";
 import { CAPTION_LIMIT, HASHTAG_LIMIT, hashtagCount, instagramCaption, publishProblems, scheduleProblems } from "@/lib/instagram-publish";
@@ -48,13 +47,15 @@ import { CAPTION_LIMIT, HASHTAG_LIMIT, hashtagCount, instagramCaption, publishPr
 // alternatives run on the server; every result lands in the editor as an
 // editable draft with undo. Edits autosave to the workspace after a pause.
 
+// A post is always image + caption (Instagram has no text-only posts), so
+// "Afbeelding" and "Caption" are no separate formats any more. Older concepts
+// of those types open as a Post (POST_TYPE).
 const FORMATS: { id: ContentType; label: string; hint: string; Icon: typeof ImageIcon }[] = [
-  { id: "Post", label: "Post", hint: "Caption, hashtags en je foto", Icon: ImageIcon },
-  { id: "Image", label: "Afbeelding", hint: "Beeldpost met korte tekst", Icon: ImagePlus },
+  { id: "Post", label: "Post", hint: "Eén beeld met caption en hashtags", Icon: ImageIcon },
   { id: "Carousel", label: "Carrousel", hint: "Meerdere samenhangende slides in één post", Icon: Images },
-  { id: "Captions & Hashtags", label: "Caption", hint: "Alleen tekst en hashtags", Icon: Type },
   { id: "Content Ideas", label: "Ideeën", hint: "5 postideeën", Icon: Lightbulb },
 ];
+const POST_TYPE = (t: ContentType | undefined): ContentType | undefined => (t === "Image" || t === "Captions & Hashtags" ? "Post" : t);
 const UPCOMING: Record<string, string> = {
   Story: "Verticale stories zijn in ontwikkeling.",
   Reel: "AI-video is in ontwikkeling.",
@@ -64,9 +65,9 @@ const UPCOMING: Record<string, string> = {
 const VIDEO = ["Reel", "Animate Image", "Photos to Reel"];
 type VisualMode = "ai" | "own" | "edit";
 const VISUAL_MODES: { id: VisualMode; label: string; Icon: typeof ImageIcon }[] = [
-  { id: "ai", label: "AI-afbeelding genereren", Icon: Wand2 },
-  { id: "own", label: "Eigen foto gebruiken", Icon: ImagePlus },
-  { id: "edit", label: "Foto bewerken met AI", Icon: PenLine },
+  { id: "ai", label: "AI-beeld", Icon: Wand2 },
+  { id: "own", label: "Eigen foto", Icon: ImagePlus },
+  { id: "edit", label: "Foto bewerken", Icon: PenLine },
 ];
 const AUTOSAVE_MS = 1500;
 
@@ -96,8 +97,9 @@ export function CreateStudio({
   onPersist: (post: Post) => Promise<boolean>;
 }) {
   const { saveState } = useWorkspace();
-  const known = FORMATS.some((f) => f.id === initialType);
-  const [type, setType] = useState<ContentType>(editPost?.contentType || (known ? (initialType as ContentType) : "Post"));
+  const publishCap = usePublishCapability();
+  const known = FORMATS.some((f) => f.id === POST_TYPE(initialType as ContentType));
+  const [type, setType] = useState<ContentType>(POST_TYPE(editPost?.contentType) || (known ? (POST_TYPE(initialType as ContentType) as ContentType) : "Post"));
   const [notice, setNotice] = useState(initialType && UPCOMING[initialType] ? UPCOMING[initialType] : "");
   const [prompt, setPrompt] = useState(editPost?.prompt || initialBrief);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -114,8 +116,18 @@ export function CreateStudio({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<"" | "generate" | "edit" | "upload" | "image">("");
-  // Visual: a new AI image (default for "Afbeelding"), an own photo, or an own photo edited with AI.
-  const [imageMode, setImageMode] = useState<VisualMode>((editPost?.contentType || initialType) === "Image" && !editPost?.media?.length ? "ai" : "own");
+  // `busy` only disables the buttons after the next render; this lock is set
+  // synchronously, so a fast double click or Enter never starts a second paid
+  // AI request while one is running.
+  const aiLock = useRef(false);
+  const lockAi = () => (aiLock.current ? false : (aiLock.current = true));
+  // Visual: an AI image made with the caption (default), an own photo, or an
+  // own photo edited with AI. Own photos already on the concept keep "own".
+  const [imageMode, setImageMode] = useState<VisualMode>(editPost?.media?.length && !linkedImage(editPost, editPost.media) ? "own" : "ai");
+  // One prompt makes caption + image; the user can switch the image off.
+  const [autoImage, setAutoImage] = useState(true);
+  // The image of this result: being made, failed (with the reason) or idle.
+  const [imageState, setImageState] = useState<{ state: "idle" | "loading" | "error"; message?: string }>({ state: "idle" });
   const [imageBrief, setImageBrief] = useState("");
   const [imageFormat, setImageFormat] = useState<"square" | "portrait">("square");
   const [useBrand, setUseBrand] = useState(true);
@@ -130,11 +142,15 @@ export function CreateStudio({
   const [view, setView] = useState<"edit" | "preview">(focusPreview && editPost ? "preview" : "edit");
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
-  // Choosing "Afbeelding" without a photo makes AI generation the default.
+  // Back to Post without own photos: the AI image is the default again.
   useEffect(() => {
-    if (type === "Image" && !photos.length) setImageMode("ai");
+    if (AUTO_IMAGE_TYPES.includes(type) && !photos.length) setImageMode("ai");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the format changes
   }, [type]);
+  const linked = linkedImage(post, photos);
+  const hasOwn = photos.some((p) => p !== linked);
+  const autoApplies = imageMode === "ai" && autoImage && AUTO_IMAGE_TYPES.includes(type);
+  const imageLoading = imageState.state === "loading";
 
   const products = profile.productList?.length
     ? profile.productList.filter((p) => p.active).map((p) => p.name)
@@ -157,7 +173,7 @@ export function CreateStudio({
         setError("Kies een tijdstip in de toekomst of maak de datum leeg.");
         return false;
       }
-      const next: Post = { ...post, caption, hashtags, date, media: photos, status: nextStatus || post.status, failureReason: undefined, updatedAt: new Date().toISOString() };
+      const next: Post = { ...post, caption, hashtags, date, media: photos, aiImage: linkedImage(post, photos), status: nextStatus || post.status, failureReason: undefined, updatedAt: new Date().toISOString() };
       setStatus("saving");
       const ok = await onPersist(next);
       setStatus(ok ? "saved" : "error");
@@ -204,52 +220,99 @@ export function CreateStudio({
       setError("Beschrijf eerst in een paar woorden wat je wilt maken.");
       return;
     }
+    if (!lockAi()) return;
     setBusy("generate");
+    setImageState({ state: "idle" });
+    // Regenerating keeps the same concept (no duplicate drafts) and the
+    // previous text stays available through "Ongedaan maken".
+    if (post) remember();
+    setStatus("saving");
     try {
-      const next = await previewMock(
-        generateInstagramContent({
-          prompt: prompt.trim(),
-          type,
-          profile,
-          product,
-          useWebsite: website,
-          photos,
-          duration: 5,
-          videoMode: type,
-          variant: again && post ? post.variant + 1 : 0,
-          goal,
-          segmentId: segmentId || undefined,
-          cta: cta.trim() || undefined,
-        }),
-      );
-      // Regenerating keeps the same concept (no duplicate drafts) and the
-      // previous text stays available through "Ongedaan maken".
-      if (post) {
-        next.id = post.id;
-        next.createdAt = post.createdAt;
-        remember();
-      }
-      if (date) next.date = date;
-      next.updatedAt = new Date().toISOString();
-      setStatus("saving");
-      if (await onPersist(next)) {
-        setPost(next);
-        setCaption(next.caption);
-        setHashtags(next.hashtags);
-        setDate(next.date || "");
-        setAlternatives([]);
-        setStatus("saved");
-        setMessage(again ? "Nieuwe versie gemaakt en opgeslagen als concept." : "Concept gemaakt en opgeslagen.");
-        setView("edit");
-        // "Afbeelding" without an own photo: make the real AI visual right away.
-        if (type === "Image" && imageMode === "ai" && !photos.length) {
-          setBusy("");
-          await makeImage(undefined, next);
-        }
-      } else setStatus("error");
+      // One prompt, one result: the caption first, then the matching image
+      // (src/lib/post-image.ts). Own photos are never replaced.
+      const r = await generateWithImage({
+        prompt: prompt.trim(),
+        type,
+        auto: autoApplies,
+        current: { post, media: photos, date },
+        persist: onPersist,
+        image: aiImage,
+        text: () =>
+          previewMock(
+            generateInstagramContent({
+              prompt: prompt.trim(),
+              type,
+              profile,
+              product,
+              useWebsite: website,
+              photos,
+              duration: 5,
+              videoMode: type,
+              variant: again && post ? post.variant + 1 : 0,
+              goal,
+              segmentId: segmentId || undefined,
+              cta: cta.trim() || undefined,
+            }),
+          ),
+        onText: (next, imageComing) => {
+          setPost(next);
+          setCaption(next.caption);
+          setHashtags(next.hashtags);
+          setDate(next.date || "");
+          setAlternatives([]);
+          setStatus("saved");
+          setView("edit");
+          setMessage(imageComing ? "Caption klaar. Mavix maakt nu de bijpassende afbeelding…" : again ? "Nieuwe versie gemaakt en opgeslagen als concept." : "Concept gemaakt en opgeslagen.");
+          if (imageComing) {
+            setBusy("image");
+            setImageState({ state: "loading" });
+          }
+        },
+      });
+      showImageOutcome(r, again);
     } catch (e) {
+      setStatus(post ? "saved" : "idle");
       setError(e instanceof Error ? e.message : "Genereren is niet gelukt. Probeer het opnieuw.");
     } finally {
+      aiLock.current = false;
+      setBusy("");
+    }
+  }
+
+  // Generator for the AI image of this result. A typed image description
+  // wins over the briefing; Brand Hub style and inspiration are optional.
+  function aiImage(brief: string) {
+    return generateImage({ mode: "generate", brief: imageBrief.trim() || brief, format: imageFormat, useBrand, references: inspiration.length ? inspiration : undefined });
+  }
+
+  function showImageOutcome(r: Awaited<ReturnType<typeof regenerateImage>>, again = false) {
+    setPost(r.post);
+    setPhotos(r.media);
+    if (r.image.state === "done") {
+      setImageState({ state: "idle" });
+      setStatus("saved");
+      setMessage(again ? "Nieuwe caption en afbeelding gemaakt en opgeslagen." : "Caption en afbeelding gemaakt en opgeslagen als concept.");
+    } else if (r.image.state === "error") {
+      setImageState({ state: "error", message: r.image.message });
+      setMessage("");
+    } else setImageState({ state: "idle" });
+  }
+
+  // "Alleen afbeelding opnieuw genereren": a new AI image for the current
+  // concept; caption, hashtags and own photos stay as they are.
+  async function regenerateImageOnly() {
+    if (!post) return makeImage();
+    if (!lockAi()) return;
+    setError("");
+    setMessage("");
+    setBusy("image");
+    setImageState({ state: "loading" });
+    try {
+      const r = await regenerateImage({ prompt: prompt.trim(), type, post: { ...post, caption, hashtags, date }, media: photos, image: aiImage, persist: onPersist });
+      showImageOutcome(r);
+      if (r.image.state === "done") setMessage("Nieuwe afbeelding gemaakt en opgeslagen. De caption is niet veranderd.");
+    } finally {
+      aiLock.current = false;
       setBusy("");
     }
   }
@@ -272,11 +335,13 @@ export function CreateStudio({
   // A paid image must never get lost: save it right away. Without a concept
   // yet, a draft is created for it (caption can follow); with a concept the
   // current editor state is saved with the new photos.
-  async function keepImage(media: string[], fresh?: Post) {
+  async function keepImage(media: string[], fresh?: Post, aiImage?: string) {
     const now = new Date().toISOString();
     // `fresh` = the concept generate() just saved (its text is newer than this render's state).
     const base: Post = fresh || post || { id: crypto.randomUUID(), prompt: (imageBrief.trim() || prompt.trim()).slice(0, 1000), caption: "", hashtags: "", status: "draft", date: date || "", createdAt: now, variant: 0, contentType: type, source: "manual", media: [] };
-    const next: Post = fresh ? { ...fresh, media, updatedAt: now } : { ...base, caption, hashtags, date, media, updatedAt: now };
+    // aiImage = the image Mavix just made; otherwise keep the existing link while it is still selected.
+    const link = aiImage || linkedImage(base, media);
+    const next: Post = fresh ? { ...fresh, media, aiImage: link, updatedAt: now } : { ...base, caption, hashtags, date, media, aiImage: link, updatedAt: now };
     setStatus("saving");
     const ok = await onPersist(next);
     setStatus(ok ? "saved" : "error");
@@ -285,20 +350,26 @@ export function CreateStudio({
   }
 
   // A new AI image from the brief (Brand Hub only as optional style context).
-  async function makeImage(brief = imageBrief.trim() || prompt.trim(), fresh?: Post) {
+  // An image before there is a concept (no caption yet): a draft is created
+  // for it, linked as this concept's AI image.
+  async function makeImage(brief = imageBrief.trim() || prompt.trim()) {
     if (!brief) return setError("Beschrijf wat er op de afbeelding moet staan.");
+    if (!lockAi()) return;
     setError("");
     setMessage("");
     setBusy("image");
+    setImageState({ state: "loading" });
     try {
       const image = await generateImage({ mode: "generate", brief, format: imageFormat, useBrand, references: inspiration.length ? inspiration : undefined });
-      const next = [image, ...(fresh ? fresh.media || [] : photos)].slice(0, 4);
+      const next = [image, ...photos.filter((p) => p !== linked)].slice(0, 4);
       setPhotos(next);
-      await keepImage(next, fresh);
+      await keepImage(next, undefined, image);
+      setImageState({ state: "idle" });
       setMessage("AI-afbeelding gemaakt en opgeslagen. Bekijk hem in het voorbeeld; je kunt een nieuwe laten maken of hem verwijderen.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "De afbeelding kon niet worden gemaakt. Probeer het opnieuw.");
+      setImageState({ state: "error", message: e instanceof Error ? e.message : "De afbeelding kon niet worden gemaakt." });
     } finally {
+      aiLock.current = false;
       setBusy("");
     }
   }
@@ -307,6 +378,7 @@ export function CreateStudio({
   async function editImage() {
     const photo = photos[editIndex];
     if (!photo) return setError("Kies eerst een foto om te bewerken.");
+    if (!lockAi()) return;
     setError("");
     setMessage("");
     setBusy("image");
@@ -320,6 +392,7 @@ export function CreateStudio({
     } catch (e) {
       setError(e instanceof Error ? e.message : "De foto kon niet worden bewerkt. Probeer het opnieuw.");
     } finally {
+      aiLock.current = false;
       setBusy("");
     }
   }
@@ -350,7 +423,7 @@ export function CreateStudio({
   }, []);
 
   async function edit(action: ContentEditAction) {
-    if (!caption.trim()) return;
+    if (!caption.trim() || !lockAi()) return;
     setError("");
     setMessage("");
     setBusy("edit");
@@ -371,6 +444,7 @@ export function CreateStudio({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Aanpassen is niet gelukt. Je tekst is niet gewijzigd.");
     } finally {
+      aiLock.current = false;
       setBusy("");
     }
   }
@@ -433,21 +507,21 @@ export function CreateStudio({
                 <Save size={15} />
                 <span>Opslaan</span>
               </button>
-              <button type="button" className="button primary" onClick={() => void approve()} disabled={status === "saving"}>
-                {date ? <CalendarClock size={15} /> : <Check size={15} />}
-                <span>{date ? "Goedkeuren en inplannen" : "Goedkeuren"}</span>
-              </button>
+              {/* Approved or scheduled: publish now (with confirmation), when Instagram allows it. */}
+              {post.status === "approved" || post.status === "scheduled" ? (
+                <PublishButton post={{ ...post, caption, hashtags, media: photos }} capability={publishCap} />
+              ) : (
+                <button type="button" className="button primary" onClick={() => void approve()} disabled={status === "saving"}>
+                  {date ? <CalendarClock size={15} /> : <Check size={15} />}
+                  <span>{date ? "Goedkeuren en inplannen" : "Goedkeuren"}</span>
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        <p className="cs-publish-note">
-          <Plug size={14} aria-hidden="true" />
-          <span>
-            Publiceren naar Instagram vanuit Mavix is nog niet beschikbaar. Ingeplande posts verschijnen in je <Link href="/calendar">kalender</Link>; plaats ze zelf, bijvoorbeeld met Kopiëren.{" "}
-            <Link href="/account/integraties">Integraties bekijken</Link>
-          </span>
-        </p>
+        {/* Live publishing status for this workspace and the one next step. */}
+        <InstagramPublishPanel capability={publishCap} />
         <div className="cs-grid" data-view={view}>
           <aside className="cs-controls" aria-label="Instellingen">
             <fieldset className="cs-field">
@@ -475,6 +549,9 @@ export function CreateStudio({
                 ))}
               </select>
             </label>
+            {/* Refinements: optional, folded away so the start stays simple. */}
+            <details className="cs-more">
+              <summary>Meer opties</summary>
             {type !== "Content Ideas" && (
               <>
                 <label className="cs-field">
@@ -517,7 +594,8 @@ export function CreateStudio({
                 <small>Uit je Brand Hub; er wordt geen website opgehaald.</small>
               </span>
             </label>
-            {type !== "Captions & Hashtags" && type !== "Content Ideas" && (
+            </details>
+            {type !== "Content Ideas" && (
               <div className="cs-field">
                 <span id="ig-visual-label">Beeld</span>
                 <div className="cs-visual-modes" role="radiogroup" aria-labelledby="ig-visual-label">
@@ -530,28 +608,48 @@ export function CreateStudio({
                 </div>
                 {imageMode === "ai" && (
                   <div className="cs-visual-panel">
-                    <label className="cs-label" htmlFor="ig-image-brief">
-                      Wat moet er op de afbeelding staan?
-                    </label>
-                    <textarea id="ig-image-brief" rows={3} maxLength={800} value={imageBrief} placeholder={prompt.trim() || "Bijvoorbeeld: een dampende pizza op een houten plank op een zonnig terras"} onChange={(e) => setImageBrief(e.target.value)} />
-                    <div className="cs-visual-format" role="radiogroup" aria-label="Formaat">
-                      <button type="button" role="radio" aria-checked={imageFormat === "square"} onClick={() => setImageFormat("square")}>
+                    {AUTO_IMAGE_TYPES.includes(type) && (
+                      <label className="cs-check">
+                        <input type="checkbox" checked={autoImage} disabled={!!busy} onChange={(e) => setAutoImage(e.target.checked)} />
+                        <span>Bij genereren meteen een bijpassende afbeelding maken</span>
+                      </label>
+                    )}
+                    <div className="cs-visual-format" role="radiogroup" aria-label="Vorm van de afbeelding">
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={imageFormat === "square"}
+                        onClick={() => setImageFormat("square")}
+                      >
                         Vierkant
                       </button>
-                      <button type="button" role="radio" aria-checked={imageFormat === "portrait"} onClick={() => setImageFormat("portrait")}>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={imageFormat === "portrait"}
+                        onClick={() => setImageFormat("portrait")}
+                      >
                         Staand (4:5)
                       </button>
                     </div>
-                    <InspirationPicker value={inspiration} onChange={setInspiration} max={plan?.inspirationMax ?? 3} disabled={!!busy} />
-                    <label className="cs-check">
-                      <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} />
-                      <span>Stijl, kleuren en doelgroep uit Brand Hub meenemen (als ze zijn ingevuld)</span>
-                    </label>
-                    <button type="button" className="button primary" disabled={!!busy || !(imageBrief.trim() || prompt.trim())} onClick={() => void makeImage()}>
-                      <Wand2 size={15} aria-hidden="true" />
-                      {busy === "image" ? "Afbeelding maken…" : photos.length ? "Nieuwe AI-afbeelding" : "AI-afbeelding genereren"}
+                    {/* The image follows the briefing above; these only fine-tune it. */}
+                    <details className="cs-more">
+                      <summary>Meer beeldopties</summary>
+                      <label className="cs-label" htmlFor="ig-image-brief">
+                        Beeld anders dan je briefing <small>optioneel</small>
+                      </label>
+                      <textarea id="ig-image-brief" rows={2} maxLength={800} value={imageBrief} placeholder="Leeg laten: Mavix gebruikt je briefing" onChange={(e) => setImageBrief(e.target.value)} />
+                      <InspirationPicker value={inspiration} onChange={setInspiration} max={plan?.inspirationMax ?? 3} disabled={!!busy} />
+                      <label className="cs-check">
+                        <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} />
+                        <span>Stijl, kleuren en doelgroep uit Brand Hub meenemen</span>
+                      </label>
+                    </details>
+                    <button type="button" className="button secondary" disabled={!!busy || !(imageBrief.trim() || prompt.trim())} onClick={() => void regenerateImageOnly()}>
+                      <RefreshCw size={15} aria-hidden="true" />
+                      {imageLoading ? "Afbeelding maken…" : post && photos.length ? "Alleen afbeelding opnieuw genereren" : "Afbeelding genereren"}
                     </button>
-                    <p className="cs-hint">Mavix maakt een nieuwe afbeelding met AI. Je hebt geen eigen foto nodig. Dit duurt meestal 15 tot 40 seconden.</p>
+                    <p className="cs-hint">Een afbeelding maken duurt meestal 15 tot 40 seconden. Je caption blijft staan.</p>
                   </div>
                 )}
                 {imageMode === "edit" && photos.length > 0 && (
@@ -609,19 +707,23 @@ export function CreateStudio({
                 </button>
                 </>
                 )}
-                {photos.length > 0 && (
-                  <div className="cs-photos">
+                {/* The selected images: the single source for the preview. */}
+                {(photos.length > 0 || imageLoading) && (
+                  <div className="cs-photos" aria-busy={imageLoading}>
+                    {imageLoading && <div className="cs-photo-loading" role="status" aria-label="Afbeelding wordt gemaakt" />}
                     {photos.map((photo, i) => (
-                      <div key={i}>
+                      <div key={photo + i} className={i === 0 ? "is-selected" : undefined}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={photo} alt={"Foto " + (i + 1)} />
-                        <button type="button" aria-label={"Verwijder foto " + (i + 1)} onClick={() => setPhotos(photos.filter((_, n) => n !== i))}>
+                        <img src={photo} alt={(photo === linked ? "AI-afbeelding" : "Foto") + " " + (i + 1)} />
+                        {photo === linked && <span className="cs-photo-tag">AI</span>}
+                        <button type="button" aria-label={"Verwijder " + (photo === linked ? "AI-afbeelding" : "foto " + (i + 1))} disabled={imageLoading} onClick={() => setPhotos(photos.filter((_, n) => n !== i))}>
                           <X size={12} />
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
+                {!photos.length && !imageLoading && post && <p className="cs-hint cs-no-image">Geen afbeelding gekozen. Maak er een met AI of kies een eigen foto.</p>}
               </div>
             )}
           </aside>
@@ -650,7 +752,7 @@ export function CreateStudio({
                 placeholder="Bijvoorbeeld: een post over onze nieuwe pizza van de maand, voor gezinnen in het weekend."
               />
               <div className="cs-brief-bar">
-                <small>Mavix AI gebruikt je Brand Hub: toon, doelgroep en producten.</small>
+                <small>{autoApplies && !hasOwn ? "Mavix maakt op basis van je briefing direct een caption én bijpassende afbeelding." : "Mavix AI gebruikt je Brand Hub: toon, doelgroep en producten."}</small>
                 {!post && (
                   <button type="button" className="button secondary" disabled={!!busy} onClick={startManual}>
                     <PenLine size={15} />
@@ -659,7 +761,7 @@ export function CreateStudio({
                 )}
                 <button className="button primary" aria-busy={generating} disabled={!!busy || !prompt.trim()}>
                   {generating ? <Mavi size={16} state="thinking" tone="brand" live /> : post ? <RefreshCw size={15} /> : <Wand2 size={15} />}
-                  {generating ? "Bezig…" : post ? "Opnieuw genereren" : "Genereren"}
+                  {generating ? "Caption maken…" : imageLoading ? "Afbeelding maken…" : post ? "Opnieuw genereren" : "Genereren"}
                 </button>
               </div>
             </form>
@@ -779,10 +881,41 @@ export function CreateStudio({
                 </span>
                 <strong>{(profile.name || "jouwbedrijf").toLowerCase().replace(/\s+/g, "")}</strong>
               </header>
-              <div className="ig-phone-media">{post ? <PostVisual post={{ ...post, media: photos.length ? photos : post.media }} /> : photos[0] ? (
+              {/* Only the selected image (photos[0]) is shown: no saved or stand-in picture. */}
+              <div className="ig-phone-media" aria-live="polite">
+                {imageLoading ? (
+                  <div className="ig-media-state is-loading" role="status">
+                    <span className="ig-media-shimmer" aria-hidden="true" />
+                    <span className="ig-media-text">
+                      <Mavi size={18} state="creating" tone="brand" live /> Afbeelding wordt gemaakt…
+                    </span>
+                  </div>
+                ) : imageState.state === "error" && !photos[0] ? (
+                  <div className="ig-media-state is-error" role="alert">
+                    <strong>De afbeelding kon niet worden gemaakt</strong>
+                    <span>{imageState.message}</span>
+                    <button type="button" className="button secondary" disabled={!!busy} onClick={() => void regenerateImageOnly()}>
+                      <RefreshCw size={14} aria-hidden="true" /> Opnieuw proberen
+                    </button>
+                  </div>
+                ) : photos[0] ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photos[0]} alt="Gekozen foto" />
-                ) : <span className="ig-phone-placeholder">Je foto verschijnt hier</span>}</div>
+                  <img className="ig-preview-photo" src={photos[0]} alt={photos[0] === linked ? "AI-afbeelding bij deze post" : "Gekozen foto"} />
+                ) : (
+                  <div className="ig-media-state">
+                    <ImageIcon size={22} aria-hidden="true" />
+                    <span>{post ? "Geen afbeelding gekozen" : autoApplies ? "Je afbeelding verschijnt hier na het genereren" : "Je foto verschijnt hier"}</span>
+                  </div>
+                )}
+              </div>
+              {imageState.state === "error" && photos[0] && !imageLoading && (
+                <div className="ig-media-note" role="alert">
+                  <span>Nieuwe afbeelding mislukt: {imageState.message} De vorige afbeelding is bewaard.</span>
+                  <button type="button" className="cs-undo" disabled={!!busy} onClick={() => void regenerateImageOnly()}>
+                    Opnieuw proberen
+                  </button>
+                </div>
+              )}
               <div className="ig-phone-actions" aria-hidden="true">
                 <Heart size={20} />
                 <MessageCircle size={20} />
@@ -808,7 +941,8 @@ export function CreateStudio({
           </p>
         )}
       </div>
-      <LibraryPicker open={pickerOpen} max={Math.max(1, 4 - photos.length)} onClose={() => setPickerOpen(false)} onPick={(imgs) => setPhotos([...photos, ...imgs].slice(0, 4))} />
+      {/* A chosen own photo takes the place of the automatic AI image. */}
+      <LibraryPicker open={pickerOpen} max={Math.max(1, 4 - photos.filter((p) => p !== linked).length)} onClose={() => setPickerOpen(false)} onPick={(imgs) => setPhotos([...imgs, ...photos.filter((p) => p !== linked)].slice(0, 4))} />
     </>
   );
 }

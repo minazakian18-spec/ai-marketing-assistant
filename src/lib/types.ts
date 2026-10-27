@@ -50,6 +50,8 @@ export type Post = {
   contentType?: ContentType;
   source?: "manual" | "autopilot";
   media?: string[];
+  /** The image in `media` that Mavix made for this concept's prompt (src/lib/post-image.ts). */
+  aiImage?: string;
   videoMode?: string;
   duration?: number;
   failureReason?: string;
