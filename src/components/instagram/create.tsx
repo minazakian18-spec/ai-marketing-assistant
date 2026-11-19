@@ -115,6 +115,8 @@ export function CreateStudio({
   const [notice, setNotice] = useState(initialType && UPCOMING[initialType] ? UPCOMING[initialType] : "");
   const [prompt, setPrompt] = useState(editPost?.prompt || initialBrief);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Library picker for the business photos (Brand Hub) instead of this post's photos.
+  const [brandPickerOpen, setBrandPickerOpen] = useState(false);
   const [photos, setPhotos] = useState<string[]>(editPost?.media || []);
   const [product, setProduct] = useState("");
   const [date, setDate] = useState(editPost?.date || initialDate || "");
@@ -358,16 +360,20 @@ export function CreateStudio({
     }
   }
 
-  // Photos of the business for Brand Hub (the references for every AI image).
+  // Photos of the business for Brand Hub (the references for every AI image):
+  // uploaded from the computer or picked from the Bibliotheek.
+  async function saveBrandPhotos(added: string[]) {
+    if (!added.length) return;
+    const media = [...new Set([...(profile.media || []), ...added])].slice(0, 12);
+    if (await save({ ...data, profile: { ...data.profile, media } })) setMessage("Foto's van je zaak opgeslagen in Brand Hub. Mavix gebruikt ze voor elk beeld.");
+    else setError("De foto's konden niet worden opgeslagen.");
+  }
   async function addBrandPhotos(files: File[]) {
     if (!files.length) return;
     setBusy("brand");
     setError("");
     try {
-      const added = await readImages(files, BRAND_REFERENCE_MAX);
-      const media = [...(profile.media || []), ...added].slice(0, 12);
-      if (await save({ ...data, profile: { ...data.profile, media } })) setMessage("Foto's van je zaak opgeslagen in Brand Hub. Mavix gebruikt ze voor elk beeld.");
-      else setError("De foto's konden niet worden opgeslagen.");
+      await saveBrandPhotos(await readImages(files, BRAND_REFERENCE_MAX));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Foto's toevoegen is niet gelukt.");
     } finally {
@@ -619,10 +625,16 @@ export function CreateStudio({
       <Camera size={18} aria-hidden="true" />
       <div>
         <strong>Voeg eerst 1 tot 3 foto&apos;s van je zaak toe</strong>
-        <span>Mavix maakt alleen beelden van jóuw producten en jóuw zaak, nooit een willekeurige stockfoto. Kies een paar foto&apos;s van je producten, je interieur of je gevel. Je kunt ze later aanpassen in Brand Hub.</span>
+        <span>Mavix maakt alleen beelden van jóuw producten en jóuw zaak, nooit een willekeurige stockfoto. Kies een paar foto&apos;s van je producten, je interieur of je gevel, van je computer of uit je Bibliotheek. Je kunt ze later aanpassen in Brand Hub.</span>
       </div>
+      <div className="cs-brand-actions">
+      <button type="button" className="button secondary" disabled={!!busy} onClick={() => setBrandPickerOpen(true)}>
+        <Images size={15} aria-hidden="true" />
+        Uit Bibliotheek
+      </button>
       <label className={"button secondary" + (busy === "brand" ? " is-busy" : "")}>
-        {busy === "brand" ? "Opslaan…" : "Foto's kiezen"}
+        <ImagePlus size={15} aria-hidden="true" />
+        {busy === "brand" ? "Opslaan…" : "Uploaden"}
         <input
           type="file"
           multiple
@@ -636,6 +648,7 @@ export function CreateStudio({
           }}
         />
       </label>
+      </div>
     </div>
   );
 
@@ -1054,6 +1067,13 @@ export function CreateStudio({
           </p>
         )}
       </div>
+      {/* Business photos for Brand Hub, straight from the Bibliotheek. */}
+      <LibraryPicker
+        open={brandPickerOpen}
+        max={BRAND_REFERENCE_MAX}
+        onClose={() => setBrandPickerOpen(false)}
+        onPick={(imgs) => void saveBrandPhotos(imgs)}
+      />
       {/* A chosen own photo takes the place of the automatic AI image. */}
       <LibraryPicker
         open={pickerOpen}

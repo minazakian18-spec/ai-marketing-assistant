@@ -30,7 +30,6 @@ const PROVIDERS: [string, string][] = [
   ["gmail", "Gmail"],
   ["google_calendar", "Google Agenda"],
   ["google_search_console", "Google Search Console"],
-  ["messenger", "Facebook Messenger"],
 ];
 const BROKEN = ["reconnect_required", "permission_missing", "error"];
 

@@ -10,7 +10,7 @@ import { CHECK_FRESH_MS, checkGoogleConnection, GOOGLE_PROVIDERS, lastCheck } fr
 // booleans about platform setup are returned, never names or values of keys.
 // Google connections that were not proven to work in the last 24 hours get a
 // real check first (token refresh at Google, src/lib/server/google-health.ts).
-const PROVIDERS: ProviderId[] = ["gmail", "google_calendar", "google_business", "google_search_console", "instagram", "messenger", "email_sending", "google_ads"];
+const PROVIDERS: ProviderId[] = ["gmail", "google_calendar", "google_business", "google_search_console", "instagram", "email_sending", "google_ads"];
 
 export async function GET() {
   try {
@@ -32,7 +32,7 @@ export async function GET() {
       const row = (data || []).find((c) => c.provider === provider && c.status !== "disconnected");
       return healthFor({
         provider,
-        platformReady: provider.startsWith("google") || provider === "gmail" ? google : metaConfigured(provider as "instagram" | "messenger"),
+        platformReady: provider.startsWith("google") || provider === "gmail" ? google : metaConfigured(provider as "instagram"),
         connection: row ? { status: row.status, scopes: row.scopes || [], lastSyncedAt: row.last_synced_at || lastCheck(row.metadata)?.at || null, expiresAt: row.expires_at || null } : null,
         verified: (GOOGLE_PROVIDERS as readonly string[]).includes(provider) ? isFresh(row?.metadata) : undefined,
       });

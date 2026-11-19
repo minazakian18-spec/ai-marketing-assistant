@@ -48,7 +48,7 @@ export type StatusUpdate = {
   status: Exclude<DeliveryStatus, "received" | "pending">;
   at: string;
   messageId?: string;
-  // Messenger reports reads/deliveries as a watermark for a whole thread.
+  // Meta can report reads/deliveries as a watermark for a whole thread.
   threadId?: string;
   watermark?: string;
   error?: string;
@@ -144,12 +144,11 @@ type MetaMessaging = {
   read?: { mid?: string; watermark?: number };
 };
 
-// Instagram (object "instagram") and Messenger (object "page") share the
-// entry[].messaging[] shape. entry.id is the IG professional account id or
-// the Facebook Page id the connection is stored under.
+// Instagram (object "instagram"): entry[].messaging[]. entry.id is the IG
+// professional account id the connection is stored under.
 export function parseMetaMessaging(
   payload: unknown,
-  channel: "instagram" | "messenger",
+  channel: "instagram",
 ) {
   const messages: NormalizedMessage[] = [];
   const statuses: StatusUpdate[] = [];
@@ -158,7 +157,7 @@ export function parseMetaMessaging(
     entry?: { id?: string; time?: number; messaging?: MetaMessaging[] }[];
   };
   if (
-    body?.object !== (channel === "instagram" ? "instagram" : "page") ||
+    body?.object !== channel ||
     !Array.isArray(body.entry)
   )
     return { messages, statuses };

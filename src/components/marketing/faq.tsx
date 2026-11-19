@@ -25,7 +25,7 @@ export const generalFaq: FaqItem[] = [
   },
   {
     q: "Kan ik mijn bestaande accounts koppelen?",
-    a: "Ja. Je koppelt onder meer je Google Bedrijfsprofiel, Gmail, Google Agenda, Search Console, Instagram en Facebook Messenger aan je werkruimte. Een aantal koppelingen wacht nog op goedkeuring van Google of Meta; in Mavix zie je per koppeling of hij al actief is. Tot die tijd plan je content in Mavix en plaats je die zelf.",
+    a: "Ja. Je koppelt onder meer je Google Bedrijfsprofiel, Gmail, Google Agenda, Search Console en Instagram aan je werkruimte. Een aantal koppelingen wacht nog op goedkeuring van Google of Meta; in Mavix zie je per koppeling of hij al actief is. Tot die tijd plan je content in Mavix en plaats je die zelf.",
   },
   {
     q: "Heb ik technische kennis nodig?",

@@ -7,7 +7,6 @@ const integrations: { brand: Brand; name: string; use: string; soon?: boolean }[
   { brand: "google_business", name: "Google Bedrijfsprofiel", use: "Reviews lezen en beantwoorden" },
   { brand: "instagram", name: "Instagram", use: "Posts en carrousels inplannen" },
   { brand: "gmail", name: "Gmail", use: "E-mail in je Inbox" },
-  { brand: "messenger", name: "Facebook Messenger", use: "Klantgesprekken" },
   { brand: "google_calendar", name: "Google Agenda", use: "Afspraken in je kalender" },
   { brand: "search_console", name: "Google Search Console", use: "Vindbaarheid in Google" },
   { brand: "google_ads", name: "Google Ads", use: "Campagneresultaten", soon: true },

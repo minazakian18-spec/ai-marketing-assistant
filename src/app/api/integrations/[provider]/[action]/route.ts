@@ -28,7 +28,6 @@ import {
   authorizeUrl,
   completeInstagram,
   completeInstagramFacebook,
-  completeMessenger,
   INSTAGRAM_TAKEN,
   instagramMode,
   InstagramTokenTypeError,
@@ -40,7 +39,6 @@ import {
   metaConfigured,
   metaScopes,
   missingMetaConfig,
-  selectPage,
   type MetaCredentials,
 } from "@/lib/server/meta";
 import {
@@ -57,7 +55,6 @@ const PROVIDERS = [
   "gmail",
   "instagram",
   "google_calendar",
-  "messenger",
 ];
 const GOOGLE = ["google_business", "gmail", "google_calendar"];
 
@@ -124,13 +121,13 @@ export async function POST(request: Request, { params }: Context) {
     sameOrigin(request);
     if (!PROVIDERS.includes(route.provider))
       throw new HttpError(404, "Niet gevonden.");
-    const provider = route.provider as Provider | "messenger",
+    const provider = route.provider as Provider,
       action = route.action;
     const auth = await workspace(["OWNER", "ADMIN"]);
     await limited("oauth:" + auth.user.id, 10);
     const db = adminClient();
     if (action === "connect") {
-      if (provider === "instagram" || provider === "messenger") {
+      if (provider === "instagram") {
         if (!metaConfigured(provider)) {
           console.error(
             JSON.stringify({
@@ -141,8 +138,7 @@ export async function POST(request: Request, { params }: Context) {
           );
           throw new HttpError(
             503,
-            (provider === "instagram" ? "Instagram" : "Messenger") +
-              "-koppeling vereist nog Meta-appconfiguratie.",
+            "Instagram-koppeling vereist nog Meta-appconfiguratie.",
           );
         }
         const { state } = await newState(
@@ -256,14 +252,6 @@ export async function POST(request: Request, { params }: Context) {
       await audit(auth.workspaceId, auth.user.id, "integration_connected");
       return NextResponse.json({ ok: true });
     }
-    if (action === "select" && provider === "messenger") {
-      const { page } = z
-        .object({ page: z.string().regex(/^\d{1,30}$/) })
-        .parse(await request.json());
-      await selectPage(auth.workspaceId, page);
-      await audit(auth.workspaceId, auth.user.id, "integration_connected");
-      return NextResponse.json({ ok: true });
-    }
     // Which e-mails come into the Inbox: only mail sent to these addresses
     // (empty = every primary mail). Newsletters and promotions never do.
     if (action === "filter" && provider === "gmail") {
@@ -350,7 +338,7 @@ export async function GET(request: Request, { params }: Context) {
   try {
     const route = await params;
     gmailCallback = route.provider === "gmail" && route.action === "callback";
-    if ((route.provider === "instagram" || route.provider === "messenger") && route.action === "callback") metaCallbackProvider = route.provider;
+    if (route.provider === "instagram" && route.action === "callback") metaCallbackProvider = route.provider;
     if (
       route.provider === "google_calendar" ||
       route.provider === "google-calendar"
@@ -362,7 +350,7 @@ export async function GET(request: Request, { params }: Context) {
       return handleSearchConsoleIntegration(request, route.action);
     if (!PROVIDERS.includes(route.provider))
       throw new HttpError(404, "Niet gevonden.");
-    const provider = route.provider as Provider | "messenger",
+    const provider = route.provider as Provider,
       action = route.action;
     const auth = await workspace(
       action === "status" && provider === "gmail"
@@ -398,31 +386,6 @@ export async function GET(request: Request, { params }: Context) {
         { headers: { "Cache-Control": "private, no-store" } },
       );
     }
-    if (action === "pages" && provider === "messenger") {
-      const { data: c } = await db
-        .from("integration_connections")
-        .select("encrypted_credentials")
-        .eq("workspace_id", auth.workspaceId)
-        .eq("provider", "messenger")
-        .maybeSingle();
-      if (!c?.encrypted_credentials)
-        throw new HttpError(409, "Verbind eerst Facebook.");
-      const creds = decrypt<MetaCredentials>(
-        c.encrypted_credentials,
-        auth.workspaceId + ":messenger",
-      );
-      if (!creds.user_token)
-        throw new HttpError(
-          409,
-          "Verbind Facebook opnieuw om een andere pagina te kiezen.",
-        );
-      return NextResponse.json({
-        pages: (await listPages(creds.user_token)).map((p) => ({
-          id: p.id,
-          name: p.name,
-        })),
-      });
-    }
     if (action === "accounts" && provider === "instagram") {
       const { data: c } = await db
         .from("integration_connections")
@@ -456,7 +419,7 @@ export async function GET(request: Request, { params }: Context) {
     }
     if (action !== "callback") throw new HttpError(404, "Niet gevonden.");
     const url = new URL(request.url);
-    if (provider === "instagram" || provider === "messenger") {
+    if (provider === "instagram") {
       if (url.searchParams.get("error")) {
         await consumeState(provider, url, auth).catch(() => {});
         // Meta reports why (user_denied, or a configuration problem); only
@@ -546,43 +509,6 @@ export async function GET(request: Request, { params }: Context) {
           await audit(auth.workspaceId, auth.user.id, "integration_authorized");
           return back("connected=instagram");
         }
-        const fb = await completeMessenger(code);
-        const { error } = await db.from("integration_connections").upsert(
-          {
-            workspace_id: auth.workspaceId,
-            provider,
-            connected_user: auth.user.id,
-            provider_account_id: null,
-            display_name: fb.userName,
-            status: "selection_required",
-            encrypted_credentials: encrypt(
-              {
-                access_token: fb.userToken,
-                user_token: fb.userToken,
-                obtained_at: Date.now(),
-              },
-              auth.workspaceId + ":messenger",
-            ),
-            scopes: fb.granted.filter((s: string) =>
-              metaScopes.messenger.includes(s),
-            ),
-            expires_at: null,
-            metadata: {},
-          },
-          { onConflict: "workspace_id,provider" },
-        );
-        if (error) throw error;
-        await audit(auth.workspaceId, auth.user.id, "integration_authorized");
-        const pages = await listPages(fb.userToken);
-        if (pages.length === 1) {
-          await selectPage(auth.workspaceId, pages[0].id);
-          return back("connected=messenger");
-        }
-        return back(
-          pages.length
-            ? "select=messenger"
-            : "error=no_pages&provider=messenger",
-        );
       } catch (e) {
         metaFailure(provider, stage, e);
         if (e instanceof InstagramTokenTypeError) {

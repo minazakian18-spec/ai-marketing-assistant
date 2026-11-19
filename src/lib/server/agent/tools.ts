@@ -73,7 +73,6 @@ export class Loader {
 
 const PROVIDERS: Record<string, string> = {
   instagram: "Instagram",
-  messenger: "Facebook Messenger",
   gmail: "Gmail",
   google_business: "Google Bedrijfsprofiel",
   google_calendar: "Google Agenda",
@@ -108,7 +107,7 @@ const brandContext: AgentTool<Record<string, never>> = {
 
 const integrations: AgentTool<Record<string, never>> = {
   name: "get_integrations",
-  description: "Read which external accounts are connected to Mavix (Instagram, Facebook Messenger, Gmail, Google Business Profile, Google Calendar, Search Console) and their status.",
+  description: "Read which external accounts are connected to Mavix (Instagram, Gmail, Google Business Profile, Google Calendar, Search Console) and their status.",
   parameters: noArgs,
   args: z.object({}).strict(),
   roles: ALL,
@@ -296,10 +295,10 @@ const campaigns: AgentTool<Record<string, never>> = {
   },
 };
 
-const MESSAGING = ["gmail", "instagram", "messenger"];
+const MESSAGING = ["gmail", "instagram"];
 const inbox: AgentTool<Record<string, never>> = {
   name: "get_inbox_overview",
-  description: "Read how many conversations in the Mavix Inbox have unread messages, per channel (Gmail, Instagram, Messenger). Counts only; message contents are not available to you.",
+  description: "Read how many conversations in the Mavix Inbox have unread messages, per channel (Gmail, Instagram). Counts only; message contents are not available to you.",
   parameters: noArgs,
   args: z.object({}).strict(),
   roles: ALL,

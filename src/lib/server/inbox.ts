@@ -163,9 +163,9 @@ export async function channelStates(
     .from("integration_connections")
     .select("provider,status,scopes,display_name,provider_account_id")
     .eq("workspace_id", workspaceId)
-    .in("provider", ["gmail", "instagram", "messenger"]);
+    .in("provider", ["gmail", "instagram"]);
   if (error) throw error;
-  return (["gmail", "instagram", "messenger"] as Channel[]).map(
+  return (["gmail", "instagram"] as Channel[]).map(
     (channel) => {
       const c = data?.find((d) => d.provider === channel);
       if (!c || c.status === "disconnected")
@@ -335,7 +335,7 @@ export async function ingest(
   let merged = { ...(row.external_contact || {}), ...contact };
   if (
     created &&
-    (m.channel === "instagram" || m.channel === "messenger") &&
+    m.channel === "instagram" &&
     m.direction === "inbound"
   ) {
     const profile = await metaProfile(workspaceId, m.channel, m.threadId);
@@ -456,15 +456,13 @@ async function firstDelivery(
   throw error;
 }
 
-// Process a verified Meta webhook body (Instagram or Messenger).
+// Process a verified Meta webhook body (Instagram).
 export async function processMetaWebhook(payload: unknown) {
   const object = (payload as { object?: string })?.object;
   const provider: MetaProvider | null =
     object === "instagram"
       ? "instagram"
-      : object === "page"
-        ? "messenger"
-        : null;
+      : null;
   if (!provider) return;
   const { messages, statuses } = parseMetaMessaging(payload, provider);
   const cache = new Map<string, string[]>();
@@ -1070,7 +1068,7 @@ export async function listConversations(
 // Gmail counts only the mailbox that is linked right now.
 export async function unreadByChannel(workspaceId: string): Promise<Record<Channel, number>> {
   const gmailAccount = await visibleGmailAccount(workspaceId);
-  const channels: Channel[] = ["gmail", "instagram", "messenger"];
+  const channels: Channel[] = ["gmail", "instagram"];
   const counts = await Promise.all(
     channels.map(async (channel) => {
       if (channel === "gmail" && !gmailAccount) return 0;

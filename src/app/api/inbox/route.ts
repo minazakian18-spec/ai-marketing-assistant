@@ -4,7 +4,7 @@ import { workspace, failure, limited, HttpError } from "@/lib/server/access";
 import { channelStates, listConversations, unreadByChannel } from "@/lib/server/inbox";
 
 const query = z.object({
-  channel: z.enum(["gmail", "instagram", "messenger"]).optional(),
+  channel: z.enum(["gmail", "instagram"]).optional(),
   filter: z.enum(["open", "unread", "mine", "resolved"]).optional(),
   q: z.string().max(100).optional(),
   cursor: z.string().max(100).optional(),

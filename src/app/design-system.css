@@ -984,3 +984,12 @@ button:focus-visible > .cs-chip, .cs-chip:focus-visible { outline: none; box-sha
   .cs-kinds { grid-template-columns: 1fr; }
   .cs-goals button { flex: 1 1 100%; }
 }
+
+.cs-brand-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.cs-brand-actions .button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+@media (max-width: 760px) { .cs-brand-actions { grid-column: 1 / -1; } }
+
+/* E-mail kinds: three per row (components/email/create.tsx). */
+.cs-kinds.cs-kinds-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .cs-kinds.cs-kinds-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .cs-kinds.cs-kinds-3 { grid-template-columns: 1fr; } }

@@ -1,4 +1,4 @@
--- WhatsApp verwijderen uit de database.
+-- WhatsApp en Facebook Messenger verwijderen uit de database.
 --
 -- LET OP: NIET UITVOEREN ZONDER AKKOORD VAN DE EIGENAAR.
 -- Dit bestand staat bewust NIET in supabase/migrations/, zodat het nooit
@@ -15,23 +15,23 @@
 begin;
 
 -- 1. De koppeling: het opgeslagen token en de account-gegevens gaan weg.
-delete from public.integration_connections where provider = 'whatsapp';
+delete from public.integration_connections where provider in ('whatsapp', 'messenger');
 
 -- 2. Inbox-gegevens van WhatsApp (nu 0 rijen; voor de volledigheid).
-delete from public.inbox_messages where provider = 'whatsapp';
-delete from public.inbox_conversations where provider = 'whatsapp';
-delete from public.inbox_sync_state where provider = 'whatsapp';
-delete from public.inbox_webhook_events where provider = 'whatsapp';
+delete from public.inbox_messages where provider in ('whatsapp', 'messenger');
+delete from public.inbox_conversations where provider in ('whatsapp', 'messenger');
+delete from public.inbox_sync_state where provider in ('whatsapp', 'messenger');
+delete from public.inbox_webhook_events where provider in ('whatsapp', 'messenger');
 
 -- 3. Index en toegestane waarden zonder WhatsApp.
 drop index if exists public.integration_connections_whatsapp_number_uidx;
 
 alter table public.inbox_conversations drop constraint if exists inbox_conversations_provider_check;
 alter table public.inbox_conversations add constraint inbox_conversations_provider_check
-  check (provider in ('gmail', 'instagram', 'messenger'));
+  check (provider in ('gmail', 'instagram'));
 
 alter table public.integration_connections drop constraint if exists integration_connections_provider_check;
 alter table public.integration_connections add constraint integration_connections_provider_check
-  check (provider in ('google_business', 'gmail', 'instagram', 'google_calendar', 'messenger', 'google_search_console'));
+  check (provider in ('google_business', 'gmail', 'instagram', 'google_calendar', 'google_search_console'));
 
 commit;

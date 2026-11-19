@@ -2,7 +2,7 @@
 // customer or the Mavix platform owner), the single next step, missing
 // required permissions and optional extras. Pure; the server supplies facts.
 
-export type ProviderId = "gmail" | "google_calendar" | "google_business" | "google_search_console" | "instagram" | "messenger" | "email_sending" | "google_ads";
+export type ProviderId = "gmail" | "google_calendar" | "google_business" | "google_search_console" | "instagram" | "email_sending" | "google_ads";
 
 /**
  * One status vocabulary for every integration (Integraties, Dashboard):
@@ -59,7 +59,6 @@ const LABEL: Record<ProviderId, string> = {
   google_business: "Google Bedrijfsprofiel",
   google_search_console: "Google Search Console",
   instagram: "Instagram",
-  messenger: "Facebook Messenger",
   email_sending: "E-mailcampagnes versturen",
   google_ads: "Google Ads",
 };
@@ -73,7 +72,6 @@ const REQUIRED: Partial<Record<ProviderId, [string[], string][]>> = {
   google_calendar: [[["https://www.googleapis.com/auth/calendar.events"], "Afspraken beheren"]],
   google_business: [[["https://www.googleapis.com/auth/business.manage"], "Bedrijfsprofiel en reviews beheren"]],
   instagram: [[["instagram_business_manage_messages", "instagram_manage_messages"], "Berichten lezen en beantwoorden"]],
-  messenger: [[["pages_messaging"], "Messenger-berichten beantwoorden"]],
 };
 
 export function healthFor(f: HealthFacts): Health {

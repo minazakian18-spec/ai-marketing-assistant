@@ -148,7 +148,7 @@ test("integration health: customer vs Mavix steps, missing permissions, optional
   assert.equal(ig.state, "ready");
   assert.equal(ig.extras.find((x) => x.label === "Posts publiceren").granted, false);
   assert.equal(healthFor({ provider: "google_business", platformReady: true, connection: { status: "api_access_required", scopes: [], lastSyncedAt: null, expiresAt: null } }).actor, "mavix");
-  assert.equal(healthFor({ provider: "messenger", platformReady: true, connection: { status: "reconnect_required", scopes: [], lastSyncedAt: null, expiresAt: null } }).next.label, "Opnieuw koppelen");
+  assert.equal(healthFor({ provider: "instagram", platformReady: true, connection: { status: "reconnect_required", scopes: [], lastSyncedAt: null, expiresAt: null } }).next.label, "Opnieuw koppelen");
 });
 
 test("integration health route never exposes configuration names or tokens", async () => {
@@ -165,7 +165,7 @@ test("integration health route never exposes configuration names or tokens", asy
 
 test("dashboard to-dos flag broken connections for every provider first", () => {
   const { buildTodos } = pure("src/lib/dashboard-todos.ts");
-  const todos = buildTodos({ brandScore: 50, review: { count: 0, href: "/" }, failed: { count: 0, href: "/" }, campaigns: 0, plannedThisWeek: 0, status: (p) => (p === "messenger" ? "reconnect_required" : "disconnected") });
-  assert.equal(todos[0].id, "reconnect-messenger");
+  const todos = buildTodos({ brandScore: 50, review: { count: 0, href: "/" }, failed: { count: 0, href: "/" }, campaigns: 0, plannedThisWeek: 0, status: (p) => (p === "google_calendar" ? "reconnect_required" : "disconnected") });
+  assert.equal(todos[0].id, "reconnect-google_calendar");
   assert.equal(todos[0].urgent, true);
 });

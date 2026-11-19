@@ -47,7 +47,7 @@ export function demoThreads(): DemoThread[] {
   return [
     thread(
       "demo-1",
-      "messenger",
+      "instagram",
       "Sanne de Vries",
       "Sanne de Vries",
       [
@@ -82,7 +82,7 @@ export function demoThreads(): DemoThread[] {
     ),
     thread(
       "demo-4",
-      "messenger",
+      "instagram",
       "Peter Smit",
       "Facebook",
       [

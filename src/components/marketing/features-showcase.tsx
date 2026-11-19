@@ -87,7 +87,6 @@ const GROUPS: { title: string; intro: string; items: Feature[] }[] = [
         mini: (
           <div className="ft-inbox">
             <BrandIcon brand="gmail" size={15} title="Gmail" />
-            <BrandIcon brand="messenger" size={15} title="Messenger" />
             <small>1 inbox voor al je kanalen</small>
           </div>
         ),

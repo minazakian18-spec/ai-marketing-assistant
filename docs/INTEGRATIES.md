@@ -16,10 +16,9 @@ koppelingen", via `GET /api/integrations/health`).
 | Instagram (berichten) | Koppelen via Facebook Login for Business, account kiezen | `META_CLIENT_ID`, `META_CLIENT_SECRET`, `META_INSTAGRAM_CONFIG_ID`, `META_WEBHOOK_VERIFY_TOKEN` | Meta App Review voor `instagram_manage_messages` e.a. |
 | Instagram (publiceren, fase 4) | Na goedkeuring één keer opnieuw koppelen | `instagram_content_publish` toevoegen aan de Login-configuratie (of `INSTAGRAM_PUBLISH_SCOPE=1` bij Business Login for Instagram) | Meta App Review voor `instagram_content_publish` |
 | Instagram (bereik/interacties) | – | `instagram_manage_insights` aanvragen | Meta App Review; nog niet aangevraagd |
-| Facebook Messenger | Koppelen, pagina kiezen | `META_CLIENT_ID`, `META_CLIENT_SECRET` | Meta App Review voor `pages_messaging` |
 | Google Ads | – (module in voorbereiding) | Google Ads API developer token, OAuth-scope `adwords` | Google Ads API-toegang (Basic access) |
 
-WhatsApp en TikTok zijn op 19 november 2026 uit Mavix verwijderd (zie docs/OVERDRACHT.md).
+WhatsApp, Facebook Messenger en TikTok zijn op 19 november 2026 uit Mavix verwijderd (zie docs/OVERDRACHT.md).
 
 ## Fase 4: verzenden, publiceren en automatiseren
 

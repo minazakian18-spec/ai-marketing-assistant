@@ -16,7 +16,6 @@ export { CHANNEL_ORDER };
 export const CHANNEL_NAME: Record<Channel, string> = {
   instagram: "Instagram Direct",
   gmail: "Gmail",
-  messenger: "Facebook Messenger",
 };
 const FOLDERS: [StatusFilter, string, typeof Inbox][] = [
   ["open", "Open", Inbox],

@@ -97,3 +97,4 @@ Op 23 september 2026 is een volledige Mavix-audit uitgevoerd op verzoek van de g
 - WhatsApp en TikTok zijn uit de code verwijderd. Data-opruiming staat klaar in `supabase/pending-approval/202611190004_remove_whatsapp_data.sql` (pas uitvoeren na akkoord).
 - Gmail-inbox: alleen primaire inbox (ook updates eruit), bulkmail (List-Unsubscribe/Precedence) overgeslagen, optioneel filter op ontvangstadres (Integraties > Gmail), tekencodering hersteld (`cleanMailText` in `src/lib/inbox/core.ts`).
 - Migraties (nog niet toegepast): `202611190001_updated_at_triggers.sql`, `202611190002_security_hardening.sql`, `202611190003_performance.sql`.
+- Facebook Messenger is daarna ook verwijderd (kanaal, koppeling, paginakeuze, teksten). Data-opruiming: zelfde map supabase/pending-approval/.

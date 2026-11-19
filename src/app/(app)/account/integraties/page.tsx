@@ -40,7 +40,6 @@ const INTEGRATIONS: Integration[] = [
   { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", group: "recommended", provider: "instagram" },
   { id: "gmail", brand: "gmail", name: "Gmail", description: "E-mails versturen en klantmails in de Inbox lezen.", group: "recommended", provider: "gmail" },
   { id: "google_business", brand: "google_business", name: "Google Bedrijfsprofiel", description: "Bedrijfsprofiel en Google-reviews, met één koppeling.", group: "recommended", provider: "google_business" },
-  { id: "messenger", brand: "messenger", name: "Facebook Messenger", description: "Berichten aan je Facebook-pagina in de Inbox.", group: "communication", provider: "messenger" },
   { id: "google_calendar", brand: "google_calendar", name: "Google Agenda", description: "Je afspraken naast je Mavix-planning, in twee richtingen gesynchroniseerd.", group: "productivity", provider: "google_calendar" },
   { id: "google_search_console", brand: "search_console", name: "Google Search Console", description: "Klikken, vertoningen en zoekwoorden van je website.", group: "productivity", provider: "google_search_console" },
   { id: "linkedin", brand: "linkedin", name: "LinkedIn", description: "Posts plannen voor je bedrijfspagina.", group: "other", planned: true },
@@ -66,17 +65,14 @@ const SCOPE_LABEL: Record<string, string> = {
   business_management: "Pagina's in je Meta Business Portfolio vinden",
   pages_show_list: "Je Facebook-pagina's bekijken",
   pages_manage_metadata: "Berichtmeldingen voor je pagina instellen",
-  pages_messaging: "Messenger-berichten beantwoorden",
 };
 const GMAIL_READ = "https://www.googleapis.com/auth/gmail.readonly";
 const NOTICES: Record<string, string> = {
   "connected=instagram": "Instagram is verbonden.",
-  "connected=messenger": "Messenger is verbonden. Nieuwe berichten verschijnen in de Inbox.",
   "connected=gmail": "Gmail is gekoppeld. Je klantmails verschijnen zo in de Inbox.",
   "error=offline_access": "Google gaf geen blijvende toegang. Koppel opnieuw; trek zo nodig eerst de toegang van Mavix in je Google-account in.",
   "error=expired": "De koppelpoging is verlopen of al gebruikt. Probeer het opnieuw.",
   "error=failed": "Koppelen is niet gelukt. Probeer het later opnieuw.",
-  "select=messenger": "Kies welke Facebook-pagina je wilt koppelen (via Beheren bij Facebook Messenger).",
   "select=instagram": "Kies welk Instagram-account je wilt koppelen.",
   "error=no_instagram_account":
     "Er is geen professioneel Instagram-account gevonden. Koppel je Instagram Business- of Creator-account aan een Facebook-pagina die je beheert en probeer opnieuw.",
@@ -136,7 +132,6 @@ export default function IntegrationsPage() {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [busy, setBusy] = useState(false);
   const [locations, setLocations] = useState<{ id: string; account: string; name: string }[] | null>(null);
-  const [pages, setPages] = useState<{ id: string; name: string }[] | null>(null);
   const [igAccounts, setIgAccounts] = useState<{ id: string; username: string; name: string; pageName: string }[] | null>(null);
   const [test, setTest] = useState({ to: "", subject: "", body: "", result: "" });
 
@@ -166,8 +161,6 @@ export default function IntegrationsPage() {
     }
     void load()
       .then((list) => {
-        if (list.some((c) => c.provider === "messenger" && c.status === "selection_required") && q.get("select") === "messenger")
-          setManage(INTEGRATIONS.find((i) => i.id === "messenger")!);
         if (list.some((c) => c.provider === "instagram" && c.status === "selection_required") && q.get("select") === "instagram")
         {
           setManage(INTEGRATIONS.find((i) => i.id === "instagram")!);
@@ -211,11 +204,9 @@ export default function IntegrationsPage() {
   function open(item: Integration) {
     setError("");
     setLocations(null);
-    setPages(null);
     setIgAccounts(null);
     setManage(item);
     const c = conn(item);
-    if (item.provider === "messenger" && c?.status === "selection_required") void call("messenger", "pages").then((d) => d && setPages(d.pages));
     if (item.provider === "instagram" && c?.status === "selection_required") void call("instagram", "accounts").then((d) => d && setIgAccounts(d.accounts));
   }
 
@@ -415,23 +406,6 @@ export default function IntegrationsPage() {
                     </div>
                   ) : (
                     <p className="int-hint">Geen locaties gevonden voor dit Google-account.</p>
-                  )}
-                </div>
-              )}
-
-              {m.provider === "messenger" && pages && (
-                <div className="int-section">
-                  <h3>Kies een Facebook-pagina</h3>
-                  {pages.length ? (
-                    <div className="int-choices">
-                      {pages.map((p) => (
-                        <button key={p.id} type="button" className="button secondary" disabled={busy} onClick={() => void call("messenger", "select", { page: p.id }).then((d) => d && (setPages(null), setNotice("Messenger is verbonden.")))}>
-                          {p.name}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="int-hint">Er is geen pagina gevonden waarop je berichten mag beheren.</p>
                   )}
                 </div>
               )}

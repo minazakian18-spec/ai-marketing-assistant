@@ -163,7 +163,7 @@ test("Mavix Agent: answers from the caller's own workspace, metered, only allow-
       ],
       integration_connections: [
         { workspace_id: "w1", provider: "gmail", status: "connected" },
-        { workspace_id: "w2", provider: "messenger", status: "connected" },
+        { workspace_id: "w2", provider: "google_calendar", status: "connected" },
       ],
     };
     const { load, calls, setReply } = setup(tables);
@@ -176,7 +176,7 @@ test("Mavix Agent: answers from the caller's own workspace, metered, only allow-
     assert.deepEqual(body.reply.action, { href: "/dashboard", label: "Open Dashboard" });
     const sent = JSON.stringify(calls[0]);
     assert.match(sent, /Telepizza/);
-    assert.ok(!sent.includes("Andere zaak") && !sent.includes("messenger"), "no data from another workspace");
+    assert.ok(!sent.includes("Andere zaak") && !sent.includes("google_calendar"), "no data from another workspace");
     assert.equal(calls[0].model, "gpt-5.4-mini");
     assert.deepEqual([tables.ai_usage[0].feature, tables.ai_usage[0].status, tables.ai_usage[0].request_key], ["agent", "succeeded", "agent:agent-key-123456"]);
 

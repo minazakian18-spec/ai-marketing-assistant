@@ -219,7 +219,7 @@ export async function runResearch(workspaceId: string, id: string, userId?: stri
     await setStage(id, "content");
     sources.push({ id: "content", label: "Content in Mavix", status: "used", note: "Posts die via Mavix zijn gemaakt of gepland." });
     sources.push({ id: "email", label: "E-mail en contacten", status: "used", note: "Campagnes en contacten in Mavix." });
-    const inboxChannels = ["gmail", "instagram", "messenger"].filter((p) => connected(p));
+    const inboxChannels = ["gmail", "instagram"].filter((p) => connected(p));
     input.inbox = await inboxStats(workspaceId, inboxChannels).catch(() => undefined);
     if (input.inbox) sources.push({ id: "inbox", label: "Inbox", status: "used", note: "Klantgesprekken van de afgelopen 30 dagen." });
     sources.push({ id: "instagram_insights", label: "Instagram-statistieken", status: "unavailable", note: "Bereik en engagement kunnen nog niet worden uitgelezen." });

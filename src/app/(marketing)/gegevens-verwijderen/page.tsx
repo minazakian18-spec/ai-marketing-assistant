@@ -16,13 +16,13 @@ export const metadata: Metadata = pageMetadata({
 const sections: LegalSection[] = [
   {
     id: "koppeling",
-    title: "Instagram of Facebook loskoppelen",
+    title: "Instagram loskoppelen",
     body: (
       <>
         <p>In Mavix:</p>
         <ol>
           <li>Log in bij Mavix en ga naar Account → Integraties.</li>
-          <li>Klik bij de koppeling (Instagram of Facebook Messenger) op Beheren en kies Verbinding verwijderen.</li>
+          <li>Klik bij de koppeling (Instagram) op Beheren en kies Verbinding verwijderen.</li>
         </ol>
         <p>Mavix verwijdert dan direct de toegangssleutels van die koppeling. Daarna kan Mavix niets meer lezen of versturen via dat account.</p>
         <p>Bij Meta kun je de toegang ook zelf intrekken:</p>

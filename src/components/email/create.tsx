@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Send, Mail, Newspaper, Tag, Reply, HeartHandshake, RefreshCw, Wand2, Monitor, Smartphone, Save, Check, CalendarClock, Copy, Undo2, Eye, PenLine, ChevronDown } from "lucide-react";
 import { GenerationSkeleton, previewMock } from "@/components/generation-skeleton";
+import { GlowBorder } from "@/components/glow-border";
 import { Mavi } from "@/components/mavi";
 import { Menu } from "@/components/menu";
 import { SaveIndicator, type SaveStatus } from "@/components/save-indicator";
@@ -17,17 +18,18 @@ import { EmailStatus } from "./shared";
 import { SendPanel } from "./send-panel";
 import { PlanningNotice } from "@/components/calendar/planning-notice";
 
-// Content Studio for e-mail, same structure as Instagram: controls, editor,
+// Content Studio for e-mail, the same flow as Instagram: three steps (kind,
+// audience, one brief with optional refinements), then the editor next to a
 // realistic inbox/letter preview. AI output is always an editable draft;
 // nothing is sent from here. Edits autosave after a pause.
 
-const KINDS: { id: EmailKind; label: string; Icon: typeof Mail; starter: string }[] = [
-  { id: "Create Campaign", label: "Campagne", Icon: Mail, starter: "Een campagne voor ons bedrijf" },
-  { id: "Create Newsletter", label: "Nieuwsbrief", Icon: Newspaper, starter: "Een nieuwsbrief met ons laatste nieuws" },
-  { id: "Create Promotion", label: "Aanbieding", Icon: Tag, starter: "Een e-mail over onze bestaande aanbieding" },
-  { id: "Create Follow-up", label: "Follow-up", Icon: Reply, starter: "Een vriendelijk vervolg op een aankoop" },
-  { id: "Create Welcome Email", label: "Welkom", Icon: HeartHandshake, starter: "Een welkomstmail voor nieuwe klanten" },
-  { id: "Re-engagement Email", label: "Terugwinnen", Icon: RefreshCw, starter: "Een e-mail voor klanten die we een tijdje niet zagen" },
+const KINDS: { id: EmailKind; label: string; hint: string; Icon: typeof Mail; starter: string }[] = [
+  { id: "Create Campaign", label: "Campagne", hint: "Eén boodschap of actie onder de aandacht", Icon: Mail, starter: "Een campagne voor ons bedrijf" },
+  { id: "Create Newsletter", label: "Nieuwsbrief", hint: "Je laatste nieuws, tips en updates", Icon: Newspaper, starter: "Een nieuwsbrief met ons laatste nieuws" },
+  { id: "Create Promotion", label: "Aanbieding", hint: "Een bestaande korting of deal", Icon: Tag, starter: "Een e-mail over onze bestaande aanbieding" },
+  { id: "Create Follow-up", label: "Follow-up", hint: "Bedanken na een bezoek of aankoop", Icon: Reply, starter: "Een vriendelijk vervolg op een aankoop" },
+  { id: "Create Welcome Email", label: "Welkom", hint: "Voor nieuwe klanten of inschrijvers", Icon: HeartHandshake, starter: "Een welkomstmail voor nieuwe klanten" },
+  { id: "Re-engagement Email", label: "Terugwinnen", hint: "Klanten die je een tijdje niet zag", Icon: RefreshCw, starter: "Een e-mail voor klanten die we een tijdje niet zagen" },
 ];
 const kindLabel = (k: EmailKind) => KINDS.find((x) => x.id === k)?.label || "E-mail";
 const AUTOSAVE_MS = 1500;
@@ -282,6 +284,104 @@ export function EmailCreate({
 
   const count = recipients(draft?.audience || audience).length;
   const generating = busy === "generate";
+  const brief = (
+    <form
+      className={"cs-brief glow-host" + (saved ? " is-compact" : "")}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void generate();
+      }}
+    >
+      <GlowBorder />
+
+      <label htmlFor="em-prompt" className="sr-only">
+        Waar gaat de e-mail over?
+      </label>
+      <textarea
+        id="em-prompt"
+        rows={saved ? 2 : 3}
+        maxLength={1500}
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void generate();
+          }
+        }}
+        placeholder="Bijvoorbeeld: onze nieuwe zomerpizza's, met de bestaande actie 2 halen 1 betalen."
+      />
+      <div className="cs-brief-bar">
+        <span />
+        {!saved && (
+          <button type="button" className="button secondary" disabled={!!busy} onClick={() => void startManual()}>
+            <PenLine size={15} />
+            Zelf schrijven
+          </button>
+        )}
+        <button className="button primary cs-go" aria-busy={generating} disabled={!!busy || !prompt.trim()}>
+          {generating ? <Mavi size={16} state="thinking" tone="brand" live /> : saved ? <RefreshCw size={15} /> : <Wand2 size={15} />}
+          {generating ? "Bezig…" : saved ? "Opnieuw genereren" : "Maak mijn e-mail"}
+        </button>
+      </div>
+    </form>
+  );
+  // Refinements, folded away under "Meer opties" so the start stays simple.
+  const moreOptions = (
+    <>
+      <label className="cs-field">
+        <span>Product of dienst</span>
+        <select value={product} onChange={(e) => setProduct(e.target.value)}>
+          <option value="">Mavix kiest op basis van je opdracht</option>
+          {products.map((p, i) => (
+            <option key={i}>{p}</option>
+          ))}
+        </select>
+      </label>
+      {offers.length > 0 && (
+        <label className="cs-field">
+          <span>Aanbieding</span>
+          <select value={offer} onChange={(e) => setOffer(e.target.value)}>
+            <option value="">Geen aanbieding</option>
+            {offers.map((p, i) => (
+              <option key={i}>{p}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label className="cs-field">
+        <span>Toon</span>
+        <select value={tone} onChange={(e) => setTone(e.target.value as Formality | "")}>
+          <option value="">Merkstem</option>
+          {formalityOptions.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="cs-field">
+        <span>Lengte</span>
+        <select value={length} onChange={(e) => setLength(e.target.value as EmailLength)}>
+          {emailLengths.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="cs-field">
+        <span>Call-to-action</span>
+        <input value={cta} maxLength={120} placeholder={profile.strategy?.ctas?.[0] || "Bijv. Bekijk het menu"} onChange={(e) => setCta(e.target.value)} />
+      </label>
+      <label className="cs-switch">
+        <input type="checkbox" checked={website} disabled={!profile.description} onChange={(e) => setWebsite(e.target.checked)} />
+        <span>
+          <strong>Bedrijfsomschrijving uit Brand Hub gebruiken</strong>
+        </span>
+      </label>
+    </>
+  );
 
   return (
     <>
@@ -327,137 +427,88 @@ export function EmailCreate({
             <span>Sla je e-mail op en keur hem goed. Daarna kun je een testmail naar jezelf sturen en versturen naar ontvangers met toestemming. Ingeplande e-mails staan in je <Link href="/calendar">kalender</Link>.</span>
           </p>
         )}
-        <div className="cs-grid" data-view={view}>
-          <aside className="cs-controls" aria-label="Instellingen">
-            <fieldset className="cs-field">
-              <legend>Soort e-mail</legend>
-              <div className="cs-formats">
-                {KINDS.map(({ id, label, Icon, starter }) => (
+        {!saved && !generating ? (
+          <div className="cs-start">
+            <section className="cs-step" aria-labelledby="em-step-1">
+              <header>
+                <span className="cs-step-n" aria-hidden="true">
+                  1
+                </span>
+                <h3 id="em-step-1">Wat voor e-mail?</h3>
+              </header>
+              <div className="cs-kinds cs-kinds-3" role="radiogroup" aria-labelledby="em-step-1">
+                {KINDS.map(({ id, label, hint, Icon, starter }) => (
                   <button
                     key={id}
                     type="button"
-                    aria-pressed={kind === id}
+                    role="radio"
+                    aria-checked={kind === id}
                     onClick={() => {
                       setKind(id);
                       if (!prompt.trim()) setPrompt(starter);
                     }}
                   >
-                    <Icon size={15} aria-hidden="true" />
-                    {label}
+                    <span className="cs-kind-icon">
+                      <Icon size={20} aria-hidden="true" />
+                    </span>
+                    <strong>{label}</strong>
+                    <small>{hint}</small>
                   </button>
                 ))}
               </div>
-            </fieldset>
-            <label className="cs-field">
-              <span>Doelgroep</span>
-              <select
-                value={audience}
-                onChange={(e) => {
-                  setAudience(e.target.value);
-                  set({ audience: e.target.value });
-                }}
-              >
-                {segments.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-              <small>
-                {count} ingeschreven {count === 1 ? "contact" : "contacten"} · uit <Link href="/contacten">Contacten</Link>
-              </small>
-            </label>
-            <label className="cs-field">
-              <span>Product of dienst</span>
-              <select value={product} onChange={(e) => setProduct(e.target.value)}>
-                <option value="">Geen specifiek product</option>
-                {products.map((p, i) => (
-                  <option key={i}>{p}</option>
-                ))}
-              </select>
-            </label>
-            {offers.length > 0 && (
-              <label className="cs-field">
-                <span>Aanbieding</span>
-                <select value={offer} onChange={(e) => setOffer(e.target.value)}>
-                  <option value="">Geen aanbieding</option>
-                  {offers.map((p, i) => (
-                    <option key={i}>{p}</option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <div className="cs-field-row">
-              <label className="cs-field">
-                <span>Toon</span>
-                <select value={tone} onChange={(e) => setTone(e.target.value as Formality | "")}>
-                  <option value="">Merkstem</option>
-                  {formalityOptions.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="cs-field">
-                <span>Lengte</span>
-                <select value={length} onChange={(e) => setLength(e.target.value as EmailLength)}>
-                  {emailLengths.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="cs-field">
-              <span>Call-to-action</span>
-              <input value={cta} maxLength={120} placeholder={profile.strategy?.ctas?.[0] || "Bijv. Bekijk het menu"} onChange={(e) => setCta(e.target.value)} />
-            </label>
-            <label className="cs-switch">
-              <input type="checkbox" checked={website} disabled={!profile.description} onChange={(e) => setWebsite(e.target.checked)} />
-              <span>
-                <strong>Bedrijfsomschrijving gebruiken</strong>
-                <small>Uit je Brand Hub; er wordt geen website opgehaald.</small>
-              </span>
-            </label>
-          </aside>
+            </section>
 
-          <section className="cs-editor" aria-label="Editor">
-            <form
-              className="cs-brief"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void generate();
-              }}
-            >
-              <label htmlFor="em-prompt">Waar gaat de e-mail over?</label>
-              <textarea
-                id="em-prompt"
-                rows={saved ? 2 : 4}
-                maxLength={1500}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    void generate();
-                  }
-                }}
-                placeholder="Bijvoorbeeld: onze nieuwe zomerpizza's, met de bestaande actie 2 halen 1 betalen."
-              />
-              <div className="cs-brief-bar">
-                <small>Mavix AI gebruikt je Brand Hub en verzint geen prijzen of acties.</small>
-                {!saved && (
-                  <button type="button" className="button secondary" disabled={!!busy} onClick={() => void startManual()}>
-                    <PenLine size={15} />
-                    Zelf schrijven
-                  </button>
-                )}
-                <button className="button primary" aria-busy={generating} disabled={!!busy || !prompt.trim()}>
-                  {generating ? <Mavi size={16} state="thinking" tone="brand" live /> : saved ? <RefreshCw size={15} /> : <Wand2 size={15} />}
-                  {generating ? "Bezig…" : saved ? "Opnieuw genereren" : "Genereren"}
-                </button>
+            <section className="cs-step" aria-labelledby="em-step-2">
+              <header>
+                <span className="cs-step-n" aria-hidden="true">
+                  2
+                </span>
+                <h3 id="em-step-2">Voor wie?</h3>
+              </header>
+              <div className="cs-goals" role="radiogroup" aria-labelledby="em-step-2">
+                {segments.map((seg) => {
+                  const n = recipients(seg).length;
+                  return (
+                    <button key={seg} type="button" role="radio" aria-checked={audience === seg} onClick={() => setAudience(seg)}>
+                      <strong>{seg}</strong>
+                      <small>
+                        {n} {n === 1 ? "contact" : "contacten"} met toestemming
+                      </small>
+                    </button>
+                  );
+                })}
               </div>
-            </form>
+              <p className="cs-hint">
+                Ontvangers komen uit <Link href="/contacten">Contacten</Link>. Alleen wie toestemming gaf, krijgt de e-mail.
+              </p>
+            </section>
+
+            <section className="cs-step cs-step-brief" aria-labelledby="em-step-3">
+              <header>
+                <span className="cs-step-n" aria-hidden="true">
+                  3
+                </span>
+                <h3 id="em-step-3">Waar gaat de e-mail over?</h3>
+              </header>
+              {brief}
+              <p className="cs-plan-note">
+                <Wand2 size={14} aria-hidden="true" /> Mavix schrijft de onderwerpregel, voorbeeldtekst en inhoud op basis van je Brand Hub. Prijzen en acties verzint Mavix niet.
+              </p>
+              <details className="cs-more">
+                <summary>Meer opties</summary>
+                {moreOptions}
+              </details>
+              {(message || error) && (
+                <p role={error ? "alert" : "status"} className={error ? "cs-error" : "cs-message"}>
+                  {error || message}
+                </p>
+              )}
+            </section>
+          </div>
+        ) : (
+        <div className="cs-grid cs-grid-ig" data-view={view}>
+          <section className="cs-editor" aria-label="Editor">
+            {brief}
 
             {generating && !saved ? (
               <div className="cs-result">
@@ -583,7 +634,7 @@ export function EmailCreate({
               <div className="cs-empty">
                 <Mavi size={44} tone="brand" live />
                 <h3>Begin met een korte opdracht</h3>
-                <p>Kies links het soort e-mail en de doelgroep, beschrijf de boodschap en klik op Genereren. Je krijgt een bewerkbaar concept dat automatisch wordt opgeslagen.</p>
+                <p>Beschrijf de boodschap en klik op Maak mijn e-mail. Je krijgt een bewerkbaar concept dat automatisch wordt opgeslagen.</p>
               </div>
             )}
             {(message || error) && (
@@ -633,6 +684,7 @@ export function EmailCreate({
             </div>
           </aside>
         </div>
+        )}
       </div>
     </>
   );

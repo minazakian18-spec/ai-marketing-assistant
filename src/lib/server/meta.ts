@@ -11,13 +11,11 @@ import {mapMetaError,type Channel} from '../inbox/core';
 //   (graph.facebook.com, /{page-id}/messages). Connections made earlier with
 //   "Business Login for Instagram" (graph.instagram.com, INSTAGRAM_APP_ID)
 //   keep working; that flow is only offered when no configuration id is set.
-// - Messenger via Facebook Login + a Facebook Page access token.
 // Tokens never leave the server.
 
-export type MetaProvider='instagram'|'messenger';
+export type MetaProvider='instagram';
 export const metaScopes={
  instagram:['instagram_business_basic','instagram_business_manage_messages'],
- messenger:['pages_show_list','pages_manage_metadata','pages_messaging'],
  // Instagram with Facebook Login, in two stages. Connecting needs only the
  // account and its Page (core). Inbox messages additionally need the messaging
  // rights: instagram_manage_messages and pages_manage_metadata (to subscribe
@@ -44,12 +42,12 @@ export const instagramMode=():'facebook'|'instagram'=>process.env.INSTAGRAM_APP_
 const version=()=>/^v\d+\.\d+$/.test(process.env.META_GRAPH_VERSION||'')?process.env.META_GRAPH_VERSION!:'v25.0';
 export const graph=(path:string)=>'https://graph.facebook.com/'+version()+path;
 export const igGraph=(path:string)=>'https://graph.instagram.com/'+version()+path;
-export const metaCallback=(provider:'instagram'|'messenger')=>appUrl()+'/api/integrations/'+provider+'/callback';
+export const metaCallback=(provider:'instagram')=>appUrl()+'/api/integrations/'+provider+'/callback';
 
 // Names (never values) of the environment variables a channel still needs.
 // Only for server logs; customers get a generic Dutch message.
 export function missingMetaConfig(provider:MetaProvider){
- const need=['OAUTH_ENCRYPTION_KEY',...(provider==='instagram'?(instagramMode()==='facebook'?['META_CLIENT_ID','META_CLIENT_SECRET','META_INSTAGRAM_CONFIG_ID','META_WEBHOOK_VERIFY_TOKEN']:['INSTAGRAM_APP_ID','INSTAGRAM_APP_SECRET']):provider==='messenger'?['META_CLIENT_ID','META_CLIENT_SECRET']:['META_CLIENT_SECRET','META_WEBHOOK_VERIFY_TOKEN'])];
+ const need=['OAUTH_ENCRYPTION_KEY',...(provider==='instagram'?(instagramMode()==='facebook'?['META_CLIENT_ID','META_CLIENT_SECRET','META_INSTAGRAM_CONFIG_ID','META_WEBHOOK_VERIFY_TOKEN']:['INSTAGRAM_APP_ID','INSTAGRAM_APP_SECRET']):[])];
  return need.filter(n=>!process.env[n]);
 }
 export const metaConfigured=(provider:MetaProvider)=>missingMetaConfig(provider).length===0;
@@ -63,19 +61,18 @@ export type MetaCredentials={access_token:string;user_token?:string;obtained_at?
 // Instagram connections made with Facebook Login: Page token, Page id in metadata.
 const viaFacebook=(c:{metadata?:unknown})=>(c.metadata as {authMode?:string}|null)?.authMode==='facebook';
 
-async function metaJson(url:string,init:RequestInit={},channel:Channel='messenger'){
+async function metaJson(url:string,init:RequestInit={},channel:Channel='instagram'){
  const r=await fetch(url,{...init,cache:'no-store',signal:AbortSignal.timeout(15000)});
  const data=await r.json().catch(()=>({}));
  if(!r.ok){const e=mapMetaError(r.status,data?.error,channel);throw Object.assign(new HttpError(e.status,e.message),{provider:e});}
  return data;
 }
 
-export function authorizeUrl(provider:'instagram'|'messenger',state:string){
+export function authorizeUrl(provider:'instagram',state:string){
  // Facebook Login for Business: the configuration decides the permissions and
  // token type, so no scope is sent.
  if(provider==='instagram'&&instagramMode()==='facebook'){const u=new URL('https://www.facebook.com/'+version()+'/dialog/oauth');u.search=new URLSearchParams({client_id:process.env.META_CLIENT_ID!,config_id:process.env.META_INSTAGRAM_CONFIG_ID!,redirect_uri:metaCallback('instagram'),response_type:'code',state}).toString();return u.toString();}
- if(provider==='instagram'){const u=new URL('https://www.instagram.com/oauth/authorize');u.search=new URLSearchParams({client_id:process.env.INSTAGRAM_APP_ID!,redirect_uri:metaCallback('instagram'),response_type:'code',scope:instagramRequestScopes().join(','),state}).toString();return u.toString();}
- const u=new URL('https://www.facebook.com/'+version()+'/dialog/oauth');u.search=new URLSearchParams({client_id:process.env.META_CLIENT_ID!,redirect_uri:metaCallback('messenger'),response_type:'code',scope:metaScopes.messenger.join(','),state}).toString();return u.toString();
+ {const u=new URL('https://www.instagram.com/oauth/authorize');u.search=new URLSearchParams({client_id:process.env.INSTAGRAM_APP_ID!,redirect_uri:metaCallback('instagram'),response_type:'code',scope:instagramRequestScopes().join(','),state}).toString();return u.toString();}
 }
 
 // Instagram: code -> short-lived token -> long-lived (60 days) token, then the
@@ -215,37 +212,12 @@ export async function selectInstagramAccount(workspaceId:string,igId:string,opts
  if(error)throw error;
  return account.username?'@'+account.username:account.name;
 }
-// Messenger: code -> user token -> long-lived user token; the Page is chosen
-// afterwards (automatically when there is exactly one).
-export async function completeMessenger(code:string){
- const short=await metaJson(graph('/oauth/access_token?'+new URLSearchParams({client_id:process.env.META_CLIENT_ID!,client_secret:process.env.META_CLIENT_SECRET!,redirect_uri:metaCallback('messenger'),code})));
- const long=await metaJson(graph('/oauth/access_token?'+new URLSearchParams({grant_type:'fb_exchange_token',client_id:process.env.META_CLIENT_ID!,client_secret:process.env.META_CLIENT_SECRET!,fb_exchange_token:short.access_token})));
- const perms=await metaJson(graph('/me/permissions'),{headers:{Authorization:'Bearer '+long.access_token}});
- const granted=(perms.data||[]).filter((p:{status?:string})=>p.status==='granted').map((p:{permission:string})=>p.permission);
- if(metaScopes.messenger.some(s=>!granted.includes(s)))throw new HttpError(403,'Geef Mavix toegang tot je Facebook-pagina en Messenger-berichten.');
- const me=await metaJson(graph('/me?fields=id,name'),{headers:{Authorization:'Bearer '+long.access_token}});
- return {userToken:long.access_token as string,userId:String(me.id),userName:String(me.name||''),granted};
-}
-
 export async function listPages(userToken:string){
  const pages:{id:string;name:string;access_token:string;tasks?:string[]}[]=[];
  let url:string|undefined=graph('/me/accounts?fields=id,name,access_token,tasks&limit=100');
  for(let i=0;url&&i<5;i++){const d:{data?:typeof pages;paging?:{next?:string}}=await metaJson(url,{headers:{Authorization:'Bearer '+userToken}});pages.push(...(d.data||[]));url=d.paging?.next&&d.paging.next.startsWith('https://graph.facebook.com/')?d.paging.next:undefined;}
  // Replying needs the MESSAGING task on the Page.
  return pages.filter(p=>!p.tasks||p.tasks.includes('MESSAGING')||p.tasks.includes('MANAGE'));
-}
-
-export async function selectPage(workspaceId:string,pageId:string){
- const db=adminClient();
- const {data:c}=await db.from('integration_connections').select('id,encrypted_credentials').eq('workspace_id',workspaceId).eq('provider','messenger').single();
- if(!c?.encrypted_credentials)throw new HttpError(409,'Verbind eerst Facebook.');
- const creds=decrypt<MetaCredentials>(c.encrypted_credentials,workspaceId+':messenger');
- const page=(await listPages(creds.user_token||creds.access_token)).find(p=>p.id===pageId);
- if(!page)throw new HttpError(403,'Geen toegang tot deze pagina.');
- await metaJson(graph('/'+page.id+'/subscribed_apps?subscribed_fields=messages,message_echoes,message_deliveries,message_reads'),{method:'POST',headers:{Authorization:'Bearer '+page.access_token}});
- const {error}=await db.from('integration_connections').update({provider_account_id:page.id,display_name:page.name,status:'connected',encrypted_credentials:encrypt({access_token:page.access_token,obtained_at:Date.now()},workspaceId+':messenger'),expires_at:null,metadata:{}}).eq('id',c.id);
- if(error)throw error;
- return page.name;
 }
 
 // Decrypted credentials for a Meta connection. Instagram long-lived tokens
@@ -281,18 +253,17 @@ export async function sendMetaText(workspaceId:string,provider:MetaProvider,reci
  const {creds,c}=await metaConnection(workspaceId,provider,{messaging:true});
  const headers={Authorization:'Bearer '+creds.access_token,'Content-Type':'application/json'};
  try{
-  // Instagram with Facebook Login: same /{page-id}/messages endpoint as
-  // Messenger, Page token, Instagram-scoped id (IGSID) as recipient.
+  // Instagram with Facebook Login: /{page-id}/messages endpoint,
+  // Page token, Instagram-scoped id (IGSID) as recipient.
   if(provider==='instagram'&&viaFacebook(c)){const pageId=String((c.metadata as {pageId?:string}).pageId||creds.page_id||'');if(!/^\d{1,30}$/.test(pageId))throw new HttpError(409,'Verbind Instagram opnieuw.');const d=await metaJson(graph('/'+pageId+'/messages'),{method:'POST',headers,body:JSON.stringify({recipient:{id:recipient},messaging_type:'RESPONSE',message:{text}})},'instagram');return String(d.message_id);}
   if(provider==='instagram'){const d=await metaJson(igGraph('/me/messages'),{method:'POST',headers,body:JSON.stringify({recipient:{id:recipient},message:{text}})},'instagram');return String(d.message_id);}
-  if(provider==='messenger'){const d=await metaJson(graph('/'+c.provider_account_id+'/messages'),{method:'POST',headers,body:JSON.stringify({recipient:{id:recipient},messaging_type:'RESPONSE',message:{text}})},'messenger');return String(d.message_id);}
   throw new HttpError(400,'Dit kanaal wordt niet ondersteund.');
  }catch(e){await flag(c.id,e);throw e;}
 }
 
 
 // Best-effort customer profile for a new conversation (name/username).
-export async function metaProfile(workspaceId:string,provider:'instagram'|'messenger',id:string){
+export async function metaProfile(workspaceId:string,provider:'instagram',id:string){
  try{
   if(!/^\d{1,40}$/.test(id))return {};
   const {creds,c}=await metaConnection(workspaceId,provider);

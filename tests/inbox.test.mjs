@@ -47,9 +47,9 @@ test("webhook challenge only echoes with the right verify token", () => {
   assert.equal(verifyChallenge(bad, "tok"), null);
 });
 
-test("Messenger webhook: inbound, echo, delivery and read watermark", () => {
+test("Instagram webhook: inbound, echo, delivery and read watermark", () => {
   const payload = {
-    object: "page",
+    object: "instagram",
     entry: [
       {
         id: "PAGE1",
@@ -63,7 +63,7 @@ test("Messenger webhook: inbound, echo, delivery and read watermark", () => {
       },
     ],
   };
-  const { messages, statuses } = parseMetaMessaging(payload, "messenger");
+  const { messages, statuses } = parseMetaMessaging(payload, "instagram");
   assert.equal(messages.length, 3);
   assert.deepEqual([messages[0].direction, messages[0].threadId, messages[0].accountId], ["inbound", "PSID9", "PAGE1"]);
   assert.equal(messages[1].direction, "outbound");
@@ -74,7 +74,7 @@ test("Messenger webhook: inbound, echo, delivery and read watermark", () => {
   assert.equal(statuses[1].status, "read");
   assert.equal(statuses[1].threadId, "PSID9");
   assert.ok(statuses[1].watermark);
-  assert.equal(parseMetaMessaging(payload, "instagram").messages.length, 0, "wrong object type is ignored");
+  assert.equal(parseMetaMessaging({ ...payload, object: "page" }, "instagram").messages.length, 0, "wrong object type (a Facebook page) is ignored");
 });
 
 test("Instagram webhook: messages, deleted messages skipped, read by mid", () => {
@@ -110,11 +110,11 @@ test("delivery status only moves forward", () => {
 test("24-hour window per channel", () => {
   const now = Date.parse("2026-10-04T12:00:00Z");
   assert.equal(windowState("gmail", null, now).applies, false);
-  assert.equal(windowState("messenger", null, now).open, false);
+  assert.equal(windowState("instagram", null, now).open, false);
   const open = windowState("instagram", "2026-10-03T13:00:00Z", now);
   assert.equal(open.open, true);
   assert.equal(open.closesAt, "2026-10-04T13:00:00.000Z");
-  assert.equal(windowState("messenger", "2026-10-03T11:59:00Z", now).open, false);
+  assert.equal(windowState("instagram", "2026-10-03T11:59:00Z", now).open, false);
 });
 
 test("contact matching: exact only, ignores samples and ambiguity", () => {
@@ -137,10 +137,10 @@ test("contact matching: exact only, ignores samples and ambiguity", () => {
 
 test("Meta errors map to Dutch messages and connection states", () => {
   assert.equal(mapMetaError(400, { code: 190 }, "instagram").connection, "reconnect_required");
-  assert.match(mapMetaError(400, { code: 10, error_subcode: 2018278 }, "messenger").message, /24-uursvenster/);
-  assert.equal(mapMetaError(403, { code: 10 }, "messenger").connection, "permission_missing");
+  assert.match(mapMetaError(400, { code: 10, error_subcode: 2018278 }, "instagram").message, /24-uursvenster/);
+  assert.equal(mapMetaError(403, { code: 10 }, "instagram").connection, "permission_missing");
   assert.equal(mapMetaError(429, { code: 4 }, "instagram").retryable, true);
-  assert.equal(mapMetaError(503, undefined, "messenger").retryable, true);
+  assert.equal(mapMetaError(503, undefined, "instagram").retryable, true);
 });
 
 test("Gmail message: plain text preferred, quotes stripped, attachments, direction", () => {

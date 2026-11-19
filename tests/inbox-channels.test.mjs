@@ -37,7 +37,6 @@ function setup(t, { gmail = true } = {}) {
     workspaces: [{ id: "w1", deleted_at: null }, { id: "w2", deleted_at: null }],
     integration_connections: [
       { workspace_id: "w1", provider: "instagram", status: "connected", display_name: "@trattoria", provider_account_id: "acc-instagram", scopes: [] },
-      { workspace_id: "w1", provider: "messenger", status: "reconnect_required", display_name: "Trattoria", provider_account_id: "acc-messenger", scopes: [] },
       gmail
         ? { workspace_id: "w1", provider: "gmail", status: "connected", display_name: "info@trattoria.nl", provider_account_id: "g1", scopes: ["https://www.googleapis.com/auth/gmail.readonly"] }
         : { workspace_id: "w1", provider: "gmail", status: "disconnected", provider_account_id: null, scopes: [] },
@@ -48,10 +47,9 @@ function setup(t, { gmail = true } = {}) {
   tables.inbox_conversations.push(
     conv("w1", "instagram", "2026-10-10T09:00:00.000Z", { unread_count: 2 }),
     conv("w1", "instagram", "2026-10-10T11:00:00.000Z"),
-    conv("w1", "messenger", "2026-10-10T10:00:00.000Z", { unread_count: 1 }),
     conv("w1", "gmail", "2026-10-10T08:00:00.000Z", { unread_count: 1 }),
     conv("w1", "gmail", "2026-10-10T07:00:00.000Z", { unread_count: 3, provider_account_id: "old-mailbox" }),
-    conv("w1", "messenger", "2026-10-10T06:00:00.000Z", { status: "resolved", unread_count: 0 }),
+    conv("w1", "instagram", "2026-10-10T06:00:00.000Z", { status: "resolved", unread_count: 0 }),
     conv("w2", "instagram", "2026-10-10T12:00:00.000Z", { unread_count: 5, provider_account_id: "acc-other" }),
   );
   const db = memoryDb(tables);
@@ -79,9 +77,7 @@ test("channel filter: only that channel, only this workspace, only the linked Gm
   assert.ok(ig.body.conversations.every((c) => c.accountId === "acc-instagram"), "no conversations from the other workspace");
   const gm = await f.list("channel=gmail");
   assert.deepEqual(gm.body.conversations.map((c) => c.accountId), ["g1"], "old mailbox hidden");
-  const ms = await f.list("channel=messenger");
-  assert.equal(ms.body.conversations.length, 1, "existing messages stay visible while reconnect is needed; the resolved one is not in the open folder");
-  const resolved = await f.list("channel=messenger&filter=resolved");
+  const resolved = await f.list("channel=instagram&filter=resolved");
   assert.equal(resolved.body.conversations.length, 1);
 });
 
@@ -89,23 +85,23 @@ test("unread counts per channel and in total; channel states for the rail", asyn
   const f = setup(t);
   // (memoryDb has no PostgREST `or`, used by the all-channels list with Gmail; the counts do not use it.)
   const { body } = await f.list("channel=instagram");
-  assert.deepEqual(body.unreadByChannel, { gmail: 1, instagram: 1, messenger: 1 });
-  assert.equal(body.unread, 3);
+  assert.deepEqual(body.unreadByChannel, { gmail: 1, instagram: 1 });
+  assert.equal(body.unread, 2);
   const states = Object.fromEntries(body.channels.map((c) => [c.channel, c.state]));
-  assert.deepEqual(states, { gmail: "connected", instagram: "connected", messenger: "reconnect" });
+  assert.deepEqual(states, { gmail: "connected", instagram: "connected" });
   const other = await f.list("channel=instagram", "u2");
-  assert.deepEqual(other.body.unreadByChannel, { gmail: 0, instagram: 1, messenger: 0 });
+  assert.deepEqual(other.body.unreadByChannel, { gmail: 0, instagram: 1 });
 });
 
 test("all channels without Gmail linked: no Gmail conversations; newest or oldest first", async (t) => {
   const f = setup(t, { gmail: false });
   const newest = await f.list("filter=open");
-  assert.deepEqual(newest.body.conversations.map((c) => c.channel), ["instagram", "messenger", "instagram"]);
+  assert.deepEqual(newest.body.conversations.map((c) => c.channel), ["instagram", "instagram"]);
   assert.equal(newest.body.unreadByChannel.gmail, 0);
   const oldest = await f.list("filter=open&sort=oldest");
   assert.deepEqual(
     oldest.body.conversations.map((c) => c.lastMessageAt),
-    ["2026-10-10T09:00:00.000Z", "2026-10-10T10:00:00.000Z", "2026-10-10T11:00:00.000Z"],
+    ["2026-10-10T09:00:00.000Z", "2026-10-10T11:00:00.000Z"],
   );
 });
 

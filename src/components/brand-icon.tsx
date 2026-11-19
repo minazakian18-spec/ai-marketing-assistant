@@ -5,7 +5,6 @@ import {
   siGooglecalendar,
   siGooglesearchconsole,
   siInstagram,
-  siMessenger,
   siMeta,
   siShopify,
   type SimpleIcon,
@@ -20,7 +19,6 @@ import type React from "react";
 // monogram in its brand colour instead.
 export type Brand =
   | "instagram"
-  | "messenger"
   | "gmail"
   | "google_calendar"
   | "google_business"
@@ -33,7 +31,6 @@ export type Brand =
 
 const ICONS: Partial<Record<Brand, SimpleIcon>> = {
   instagram: siInstagram,
-  messenger: siMessenger,
   gmail: siGmail,
   google_calendar: siGooglecalendar,
   google_business: siGoogle,
@@ -46,7 +43,6 @@ const ICONS: Partial<Record<Brand, SimpleIcon>> = {
 
 export const BRAND_LABEL: Record<Brand, string> = {
   instagram: "Instagram",
-  messenger: "Messenger",
   gmail: "Gmail",
   google_calendar: "Google Agenda",
   google_business: "Google Bedrijfsprofiel",
@@ -60,7 +56,7 @@ export const BRAND_LABEL: Record<Brand, string> = {
 
 // Brands whose recognisable identity is multicolour. The Google "G" and the
 // Gmail "M" use Google's brand colours (#4285F4, #EA4335, #FBBC05/#FBBC04,
-// #34A853); Instagram and Messenger keep the simple-icons outline and get
+// #34A853); Instagram keeps the simple-icons outline and gets
 // their official gradient. Everything is inline: no runtime downloads.
 // Gradient ids are fixed per brand (identical definitions, so a repeat on a
 // page renders the same).
@@ -101,22 +97,6 @@ const MULTI: Partial<Record<Brand, { viewBox: string; body: React.ReactNode }>> 
           </radialGradient>
         </defs>
         <path fill="url(#bi-instagram)" d={siInstagram.path} />
-      </>
-    ),
-  },
-  messenger: {
-    viewBox: "0 0 24 24",
-    body: (
-      <>
-        <defs>
-          <radialGradient id="bi-messenger" cx="0.19" cy="0.99" r="1.09">
-            <stop offset="0" stopColor="#0099FF" />
-            <stop offset="0.61" stopColor="#A033FF" />
-            <stop offset="0.93" stopColor="#FF5280" />
-            <stop offset="1" stopColor="#FF7061" />
-          </radialGradient>
-        </defs>
-        <path fill="url(#bi-messenger)" d={siMessenger.path} />
       </>
     ),
   },

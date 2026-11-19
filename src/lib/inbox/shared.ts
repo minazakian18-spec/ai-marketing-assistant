@@ -1,8 +1,8 @@
 // Inbox types and channel rules shared by server and browser code. No Node
 // APIs here (core.ts holds the server-side parsing and crypto).
 
-export type Channel = "gmail" | "instagram" | "messenger";
-export const CHANNELS: Channel[] = ["gmail", "instagram", "messenger"];
+export type Channel = "gmail" | "instagram";
+export const CHANNELS: Channel[] = ["gmail", "instagram"];
 export type ConversationStatus = "open" | "pending" | "resolved";
 export type Direction = "inbound" | "outbound" | "note";
 export type DeliveryStatus = "received" | "pending" | "sent" | "delivered" | "read" | "failed";
@@ -15,7 +15,7 @@ export type Attachment = {
   // Provider reference fetched through Mavix' authenticated proxy (Gmail
   // attachment id). Never a token.
   ref?: string;
-  // Meta CDN link for Instagram/Messenger media (https only, short-lived).
+  // Meta CDN link for Instagram media (https only, short-lived).
   url?: string;
 };
 
@@ -37,7 +37,6 @@ export type Capabilities = {
 export const capabilities: Record<Channel, Capabilities> = {
   gmail: { label: "E-mail", window: null, templates: false, outboundAttachments: true, subject: true, delivery: "sent-only", live: "polling" },
   instagram: { label: "Instagram", window: 24, templates: false, outboundAttachments: false, subject: false, delivery: "provider", live: "webhook" },
-  messenger: { label: "Messenger", window: 24, templates: false, outboundAttachments: false, subject: false, delivery: "provider", live: "webhook" },
 };
 
 export const MAX_TEXT = 20000;

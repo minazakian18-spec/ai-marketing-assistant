@@ -20,7 +20,7 @@ test("every state maps to exactly one Dutch status label", () => {
   assert.deepEqual(s({ provider: "google_business", platformReady: true, connection: conn("selection_required") }), ["action", "Actie nodig"]);
   assert.deepEqual(s({ provider: "instagram", platformReady: true, connection: conn("reconnect_required") }), ["reconnect", "Opnieuw koppelen"]);
   assert.deepEqual(s({ provider: "google_business", platformReady: true, connection: conn("api_access_required") }), ["waiting", "Wacht op provider"]);
-  assert.deepEqual(s({ provider: "messenger", platformReady: false, connection: null }), ["not_configured", "Nog niet ingericht"]);
+  assert.deepEqual(s({ provider: "instagram", platformReady: false, connection: null }), ["not_configured", "Nog niet ingericht"]);
   assert.deepEqual(s({ provider: "google_ads", platformReady: false, connection: null }), ["coming_soon", "Binnenkort"]);
   assert.deepEqual(s({ provider: "google_calendar", platformReady: true, connection: null }), ["not_connected", "Niet gekoppeld"]);
   assert.equal(new Set(Object.values(STATUS_LABEL)).size, Object.keys(STATUS_LABEL).length, "no two states share a label");
