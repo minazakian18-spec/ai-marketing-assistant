@@ -371,3 +371,19 @@
     transform: rotate(180deg);
   }
 }
+
+/* Collapsible sidebar (components/app-shell.tsx): button in the top bar or
+   Ctrl/Cmd+B. Folded away, the page uses the full width. */
+.topbar-left { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
+.sidebar-toggle {
+  display: inline-grid; place-items: center; width: 34px; height: 34px; margin-left: -8px;
+  border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--color-text-muted); cursor: pointer;
+}
+.sidebar-toggle:hover { border-color: var(--border); background: #f6f4fb; color: var(--color-primary); }
+.sidebar-toggle:focus-visible { outline: 3px solid #aa9cff; outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar { transition: transform 220ms var(--ease-premium); }
+  .main-shell { transition: margin-left 220ms var(--ease-premium); }
+}
+.app-shell.is-collapsed .sidebar { transform: translateX(-100%); box-shadow: none; }
+.app-shell.is-collapsed .main-shell { margin-left: 0; }

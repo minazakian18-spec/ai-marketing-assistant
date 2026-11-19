@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Brand } from "@/components/brand";
 import { usePathname } from "next/navigation";
-import { Menu, UserRound, X } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { AccountMenu } from "@/components/account/account-menu";
 import { accountLinks } from "@/components/account/account-nav";
@@ -23,7 +23,40 @@ export function AppShell({ children }: { children: ReactNode }) {
   const label = pageLabel(path, accountLinks.map(([href, name]) => [href, name] as const));
   const [open, setOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
+  // Desktop: the sidebar can be folded away (button or Ctrl/Cmd+B); the
+  // choice is remembered in this browser only.
+  const [collapsed, setCollapsed] = useState(false);
   const drawer = useRef<HTMLElement>(null);
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem("mavix.sidebar.collapsed") === "1");
+    } catch {
+      /* storage unavailable: start open */
+    }
+  }, []);
+  const setSidebarCollapsed = (next: boolean) => {
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem("mavix.sidebar.collapsed", next ? "1" : "0");
+    } catch {
+      /* not remembered, still works */
+    }
+  };
+  // Ctrl+B (Cmd+B on a Mac): fold the sidebar in or out; on a phone it opens
+  // or closes the menu. Not inside rich text, where Ctrl+B means bold.
+  const collapsedRef = useRef(collapsed);
+  collapsedRef.current = collapsed;
+  useEffect(() => {
+    function shortcut(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "b") return;
+      if ((e.target as HTMLElement | null)?.isContentEditable) return;
+      e.preventDefault();
+      if (window.matchMedia("(max-width: 650px)").matches) setOpen((o) => !o);
+      else setSidebarCollapsed(!collapsedRef.current);
+    }
+    document.addEventListener("keydown", shortcut);
+    return () => document.removeEventListener("keydown", shortcut);
+  }, []);
   const toggle = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 650px)");
@@ -91,7 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   return (
     <AgentProvider>
-    <div className="app-shell">
+    <div className={"app-shell" + (collapsed && !mobile ? " is-collapsed" : "")}>
       <button
         ref={toggle}
         className="mobile-toggle"
@@ -112,7 +145,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside
         id="main-sidebar"
         ref={drawer}
-        inert={mobile && !open}
+        inert={(mobile && !open) || (!mobile && collapsed)}
         className={`sidebar ${open ? "open" : ""}`}
       >
         <button
@@ -145,8 +178,23 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
       <div className="main-shell" inert={mobile && open}>
         <div className="topbar">
-          <span>
+          <span className="topbar-left">
+            {!mobile && (
+              <button
+                type="button"
+                className="sidebar-toggle"
+                aria-controls="main-sidebar"
+                aria-expanded={!collapsed}
+                aria-label={collapsed ? "Menu openen (Ctrl+B)" : "Menu inklappen (Ctrl+B)"}
+                title={collapsed ? "Menu openen (Ctrl+B)" : "Menu inklappen (Ctrl+B)"}
+                onClick={() => setSidebarCollapsed(!collapsed)}
+              >
+                {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+              </button>
+            )}
+            <span>
             {data.profile.name?.trim() || "Mavix"} <span className="slash">/</span> <strong>{label || "Mavix"}</strong>
+            </span>
           </span>
           <div className="topbar-right">
             <AgentLauncher />
