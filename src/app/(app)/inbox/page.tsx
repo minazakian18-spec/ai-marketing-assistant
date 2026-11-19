@@ -32,7 +32,6 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 const uuid = () => crypto.randomUUID();
 const CONNECT_TEXT: Record<Channel, string> = {
   instagram: "Koppel je professionele Instagram-account om Direct-berichten hier te ontvangen en te beantwoorden.",
-  whatsapp: "Koppel je WhatsApp Business-nummer om klantberichten hier te ontvangen en te beantwoorden.",
   gmail: "Koppel Gmail om klantmails in Mavix te lezen en te beantwoorden.",
   messenger: "Koppel je Facebook-pagina om Messenger-berichten hier te ontvangen en te beantwoorden.",
 };
@@ -162,7 +161,7 @@ export default function InboxPage() {
     if (!ready) return;
     if (demo) {
       setDemoData((d) => (d.length ? d : demoThreads()));
-      setChannels((["whatsapp", "instagram", "messenger", "gmail"] as Channel[]).map((c) => ({ channel: c, state: "connected", account: "Voorbeeld" })));
+      setChannels((["instagram", "messenger", "gmail"] as Channel[]).map((c) => ({ channel: c, state: "connected", account: "Voorbeeld" })));
       setUserId(DEMO_MEMBERS[0].userId);
       setLoading(false);
       return;
@@ -172,7 +171,7 @@ export default function InboxPage() {
   }, [ready, demo, channel, status, debounced, sort]);
 
   // Live updates: refresh every 15 s while visible; Gmail is polled about
-  // once a minute (Instagram/Messenger/WhatsApp arrive via webhooks).
+  // once a minute (Instagram and Messenger arrive via webhooks).
   const gmailReady = !!channels?.some((c) => c.channel === "gmail" && c.state === "connected");
   useEffect(() => {
     if (!ready || demo) return;
@@ -416,14 +415,9 @@ export default function InboxPage() {
     }
   }
 
+  // No channel uses message templates.
   const loadTemplates = useCallback(() => {
     setTemplates([]);
-    api<{ templates: Template[] }>("/api/inbox/templates")
-      .then((d) => setTemplates(d.templates))
-      .catch((e) => {
-        setTemplates([]);
-        setError(e instanceof Error ? e.message : "Templates konden niet worden geladen.");
-      });
   }, []);
 
   const shown: Detail | null = useMemo(() => {
@@ -470,11 +464,11 @@ export default function InboxPage() {
   const listEmpty = demo || channel === "" ? undefined : nothingLinked ? (
     <div className="ib-list-connect">
       <div className="ib-empty-brands" aria-hidden="true">
-        {(["instagram", "whatsapp", "gmail", "messenger"] as Channel[]).map((c) => (
+        {(["instagram", "gmail", "messenger"] as Channel[]).map((c) => (
           <BrandIcon key={c} brand={c} size={20} />
         ))}
       </div>
-      <p>Koppel Instagram, WhatsApp, Gmail of Messenger om je klantgesprekken hier te ontvangen en te beantwoorden.</p>
+      <p>Koppel Instagram, Gmail of Messenger om je klantgesprekken hier te ontvangen en te beantwoorden.</p>
       <Link className="button primary" href="/account/integraties">
         <Plug size={15} />
         Kanaal koppelen

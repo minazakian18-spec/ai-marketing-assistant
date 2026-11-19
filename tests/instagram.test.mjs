@@ -491,9 +491,9 @@ test("webhook signatures: Meta secret and legacy Instagram secret accepted, anyt
   assert.equal((await f.deliver(dm("178001", "mid.1"), "wrong-secret")).status, 401);
   assert.equal(f.tables.inbox_messages, undefined);
   assert.equal((await f.deliver(dm("178001", "mid.2"), IG_SECRET)).status, 200, "older Instagram Login connections keep working");
-  // Page and WhatsApp events are never accepted with the Instagram secret.
+  // Page events (and unknown objects) are never accepted with the Instagram secret.
   assert.equal((await f.deliver({ object: "page", entry: [] }, IG_SECRET)).status, 401);
-  assert.equal((await f.deliver({ object: "whatsapp_business_account", entry: [] }, IG_SECRET)).status, 401);
+  assert.equal((await f.deliver({ object: "unknown_object", entry: [] }, IG_SECRET)).status, 401);
   delete process.env.META_CLIENT_SECRET;
   delete process.env.INSTAGRAM_APP_SECRET;
   assert.equal((await f.deliver(dm("178001", "mid.3"), "")).status, 503);

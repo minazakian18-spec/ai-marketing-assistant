@@ -41,8 +41,6 @@ import {
   metaScopes,
   missingMetaConfig,
   selectPage,
-  subscribeWhatsApp,
-  verifyWhatsAppNumber,
   type MetaCredentials,
 } from "@/lib/server/meta";
 import {
@@ -54,24 +52,12 @@ const testEmailInput = z.object({
   subject: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(5000),
 });
-const whatsappInput = z.object({
-  phoneNumberId: z.string().regex(/^\d{5,30}$/),
-  wabaId: z.string().regex(/^\d{5,30}$/),
-  token: z
-    .string()
-    .min(20)
-    .max(1000)
-    .regex(/^[\w.\-|]+$/),
-});
-const WHATSAPP_TAKEN =
-  "Dit WhatsApp-nummer is al gekoppeld aan een andere Mavix-werkruimte. Ontkoppel het daar eerst.";
 const PROVIDERS = [
   "google_business",
   "gmail",
   "instagram",
   "google_calendar",
   "messenger",
-  "whatsapp",
 ];
 const GOOGLE = ["google_business", "gmail", "google_calendar"];
 
@@ -138,7 +124,7 @@ export async function POST(request: Request, { params }: Context) {
     sameOrigin(request);
     if (!PROVIDERS.includes(route.provider))
       throw new HttpError(404, "Niet gevonden.");
-    const provider = route.provider as Provider | "messenger" | "whatsapp",
+    const provider = route.provider as Provider | "messenger",
       action = route.action;
     const auth = await workspace(["OWNER", "ADMIN"]);
     await limited("oauth:" + auth.user.id, 10);
@@ -166,62 +152,6 @@ export async function POST(request: Request, { params }: Context) {
         );
         return NextResponse.json({ url: authorizeUrl(provider, state) });
       }
-      if (provider === "whatsapp") {
-        const missing = missingMetaConfig("whatsapp");
-        if (missing.length) {
-          // Variable names only, never values.
-          console.error(
-            JSON.stringify({ event: "whatsapp_not_configured", missing }),
-          );
-          throw new HttpError(
-            503,
-            "WhatsApp kan nog niet worden gekoppeld: de Meta-configuratie van Mavix is nog niet compleet. Neem contact op met de beheerder.",
-          );
-        }
-        await limited("whatsapp-connect:" + auth.workspaceId, 5);
-        const input = whatsappInput.parse(await request.json());
-        const number = await verifyWhatsAppNumber(input);
-        // One WhatsApp number belongs to one workspace: its webhooks are
-        // routed by phone number id. The unique index in
-        // 202610080001_whatsapp_unique_number.sql enforces this under races.
-        const { data: taken, error: takenError } = await db
-          .from("integration_connections")
-          .select("workspace_id")
-          .eq("provider", "whatsapp")
-          .eq("provider_account_id", input.phoneNumberId)
-          .neq("workspace_id", auth.workspaceId)
-          .neq("status", "disconnected")
-          .limit(1);
-        if (takenError) throw takenError;
-        if (taken?.length) throw new HttpError(409, WHATSAPP_TAKEN);
-        await subscribeWhatsApp(input);
-        const { error } = await db.from("integration_connections").upsert(
-          {
-            workspace_id: auth.workspaceId,
-            provider: "whatsapp",
-            connected_user: auth.user.id,
-            provider_account_id: input.phoneNumberId,
-            display_name:
-              number.display + (number.phone ? " (" + number.phone + ")" : ""),
-            status: "connected",
-            encrypted_credentials: encrypt(
-              { access_token: input.token, obtained_at: Date.now() },
-              auth.workspaceId + ":whatsapp",
-            ),
-            scopes: [
-              "whatsapp_business_messaging",
-              "whatsapp_business_management",
-            ],
-            expires_at: null,
-            metadata: { wabaId: input.wabaId },
-          },
-          { onConflict: "workspace_id,provider" },
-        );
-        if (error?.code === "23505") throw new HttpError(409, WHATSAPP_TAKEN);
-        if (error) throw error;
-        await audit(auth.workspaceId, auth.user.id, "integration_connected");
-        return NextResponse.json({ ok: true });
-      }
       if (
         !process.env.GOOGLE_CLIENT_ID ||
         !process.env.GOOGLE_CLIENT_SECRET ||
@@ -242,6 +172,7 @@ export async function POST(request: Request, { params }: Context) {
         state,
         access_type: "offline",
         prompt: "consent",
+        include_granted_scopes: "true",
         code_challenge: Buffer.from(hash(verifier), "hex").toString(
           "base64url",
         ),
@@ -333,6 +264,18 @@ export async function POST(request: Request, { params }: Context) {
       await audit(auth.workspaceId, auth.user.id, "integration_connected");
       return NextResponse.json({ ok: true });
     }
+    // Which e-mails come into the Inbox: only mail sent to these addresses
+    // (empty = every primary mail). Newsletters and promotions never do.
+    if (action === "filter" && provider === "gmail") {
+      const input = z.object({ to: z.array(z.string().trim().toLowerCase().email().max(254)).max(10) }).parse(await request.json());
+      const { data: c, error } = await db.from("integration_connections").select("id,metadata").eq("workspace_id", auth.workspaceId).eq("provider", "gmail").maybeSingle();
+      if (error) throw error;
+      if (!c) throw new HttpError(409, "Koppel eerst Gmail.");
+      const metadata = { ...((c.metadata as Record<string, unknown>) || {}), importFilter: { to: [...new Set(input.to)] } };
+      const { error: saveError } = await db.from("integration_connections").update({ metadata }).eq("id", c.id);
+      if (saveError) throw saveError;
+      return NextResponse.json({ ok: true, to: metadata.importFilter.to });
+    }
     if (action === "send" && provider === "gmail") {
       await limited("gmail-send:" + auth.workspaceId, 20);
       const input = testEmailInput.parse(await request.json());
@@ -419,7 +362,7 @@ export async function GET(request: Request, { params }: Context) {
       return handleSearchConsoleIntegration(request, route.action);
     if (!PROVIDERS.includes(route.provider))
       throw new HttpError(404, "Niet gevonden.");
-    const provider = route.provider as Provider | "messenger" | "whatsapp",
+    const provider = route.provider as Provider | "messenger",
       action = route.action;
     const auth = await workspace(
       action === "status" && provider === "gmail"
@@ -431,7 +374,7 @@ export async function GET(request: Request, { params }: Context) {
       const { data: c, error } = await db
         .from("integration_connections")
         .select(
-          "status,account_email,display_name,scopes,encrypted_credentials,last_synced_at",
+          "status,account_email,display_name,scopes,encrypted_credentials,last_synced_at,metadata",
         )
         .eq("workspace_id", auth.workspaceId)
         .eq("provider", "gmail")
@@ -450,6 +393,7 @@ export async function GET(request: Request, { params }: Context) {
           accountEmail: c?.account_email || c?.display_name || null,
           status,
           lastSyncedAt: c?.last_synced_at || null,
+          importTo: ((c?.metadata as { importFilter?: { to?: string[] } } | null)?.importFilter?.to || []) as string[],
         },
         { headers: { "Cache-Control": "private, no-store" } },
       );

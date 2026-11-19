@@ -86,7 +86,6 @@ const GROUPS: { title: string; intro: string; items: Feature[] }[] = [
         text: "Klantgesprekken uit je gekoppelde kanalen op één plek, met AI-hulp bij het antwoorden. Kanalen komen stap voor stap beschikbaar.",
         mini: (
           <div className="ft-inbox">
-            <BrandIcon brand="whatsapp" size={15} title="WhatsApp" />
             <BrandIcon brand="gmail" size={15} title="Gmail" />
             <BrandIcon brand="messenger" size={15} title="Messenger" />
             <small>1 inbox voor al je kanalen</small>
@@ -130,7 +129,7 @@ const GROUPS: { title: string; intro: string; items: Feature[] }[] = [
         icon: Plug,
         name: "Integraties",
         href: "#integraties",
-        text: "Koppel Google, Instagram, WhatsApp en meer aan je werkruimte. In de app zie je per koppeling of hij actief is.",
+        text: "Koppel Google, Instagram en meer aan je werkruimte. In de app zie je per koppeling of hij actief is.",
         mini: (
           <div className="ft-inbox">
             <BrandIcon brand="google_business" size={15} title="Google" />

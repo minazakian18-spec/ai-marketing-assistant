@@ -1,4 +1,5 @@
 "use client";
+import { postTitle } from "@/lib/instagram-publish";
 import Link from "next/link";
 import { Check, X, Pencil, CalendarDays } from "lucide-react";
 import type { Post } from "@/lib/types";
@@ -36,7 +37,7 @@ export function ApprovalQueue({
                   {post.contentType || "Post"} ·{" "}
                   {post.source === "autopilot" ? "Mavix AI" : "Handmatig"}
                 </span>
-                <h3>{post.prompt}</h3>
+                <h3>{postTitle(post)}</h3>
                 <p className="ig-caption-excerpt">{post.caption}</p>
                 {post.failureReason && (
                   <p className="field-error">{post.failureReason}</p>
@@ -142,7 +143,7 @@ export function ScheduledContent({
                   {post.contentType || "Post"} ·{" "}
                   {post.source === "autopilot" ? "Mavix AI" : "Handmatig"}
                 </small>
-                <h3>{post.prompt}</h3>
+                <h3>{postTitle(post)}</h3>
                 {post.failureReason && (
                   <p className="field-error">{post.failureReason}</p>
                 )}

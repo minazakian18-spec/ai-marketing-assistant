@@ -37,6 +37,8 @@ export type Post = {
   /** Last edit (Content Studio); older records only have createdAt. */
   updatedAt?: string;
   prompt: string;
+  /** Short title for lists (src/lib/instagram-publish.ts postTitle); the prompt stays for the editor. */
+  title?: string;
   caption: string;
   hashtags: string;
   status:

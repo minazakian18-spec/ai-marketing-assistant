@@ -1,4 +1,5 @@
 "use client";
+import { postTitle } from "@/lib/instagram-publish";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import {
@@ -55,7 +56,7 @@ function Workspace() {
   );
   const items = data.posts.map((p) => ({
     id: p.id,
-    title: p.prompt,
+    title: postTitle(p),
     kind: p.contentType || "Post",
     status: p.status,
     confirmed: !!p.instagram,
@@ -208,7 +209,7 @@ function Workspace() {
           <Instagram size={15} />
           Instagram
         </span>
-        {["Facebook", "LinkedIn", "TikTok"].map((name) => (
+        {["Facebook", "LinkedIn"].map((name) => (
           <span key={name} className="social-platform is-soon" aria-disabled="true">
             {name}
             <small>Binnenkort</small>

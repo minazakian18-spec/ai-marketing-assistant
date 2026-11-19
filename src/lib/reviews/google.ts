@@ -123,6 +123,17 @@ export function matchesFilter(r: GoogleReview, f: ReviewFilter) {
   return true;
 }
 
+/**
+ * Plain average of the loaded reviews (one decimal). Shown as the score once
+ * every review is loaded: Google's own "averageRating" in the reviews API can
+ * differ from the figure on Google Maps, and the owner knows the Maps figure.
+ */
+export function meanRating(reviews: { rating: number | null }[]): number | null {
+  const rated = reviews.filter((r) => r.rating !== null);
+  if (!rated.length) return null;
+  return Math.round((rated.reduce((s, r) => s + (r.rating as number), 0) / rated.length) * 10) / 10;
+}
+
 /** Unanswered 1–2 star reviews: these need the owner first. */
 export const isUrgent = (r: GoogleReview) => !r.reply && r.rating !== null && r.rating <= 2;
 

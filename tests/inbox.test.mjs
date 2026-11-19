@@ -5,9 +5,11 @@ import {
   verifyMetaSignature,
   verifyChallenge,
   parseMetaMessaging,
-  parseWhatsApp,
   parseGmailMessage,
   shouldImportGmail,
+  cleanMailText,
+  isBulkMail,
+  matchesImportFilter,
   buildGmailReply,
   windowState,
   matchContact,
@@ -95,48 +97,6 @@ test("Instagram webhook: messages, deleted messages skipped, read by mid", () =>
   assert.deepEqual(statuses.map((s) => [s.status, s.messageId]), [["read", "ig.out"]]);
 });
 
-test("WhatsApp webhook: text, media, unsupported, statuses with errors", () => {
-  const payload = {
-    object: "whatsapp_business_account",
-    entry: [
-      {
-        id: "WABA",
-        changes: [
-          {
-            field: "messages",
-            value: {
-              metadata: { phone_number_id: "PN1", display_phone_number: "+31 20 000" },
-              contacts: [{ wa_id: "31612345678", profile: { name: "Sanne" } }],
-              messages: [
-                { id: "wamid.1", from: "31612345678", timestamp: "1760000000", type: "text", text: { body: "Hallo" } },
-                { id: "wamid.2", from: "31612345678", timestamp: "1760000001", type: "image", image: { id: "MEDIA1", mime_type: "image/jpeg", caption: "Kijk" } },
-                { id: "wamid.3", from: "31612345678", timestamp: "1760000002", type: "reaction", reaction: { emoji: "👍" } },
-                { id: "wamid.4", from: "31612345678", timestamp: "1760000003", type: "order" },
-                { id: "wamid.5", from: "abc", type: "text", text: { body: "x" } },
-              ],
-              statuses: [
-                { id: "wamid.out", status: "delivered", timestamp: "1760000010", recipient_id: "31612345678" },
-                { id: "wamid.out2", status: "failed", timestamp: "1760000011", recipient_id: "31612345678", errors: [{ code: 131047 }] },
-                { id: "wamid.out3", status: "weird" },
-              ],
-            },
-          },
-        ],
-      },
-    ],
-  };
-  const { messages, statuses } = parseWhatsApp(payload);
-  assert.equal(messages.length, 3);
-  assert.equal(messages[0].customer.name, "Sanne");
-  assert.equal(messages[0].customer.phone, "+31612345678");
-  assert.equal(messages[0].createdAt, new Date(1760000000000).toISOString());
-  assert.deepEqual(messages[1].attachments[0], { kind: "image", name: "image.jpeg", mimeType: "image/jpeg", ref: "MEDIA1" });
-  assert.equal(messages[1].text, "Kijk");
-  assert.match(messages[2].text, /niet ondersteund/);
-  assert.equal(statuses.length, 2);
-  assert.match(statuses[1].error, /24-uursvenster/);
-});
-
 test("delivery status only moves forward", () => {
   assert.equal(nextStatus("sent", "delivered"), "delivered");
   assert.equal(nextStatus("read", "delivered"), "read");
@@ -150,7 +110,7 @@ test("delivery status only moves forward", () => {
 test("24-hour window per channel", () => {
   const now = Date.parse("2026-10-04T12:00:00Z");
   assert.equal(windowState("gmail", null, now).applies, false);
-  assert.equal(windowState("whatsapp", null, now).open, false);
+  assert.equal(windowState("messenger", null, now).open, false);
   const open = windowState("instagram", "2026-10-03T13:00:00Z", now);
   assert.equal(open.open, true);
   assert.equal(open.closesAt, "2026-10-04T13:00:00.000Z");
@@ -178,10 +138,9 @@ test("contact matching: exact only, ignores samples and ambiguity", () => {
 test("Meta errors map to Dutch messages and connection states", () => {
   assert.equal(mapMetaError(400, { code: 190 }, "instagram").connection, "reconnect_required");
   assert.match(mapMetaError(400, { code: 10, error_subcode: 2018278 }, "messenger").message, /24-uursvenster/);
-  assert.match(mapMetaError(400, { code: 131047 }, "whatsapp").message, /template/);
   assert.equal(mapMetaError(403, { code: 10 }, "messenger").connection, "permission_missing");
-  assert.equal(mapMetaError(429, { code: 4 }, "whatsapp").retryable, true);
-  assert.equal(mapMetaError(503, undefined, "whatsapp").retryable, true);
+  assert.equal(mapMetaError(429, { code: 4 }, "instagram").retryable, true);
+  assert.equal(mapMetaError(503, undefined, "messenger").retryable, true);
 });
 
 test("Gmail message: plain text preferred, quotes stripped, attachments, direction", () => {
@@ -287,4 +246,21 @@ test("text helpers", () => {
   assert.equal(stripQuoted("Top\n\nOn Mon, X wrote:\n> old"), "Top");
   assert.deepEqual(parseAddress("Jan <JAN@x.nl>"), { name: "Jan", email: "jan@x.nl" });
   assert.deepEqual(parseAddress("plain@x.nl"), { email: "plain@x.nl" });
+});
+
+test("Gmail text: mojibake repaired, encoded words decoded, invisible preview filler removed; bulk mail recognised", () => {
+  assert.equal(cleanMailText("GabriÃ«lle"), "Gabriëlle");
+  assert.equal(cleanMailText("=?UTF-8?B?R2FicmnDq2xsZQ==?="), "Gabriëlle");
+  assert.equal(cleanMailText("=?ISO-8859-1?Q?Caf=E9_Zuid?="), "Café Zuid");
+  assert.equal(cleanMailText("Nieuw͏ ‌­ bij ons​﻿"), "Nieuw bij ons");
+  assert.equal(cleanMailText("Gewone tekst met ë"), "Gewone tekst met ë", "correct text is left alone");
+  const bulk = { headers: [{ name: "List-Unsubscribe", value: "<mailto:x@y.nl>" }] };
+  assert.equal(isBulkMail(bulk), true);
+  assert.equal(isBulkMail({ headers: [{ name: "From", value: "klant@example.nl" }] }), false);
+  assert.equal(shouldImportGmail(["INBOX", "CATEGORY_UPDATES"], false), false, "updates (invoices, shipping) stay out");
+  assert.equal(shouldImportGmail(["INBOX", "CATEGORY_PERSONAL"], false), true);
+  const to = (addr) => ({ payload: { headers: [{ name: "To", value: addr }] } });
+  assert.equal(matchesImportFilter(to("Info <info@zaak.nl>"), { importFilter: { to: ["reserveringen@zaak.nl"] } }), false);
+  assert.equal(matchesImportFilter(to("reserveringen@zaak.nl"), { importFilter: { to: ["reserveringen@zaak.nl"] } }), true);
+  assert.equal(matchesImportFilter(to("info@zaak.nl"), {}), true, "no filter: everything primary");
 });

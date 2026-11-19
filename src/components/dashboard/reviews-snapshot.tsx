@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Star } from "lucide-react";
 import { Card, SectionHeader } from "@/components/ui";
-import { loadedStats, type ReviewsPage } from "@/lib/reviews/google";
+import { loadedStats, meanRating, type ReviewsPage } from "@/lib/reviews/google";
 
 // Real Google review figures. Average and total come straight from Google;
 // unanswered and "new" are counted over the most recent reviews only, and the
@@ -28,6 +28,8 @@ export function ReviewsSnapshot() {
   }, []);
 
   const stats = page ? loadedStats(page.reviews) : null;
+  // Plain average when the 50 newest are all there are; otherwise Google's figure.
+  const score = page ? (!page.nextPageToken ? (meanRating(page.reviews) ?? page.averageRating) : page.averageRating) : null;
   return (
     <Card className="dash-card dash-reviews">
       <SectionHeader
@@ -53,7 +55,7 @@ export function ReviewsSnapshot() {
           <dl className="dash-reviews-grid">
             <div>
               <dt>Gemiddelde</dt>
-              <dd>{page.averageRating !== null ? page.averageRating.toLocaleString("nl-NL", { minimumFractionDigits: 1 }) : "—"}</dd>
+              <dd>{score !== null ? score.toLocaleString("nl-NL", { minimumFractionDigits: 1 }) : "—"}</dd>
             </div>
             <div>
               <dt>Reviews totaal</dt>

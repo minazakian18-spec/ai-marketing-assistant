@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Fragment, useMemo, useState } from "react";
 import { Check, ChevronDown, Clock, Minus, Sparkles } from "lucide-react";
 import { ACTIONS, PLAN_IDS, PLANS, YEARLY_DISCOUNT_PERCENT, euro, yearlyPrice, type PlanId } from "@/lib/plans";
-import { CATEGORIES, INFO, UPGRADE_PITCH, differs, upgradeBenefits, type Cell } from "@/lib/pricing-content";
+import { CATEGORIES, INFO, UPGRADE_PITCH, differs, upgradeBenefits, type Cell , creditExample } from "@/lib/pricing-content";
 import { InfoTip } from "./info-tip";
 
 // Interactive part of /pricing: billing toggle, three plan cards, the plan
@@ -195,7 +195,7 @@ export function PricingExperience({ yearlyAvailable }: { yearlyAvailable: boolea
       <section className="pr-credits-box" aria-labelledby="pr-credits-title">
         <h2 id="pr-credits-title">Zo werken AI-credits</h2>
         <p>
-          Met {g.name} ontvang je {g.credits} AI-credits per maand. Je kunt daarmee onder andere maximaal {g.limits.image_generate} AI-afbeeldingen en {g.limits.instagram_caption} Instagram-captions maken. Iedere actie gebruikt credits uit hetzelfde maandtegoed.
+          Met {g.name} ontvang je {g.credits} AI-credits per maand. In gewone taal: {creditExample(g)}. Iedere actie gebruikt credits uit hetzelfde maandtegoed.
         </p>
         <div className="pr-credit-grid">
           <table className="pr-credit-table">

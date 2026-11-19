@@ -136,7 +136,7 @@ const MODULES: Module[] = [
     text: "Berichten uit je gekoppelde kanalen komen in één inbox, met AI-hulp bij het antwoorden.",
     preview: (
       <ul className="ws-list">
-        <Row icon={<BrandIcon brand="whatsapp" size={14} title="WhatsApp" />} title="Hebben jullie vanavond nog plek?" meta="WhatsApp · 2 min geleden" status="Antwoord klaar" tone="is-purple" />
+        <Row icon={<BrandIcon brand="instagram" size={14} title="Instagram" />} title="Hebben jullie vanavond nog plek?" meta="Instagram · 2 min geleden" status="Antwoord klaar" tone="is-purple" />
         <Row icon={<BrandIcon brand="gmail" size={14} title="Gmail" />} title="Offerte voor een verjaardag" meta="Gmail · vandaag" />
       </ul>
     ),

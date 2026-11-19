@@ -5,7 +5,7 @@ import type { GenerationRequest } from "@/lib/providers/contracts";
 import { generateInstagramText } from "@/lib/server/ai";
 import { metered } from "@/lib/server/ai-usage";
 import { storedProfile } from "@/lib/server/stored-profile";
-import { buildInstagramInstruction, goalLabel, isInstagramGoal } from "@/lib/ai/instagram-instruction";
+import { buildInstagramInstruction, goalLabel, normalizeGoal } from "@/lib/ai/instagram-instruction";
 import type { Profile } from "@/lib/types";
 import { aiConfigured } from "@/lib/server/openai";
 
@@ -32,8 +32,8 @@ export async function POST(request: Request) {
       if (process.env.ENABLE_DEMO_AI === "true" && process.env.NODE_ENV !== "production") return NextResponse.json(await generateContent(req));
       throw new HttpError(503, "AI-generatie is nog niet geconfigureerd. Er is geen content gegenereerd.");
     }
-    const goal = isInstagramGoal(req.goal || "") ? req.goal! : "merkbekendheid";
-    const instruction = buildInstagramInstruction({ profile: req.profile, prompt: req.prompt, type: req.type, goal: goal as never, product: req.product, segmentId: req.segmentId, cta: req.cta, useWebsite: req.useWebsite });
+    const goal = normalizeGoal(req.goal);
+    const instruction = buildInstagramInstruction({ profile: req.profile, prompt: req.prompt, type: req.type, goal, product: req.product, segmentId: req.segmentId, cta: req.cta, useWebsite: req.useWebsite });
     const post = await metered(
       auth,
       "content_instagram",

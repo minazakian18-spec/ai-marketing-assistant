@@ -16,13 +16,14 @@ import { ReviewAutoReply } from "./auto-reply";
 import { ReviewSettings } from "./settings";
 import { LiveReviews } from "./live";
 import { ReplyPreferences } from "./reply-preferences";
+import { ReviewAutoReplyLive } from "./auto-reply-live";
 import { isBrowserDemo } from "@/lib/demo";
 
 type ReviewTab = "overview" | "inbox" | "auto-reply" | "settings";
 const tabs: [ReviewTab, string, typeof LayoutDashboard][] = [
   ["overview", "Overzicht", LayoutDashboard],
   ["inbox", "Reviews", Inbox],
-  ["auto-reply", "Auto Reply", Sparkles],
+  ["auto-reply", "Automatisch", Sparkles],
   ["settings", "Instellingen", Settings],
 ];
 
@@ -136,8 +137,8 @@ function Workspace() {
   }
 
   if (!ready || demo === null) return <p role="status">Reviews laden…</p>;
-  const visibleTabs = demo ? tabs : tabs.filter(([key]) => key !== "auto-reply");
-  const active: ReviewTab = !demo && tab === "auto-reply" ? "overview" : tab;
+  const visibleTabs = tabs;
+  const active: ReviewTab = tab;
   return (
     <div className="rv-workspace">
       <PageHeading
@@ -176,6 +177,7 @@ function Workspace() {
       <div className="workspace-tab-enter" key={active}>
         {!demo && (active === "overview" || active === "inbox") && <LiveReviews tab={active} />}
         {!demo && active === "settings" && <ReplyPreferences settings={settings} onChange={updateSettings} />}
+        {!demo && active === "auto-reply" && <ReviewAutoReplyLive settings={settings} onChange={updateSettings} />}
         {demo && tab === "overview" && (
           <ReviewOverview
             reviews={reviews}

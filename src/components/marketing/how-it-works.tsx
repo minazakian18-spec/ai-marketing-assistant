@@ -12,7 +12,6 @@ const CHANNELS: { brand: Brand; name: string }[] = [
   { brand: "google_business", name: "Google Bedrijfsprofiel" },
   { brand: "gmail", name: "Gmail" },
   { brand: "instagram", name: "Instagram" },
-  { brand: "whatsapp", name: "WhatsApp Business" },
   { brand: "google_calendar", name: "Google Agenda" },
   { brand: "search_console", name: "Search Console" },
 ];
@@ -143,7 +142,7 @@ const steps = [
   {
     icon: Plug,
     title: "Koppel je kanalen",
-    description: "Verbind de accounts die je al gebruikt met je Mavix-werkruimte: je Google-bedrijfsprofiel, Gmail, Instagram, WhatsApp Business, Google Agenda en Search Console.",
+    description: "Verbind de accounts die je al gebruikt met je Mavix-werkruimte: je Google-bedrijfsprofiel, Gmail, Instagram, Google Agenda en Search Console.",
     note: "Een aantal koppelingen wacht nog op goedkeuring van Google of Meta. In de app zie je per koppeling de actuele status.",
     visual: <ConnectVisual />,
   },

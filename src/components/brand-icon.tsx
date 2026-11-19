@@ -8,7 +8,6 @@ import {
   siMessenger,
   siMeta,
   siShopify,
-  siWhatsapp,
   type SimpleIcon,
 } from "simple-icons";
 
@@ -20,7 +19,6 @@ import type React from "react";
 // LinkedIn asked simple-icons to remove its logo, so it gets a plain
 // monogram in its brand colour instead.
 export type Brand =
-  | "whatsapp"
   | "instagram"
   | "messenger"
   | "gmail"
@@ -34,7 +32,6 @@ export type Brand =
   | "meta_ads";
 
 const ICONS: Partial<Record<Brand, SimpleIcon>> = {
-  whatsapp: siWhatsapp,
   instagram: siInstagram,
   messenger: siMessenger,
   gmail: siGmail,
@@ -48,7 +45,6 @@ const ICONS: Partial<Record<Brand, SimpleIcon>> = {
 };
 
 export const BRAND_LABEL: Record<Brand, string> = {
-  whatsapp: "WhatsApp",
   instagram: "Instagram",
   messenger: "Messenger",
   gmail: "Gmail",

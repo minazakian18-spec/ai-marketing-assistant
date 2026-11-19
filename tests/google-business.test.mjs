@@ -446,3 +446,14 @@ test("Reviews page: real reason, 'Opnieuw controleren' on the page, no generic w
   const gate = src.match(/export function gateContent[\s\S]*?\r?\n}\r?\n/)[0];
   assert.equal((gate.match(/connect: null/g) || []).length, 2, "location choice and API problems never send the user through OAuth");
 });
+
+test("review score: plain average of all reviews; the page loads every page (50 each) and shows Google's API figure only as a footnote", () => {
+  const { meanRating } = serverLoader({})("src/lib/reviews/google.ts");
+  assert.equal(meanRating([{ rating: 5 }, { rating: 5 }, { rating: 4 }, { rating: null }]), 4.7);
+  assert.equal(meanRating([]), null);
+  const live = fs.readFileSync("src/components/review/live.tsx", "utf8");
+  assert.match(live, /pageSize: "50"/);
+  assert.match(live, /MAX_PAGES/);
+  assert.match(live, /Gemiddelde van al je \$\{reviews\.length\} reviews/);
+  assert.doesNotMatch(live, /pageSize: "25"/);
+});

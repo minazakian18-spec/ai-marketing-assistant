@@ -216,7 +216,8 @@ export function GoogleIntegrationCard({
       const r = await request<{ state: string; message?: string; locations?: BusinessLocation[]; location?: { name: string } }>("check", "POST");
       if (r.state === "connected") onNotice((r.location?.name || config.name) + " werkt. Je reviews staan onder Reviews.");
       else if (r.state === "selection_required" && r.locations) setPicker({ loading: false, error: "", list: r.locations, choice: "", saving: false });
-      else if (r.message) setError(r.message);
+      // An API block is already shown as the card's description (after load below).
+      else if (r.message && r.state !== "api_access_required") setError(r.message);
     } catch (e) {
       setError((e as Error).message);
     } finally {

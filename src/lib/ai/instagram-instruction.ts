@@ -3,37 +3,59 @@ import type { Profile } from "../types";
 import type { AudienceSegment, Product } from "../brand-model";
 import { buildBrandContext, findSegment, findProduct, type BrandContext } from "./brand-context.ts";
 
-export type InstagramGoal =
-  | "product-promotie"
-  | "aanbieding"
-  | "merkbekendheid"
-  | "informatief"
-  | "educatief"
-  | "seizoensgebonden"
-  | "evenement"
-  | "nieuw-product"
-  | "testimonial"
-  | "engagement";
+// Goals: few, concrete and recognisable for a shop or restaurant owner. Each
+// one says what the post is for; the weekly plan (InstagramSettings.goalPlan)
+// can give every weekday its own goal.
+export type InstagramGoal = "bekendheid" | "aanbieding" | "product" | "tip" | "achter-de-schermen" | "review" | "evenement";
 
-export const instagramGoals: { id: InstagramGoal; label: string }[] = [
-  { id: "product-promotie", label: "Product promoten" },
-  { id: "aanbieding", label: "Aanbieding" },
-  { id: "merkbekendheid", label: "Merkbekendheid" },
-  { id: "informatief", label: "Informatief" },
-  { id: "educatief", label: "Educatief" },
-  { id: "seizoensgebonden", label: "Seizoensgebonden" },
-  { id: "evenement", label: "Evenement" },
-  { id: "nieuw-product", label: "Nieuw product" },
-  { id: "testimonial", label: "Testimonial" },
-  { id: "engagement", label: "Engagement" },
+export const instagramGoals: { id: InstagramGoal; label: string; hint: string }[] = [
+  { id: "bekendheid", label: "Meer bekendheid", hint: "Laat zien wie je bent en waar je voor staat." },
+  { id: "aanbieding", label: "Aanbieding of actie", hint: "Een korting, deal of tijdelijke actie." },
+  { id: "product", label: "Product in de spotlight", hint: "Eén gerecht, product of dienst centraal." },
+  { id: "tip", label: "Tip of weetje", hint: "Deel kennis; zo blijf je top of mind." },
+  { id: "achter-de-schermen", label: "Achter de schermen", hint: "Je team, je keuken, hoe het gemaakt wordt." },
+  { id: "review", label: "Klantreview", hint: "Een tevreden klant aan het woord." },
+  { id: "evenement", label: "Evenement of seizoen", hint: "Feestdag, seizoen, opening of event." },
 ];
+
+/** Older goal ids (saved concepts, links, tests) map onto the current ones. */
+const LEGACY_GOALS: Record<string, InstagramGoal> = {
+  "product-promotie": "product",
+  "nieuw-product": "product",
+  merkbekendheid: "bekendheid",
+  engagement: "bekendheid",
+  informatief: "tip",
+  educatief: "tip",
+  seizoensgebonden: "evenement",
+  testimonial: "review",
+};
 
 export function goalLabel(id: InstagramGoal): string {
   return instagramGoals.find((g) => g.id === id)?.label || id;
 }
 
 export function isInstagramGoal(value: string): value is InstagramGoal {
-  return instagramGoals.some((g) => g.id === value);
+  return instagramGoals.some((g) => g.id === value) || value in LEGACY_GOALS;
+}
+
+/** The current goal id for any (possibly older) value; "bekendheid" when unknown. */
+export function normalizeGoal(value: string | undefined | null): InstagramGoal {
+  const v = String(value || "");
+  if (instagramGoals.some((g) => g.id === v)) return v as InstagramGoal;
+  return LEGACY_GOALS[v] || "bekendheid";
+}
+
+/** Weekday ("0" = Sunday) of a local "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm" value. */
+export const weekdayOfDate = (date: string): string | null => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date || "");
+  return m ? String(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay()) : null;
+};
+
+/** The goal the weekly plan gives this date (undefined when the plan has none for that day). */
+export function plannedGoal(plan: Record<string, string> | undefined | null, date: string): InstagramGoal | undefined {
+  const day = weekdayOfDate(date);
+  if (!plan || day === null || !plan[day]) return undefined;
+  return normalizeGoal(plan[day]);
 }
 
 export type InstagramInstruction = {
@@ -60,7 +82,7 @@ export function buildInstagramInstruction(input: {
   const brand = buildBrandContext(input.profile);
   return {
     brand,
-    goal: input.goal,
+    goal: normalizeGoal(input.goal),
     contentType: input.type,
     segment: findSegment(brand, input.segmentId),
     product: findProduct(brand, input.product),
@@ -94,10 +116,12 @@ function goalMood(goal: InstagramGoal): string {
   switch (goal) {
     case "aanbieding":
       return "Energiek en urgent";
-    case "testimonial":
+    case "review":
       return "Warm en persoonlijk";
-    case "merkbekendheid":
+    case "bekendheid":
       return "Herkenbaar en consistent";
+    case "achter-de-schermen":
+      return "Echt en ongedwongen";
     case "evenement":
       return "Feestelijk en uitnodigend";
     default:
@@ -113,7 +137,7 @@ export function buildImagePromptSpec(
     mainSubject: product?.name || instruction.userInstruction,
     product: product?.description || "",
     environment:
-      goal === "seizoensgebonden"
+      goal === "evenement"
         ? "Sfeer passend bij het huidige seizoen"
         : "Past bij de merkomgeving en huisstijl",
     composition: "Gecentreerd hoofdonderwerp, ruimte voor tekst boven of onder",

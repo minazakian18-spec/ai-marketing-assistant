@@ -1,9 +1,7 @@
-// The real "eerste maand gratis bij jaarlijkse abonnementen" offer isn't
-// backed by billing yet (no Stripe price/coupon wired to it) — showing it
-// would be a false production claim. This line is intentionally a safe,
-// true statement instead. Swap PROMO_TEXT to the real offer once billing
-// supports it; nothing else needs to change.
-const PROMO_TEXT = "Geen creditcard nodig om te starten";
+// One message about the start, the same everywhere on the site: Mavix is in a
+// closed beta; taking part is free and starts with a request for access.
+// Change PROMO_TEXT when paid plans open; nothing else needs to change.
+const PROMO_TEXT = "Besloten beta: gratis meedoen. Vraag toegang aan.";
 
 export function PromoLine() {
   if (!PROMO_TEXT) return null;

@@ -113,6 +113,7 @@ export async function handleCalendarIntegration(
         state,
         access_type: "offline",
         prompt: "consent",
+        include_granted_scopes: "true",
         code_challenge: Buffer.from(hash(verifier), "hex").toString(
           "base64url",
         ),

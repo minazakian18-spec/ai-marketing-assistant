@@ -31,7 +31,6 @@ const PROVIDERS: [string, string][] = [
   ["google_calendar", "Google Agenda"],
   ["google_search_console", "Google Search Console"],
   ["messenger", "Facebook Messenger"],
-  ["whatsapp", "WhatsApp Business"],
 ];
 const BROKEN = ["reconnect_required", "permission_missing", "error"];
 

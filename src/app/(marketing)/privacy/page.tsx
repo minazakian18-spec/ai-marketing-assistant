@@ -44,7 +44,7 @@ const sections: LegalSection[] = [
           <strong>Bestanden:</strong> foto&apos;s, logo&apos;s en AI-beelden in je Bibliotheek. Ze staan in afgeschermde opslag en zijn alleen via tijdelijke, beveiligde links te bekijken.
         </li>
         <li>
-          <strong>Klantgegevens die jij beheert:</strong> contacten en hun toestemming voor nieuwsbrieven, afmeldingen, reviews van je Google-bedrijfsprofiel en berichten uit gekoppelde kanalen (Gmail, Instagram, Facebook Messenger en WhatsApp Business) in je Inbox.
+          <strong>Klantgegevens die jij beheert:</strong> contacten en hun toestemming voor nieuwsbrieven, afmeldingen, reviews van je Google-bedrijfsprofiel en berichten uit gekoppelde kanalen (Gmail, Instagram en Facebook Messenger) in je Inbox.
         </li>
         <li>
           <strong>AI-gegevens:</strong> de opdrachten die je geeft, de context uit je Brand Hub die daarbij hoort, en de gegenereerde teksten en beelden. Per AI-aanvraag houden we bij hoeveel tokens en kosten er zijn gebruikt, niet de inhoud.
@@ -112,7 +112,6 @@ const sections: LegalSection[] = [
             <strong>Instagram en Facebook (Meta):</strong> je professionele Instagram-account en de gekoppelde Facebook-pagina vinden, berichten ontvangen en beantwoorden in je Inbox, en (zodra beschikbaar) posts publiceren. Facebook Messenger werkt via je Facebook-pagina.
           </li>
           <li>
-            <strong>WhatsApp Business (Meta):</strong> berichten ontvangen en versturen via de WhatsApp Business-account die je zelf koppelt.
           </li>
           <li>
             <strong>Gmail:</strong> e-mails lezen voor je Inbox en namens jou versturen.
@@ -153,7 +152,7 @@ const sections: LegalSection[] = [
             <strong>Resend</strong>: e-mails over je account en, als je ze verstuurt, je e-mailcampagnes.
           </li>
           <li>
-            <strong>Twilio</strong>: sms- of WhatsApp-meldingen, als je die inschakelt.
+            <strong>Twilio</strong>: sms-meldingen, als je die inschakelt.
           </li>
           <li>
             <strong>Stripe</strong>: betalingen, zodra betaalde abonnementen actief zijn.

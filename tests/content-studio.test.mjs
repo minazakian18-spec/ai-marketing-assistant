@@ -13,7 +13,7 @@ const now = "2026-10-12T10:00:00.000Z";
 test("overview uses the same records as the calendar: posts, campaigns and copies, newest edit first", () => {
   const items = studioItems({
     posts: [
-      { id: "p1", prompt: "Pizza van de maand", caption: "Nieuw!", hashtags: "", status: "scheduled", date: "2026-10-20T18:00", createdAt: "2026-10-01T09:00:00Z", variant: 0, media: ["data:image/png;base64,AA=="] },
+      { id: "p1", prompt: "Pizza van de maand", caption: "Nieuw!", hashtags: "", status: "scheduled", date: "2099-10-20T18:00", createdAt: "2026-10-01T09:00:00Z", variant: 0, media: ["data:image/png;base64,AA=="] },
       { id: "p2", prompt: "", caption: "**Vet** concept", hashtags: "", status: "draft", date: "", createdAt: "2026-10-02T09:00:00Z", updatedAt: "2026-10-11T09:00:00Z", variant: 0 },
     ],
     email: { settings: {}, campaigns: [{ id: "e1", title: "Nieuwsbrief", subject: "Zomerkaart", preview: "Proef de zomer", body: "", status: "sent", date: "", createdAt: "2026-10-05T09:00:00Z" }] },

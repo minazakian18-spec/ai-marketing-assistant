@@ -447,47 +447,7 @@ export function Thread({
           </p>
         )}
 
-        {useTemplate ? (
-          <div className="ib-templates">
-            <p className="ib-banner">Het 24-uursvenster is gesloten. Stuur een goedgekeurde WhatsApp-template.</p>
-            {templates === null ? (
-              <p className="ib-muted">Templates laden…</p>
-            ) : templates.length === 0 ? (
-              <p className="ib-muted">Er zijn geen goedgekeurde templates zonder media-header. Maak er een aan in WhatsApp Manager.</p>
-            ) : (
-              <>
-                <label className="ib-field">
-                  <span>Template</span>
-                  <select
-                    value={template ? template.name + "|" + template.language : ""}
-                    onChange={(e) => {
-                      const t = templates.find((x) => x.name + "|" + x.language === e.target.value) || null;
-                      setTemplate(t);
-                      setVars(t ? Array(t.variables).fill("") : []);
-                    }}
-                  >
-                    <option value="">Kies een template</option>
-                    {templates.map((t) => (
-                      <option key={t.name + t.language} value={t.name + "|" + t.language}>
-                        {t.name} ({t.language})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {template && <p className="ib-template-body">{template.body}</p>}
-                {vars.map((v, i) => (
-                  <label key={i} className="ib-field">
-                    <span>{`Variabele {{${i + 1}}}`}</span>
-                    <input value={v} maxLength={1000} onChange={(e) => setVars(vars.map((x, j) => (j === i ? e.target.value : x)))} />
-                  </label>
-                ))}
-                <button type="button" className="button primary" onClick={submit} disabled={!template || vars.some((v) => !v.trim())}>
-                  Template versturen
-                </button>
-              </>
-            )}
-          </div>
-        ) : (
+        {(
           <div className="ib-compose-box">
             {files.length > 0 && (
               <ul className="ib-files">

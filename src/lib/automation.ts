@@ -31,7 +31,7 @@ export const WORKFLOWS: Workflow[] = [
   { id: "instagram_publish_scheduled", module: "social", level: "auto", label: "Ingeplande posts automatisch publiceren", description: "Goedgekeurde, ingeplande posts worden op het geplande moment via de officiële Instagram-API gepubliceerd.", permission: true, runnable: true },
   { id: "email_auto_create", module: "email", level: "prepare", label: "Auto Create voor e-mail", description: "Mavix stelt nieuwsbrieven en acties voor die op goedkeuring wachten.", permission: false, runnable: false },
   { id: "email_send_scheduled", module: "email", level: "auto", label: "Ingeplande campagnes automatisch versturen", description: "Goedgekeurde, ingeplande campagnes worden op het geplande moment verstuurd naar ontvangers met toestemming.", permission: true, runnable: true },
-  { id: "review_auto_reply", module: "reviews", level: "auto", label: "Auto Reply op Google-reviews", description: "Mavix beantwoordt positieve reviews volgens jouw regels; klachten en gevoelige reviews blijven altijd bij jou.", permission: true, runnable: false },
+  { id: "review_auto_reply", module: "reviews", level: "auto", label: "Reviews automatisch beantwoorden", description: "Nieuwe positieve Google-reviews (vanaf jouw drempel) krijgen vanzelf een antwoord in jouw toon; lage scores, klachten en gevoelige onderwerpen blijven altijd bij jou.", permission: true, runnable: true },
 ];
 
 export type WorkflowFacts = {

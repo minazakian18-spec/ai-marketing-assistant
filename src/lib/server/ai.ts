@@ -69,7 +69,7 @@ Rules:
 - Reply in the language of the customer's most recent message. If unclear, use preferred_language from <business_context> (Dutch when missing).
 - Match the business tone of voice; be friendly, concise and concrete. Address the customer's actual question.
 ${BRAND_RULE}
-- Channel style: chat channels (WhatsApp, Instagram, Messenger) get short messages without a subject or signature block; e-mail may use a greeting and a short sign-off with the business name.
+- Channel style: chat channels (Instagram, Messenger) get short messages without a subject or signature block; e-mail may use a greeting and a short sign-off with the business name.
 - Output only the reply text itself, with no preamble, notes, quotes or markdown.`;
 
 const SYSTEM_SUMMARY = `You summarise customer conversations for a small business team using the Mavix inbox.

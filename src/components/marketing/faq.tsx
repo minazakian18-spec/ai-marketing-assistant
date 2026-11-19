@@ -21,11 +21,11 @@ export const generalFaq: FaqItem[] = [
   },
   {
     q: "Welke marketingkanalen kan ik beheren?",
-    a: "Google-reviews, Instagram (posts, AI-afbeeldingen en carrousels), e-mailmarketing en klantgesprekken in je Inbox. Daarnaast helpen SEO Intelligence en Inzichten je met vindbaarheid en resultaten. Google Ads is in ontwikkeling. Facebook, LinkedIn en TikTok volgen later.",
+    a: "Google-reviews, Instagram (posts, AI-afbeeldingen en carrousels), e-mailmarketing en klantgesprekken in je Inbox. Daarnaast helpen SEO Intelligence en Inzichten je met vindbaarheid en resultaten. Google Ads is in ontwikkeling. Facebook en LinkedIn volgen later.",
   },
   {
     q: "Kan ik mijn bestaande accounts koppelen?",
-    a: "Ja. Je koppelt onder meer je Google Bedrijfsprofiel, Gmail, Google Agenda, Search Console, Instagram, WhatsApp Business en Facebook Messenger aan je werkruimte. Een aantal koppelingen wacht nog op goedkeuring van Google of Meta; in Mavix zie je per koppeling of hij al actief is. Tot die tijd plan je content in Mavix en plaats je die zelf.",
+    a: "Ja. Je koppelt onder meer je Google Bedrijfsprofiel, Gmail, Google Agenda, Search Console, Instagram en Facebook Messenger aan je werkruimte. Een aantal koppelingen wacht nog op goedkeuring van Google of Meta; in Mavix zie je per koppeling of hij al actief is. Tot die tijd plan je content in Mavix en plaats je die zelf.",
   },
   {
     q: "Heb ik technische kennis nodig?",

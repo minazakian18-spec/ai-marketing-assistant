@@ -25,7 +25,7 @@ function thread(id: string, channel: Channel, name: string, handle: string, mess
       id,
       channel,
       accountId: "demo",
-      contact: { name, handle, email: channel === "gmail" ? handle : undefined, phone: channel === "whatsapp" ? handle : undefined },
+      contact: { name, handle, email: channel === "gmail" ? handle : undefined },
       contactId: null,
       subject: "",
       status: "open",
@@ -47,9 +47,9 @@ export function demoThreads(): DemoThread[] {
   return [
     thread(
       "demo-1",
-      "whatsapp",
+      "messenger",
       "Sanne de Vries",
-      "+31 6 1234 5678",
+      "Sanne de Vries",
       [
         msg("inbound", "Sanne de Vries", "Hoi! Hebben jullie zaterdagavond nog plek voor 4 personen?", 26),
         msg("outbound", "Jij", "Hoi Sanne, zaterdag om 19:00 of 20:30 kan nog. Welke tijd past jullie het best?", 21),
@@ -94,9 +94,9 @@ export function demoThreads(): DemoThread[] {
     ),
     thread(
       "demo-5",
-      "whatsapp",
+      "instagram",
       "Yasmin El Amrani",
-      "+31 6 8765 4321",
+      "yasmin.elamrani",
       [msg("inbound", "Yasmin El Amrani", "Kan ik een cadeaubon van €50 bij jullie kopen?", 60 * 50)],
     ),
   ];

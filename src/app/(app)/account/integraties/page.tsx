@@ -40,7 +40,6 @@ const INTEGRATIONS: Integration[] = [
   { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", group: "recommended", provider: "instagram" },
   { id: "gmail", brand: "gmail", name: "Gmail", description: "E-mails versturen en klantmails in de Inbox lezen.", group: "recommended", provider: "gmail" },
   { id: "google_business", brand: "google_business", name: "Google Bedrijfsprofiel", description: "Bedrijfsprofiel en Google-reviews, met één koppeling.", group: "recommended", provider: "google_business" },
-  { id: "whatsapp", brand: "whatsapp", name: "WhatsApp Business", description: "Ontvang en beantwoord WhatsApp-berichten in de Inbox. Koppelen gaat nu nog met hulp van een technisch beheerder.", group: "communication", provider: "whatsapp" },
   { id: "messenger", brand: "messenger", name: "Facebook Messenger", description: "Berichten aan je Facebook-pagina in de Inbox.", group: "communication", provider: "messenger" },
   { id: "google_calendar", brand: "google_calendar", name: "Google Agenda", description: "Je afspraken naast je Mavix-planning, in twee richtingen gesynchroniseerd.", group: "productivity", provider: "google_calendar" },
   { id: "google_search_console", brand: "search_console", name: "Google Search Console", description: "Klikken, vertoningen en zoekwoorden van je website.", group: "productivity", provider: "google_search_console" },
@@ -68,8 +67,6 @@ const SCOPE_LABEL: Record<string, string> = {
   pages_show_list: "Je Facebook-pagina's bekijken",
   pages_manage_metadata: "Berichtmeldingen voor je pagina instellen",
   pages_messaging: "Messenger-berichten beantwoorden",
-  whatsapp_business_messaging: "WhatsApp-berichten versturen en ontvangen",
-  whatsapp_business_management: "Je WhatsApp Business-account beheren",
 };
 const GMAIL_READ = "https://www.googleapis.com/auth/gmail.readonly";
 const NOTICES: Record<string, string> = {
@@ -141,7 +138,6 @@ export default function IntegrationsPage() {
   const [locations, setLocations] = useState<{ id: string; account: string; name: string }[] | null>(null);
   const [pages, setPages] = useState<{ id: string; name: string }[] | null>(null);
   const [igAccounts, setIgAccounts] = useState<{ id: string; username: string; name: string; pageName: string }[] | null>(null);
-  const [wa, setWa] = useState({ phoneNumberId: "", wabaId: "", token: "" });
   const [test, setTest] = useState({ to: "", subject: "", body: "", result: "" });
 
   const load = useCallback(async () => {
@@ -221,13 +217,6 @@ export default function IntegrationsPage() {
     const c = conn(item);
     if (item.provider === "messenger" && c?.status === "selection_required") void call("messenger", "pages").then((d) => d && setPages(d.pages));
     if (item.provider === "instagram" && c?.status === "selection_required") void call("instagram", "accounts").then((d) => d && setIgAccounts(d.accounts));
-  }
-
-  async function connectWhatsApp(e: FormEvent) {
-    e.preventDefault();
-    const d = await call("whatsapp", "connect", wa);
-    setWa({ phoneNumberId: "", wabaId: "", token: "" }); // never keep the token in the page
-    if (d) setNotice("WhatsApp is verbonden. Nieuwe berichten verschijnen in de Inbox.");
   }
 
   async function sendTest(e: FormEvent) {
@@ -339,9 +328,9 @@ export default function IntegrationsPage() {
                       type="button"
                       className="button secondary"
                       disabled={demo || busy}
-                      onClick={() => (item.provider === "whatsapp" ? open(item) : void call(item.provider!, "connect"))}
+                      onClick={() => void call(item.provider!, "connect")}
                     >
-                      {item.provider === "whatsapp" ? "Bekijken" : "Koppelen"}
+                      Koppelen
                     </button>
                   )}
                 </li>
@@ -475,44 +464,7 @@ export default function IntegrationsPage() {
                 </div>
               )}
 
-              {m.provider === "whatsapp" && ms === "disconnected" && (
-                <div className="int-section">
-                  <h3>Wat kun je ermee?</h3>
-                  <p className="int-hint">WhatsApp-berichten van klanten komen binnen in je Inbox, waar je ze kunt beantwoorden. Mavix stelt antwoorden voor; jij verstuurt.</p>
-                  <h3>Zo koppel je WhatsApp</h3>
-                  <p className="int-hint">
-                    Koppelen met één klik via Meta is nog niet beschikbaar in Mavix. Tot die tijd koppelt een technisch beheerder WhatsApp met gegevens uit Meta
-                    Business Suite. Liever hulp? Neem contact op met Mavix, dan doen we het samen.
-                  </p>
-                </div>
-              )}
-              {m.provider === "whatsapp" && (
-                <details className="int-section" open={ms !== "disconnected"}>
-                  <summary>{ms === "disconnected" ? "Handmatig koppelen (voor technische beheerders)" : "Nieuwe gegevens invoeren"}</summary>
-                <form className="int-form" onSubmit={(e) => void connectWhatsApp(e)}>
-                  <p className="int-hint">
-                    Gebruik de gegevens uit Meta Business Suite (WhatsApp Manager) en een systeemgebruiker-token. Het token wordt versleuteld opgeslagen en is
-                    daarna niet meer zichtbaar.
-                  </p>
-                  <label>
-                    Phone Number ID
-                    <input inputMode="numeric" required pattern="\d{5,30}" value={wa.phoneNumberId} onChange={(e) => setWa({ ...wa, phoneNumberId: e.target.value.trim() })} />
-                  </label>
-                  <label>
-                    WhatsApp Business Account ID
-                    <input inputMode="numeric" required pattern="\d{5,30}" value={wa.wabaId} onChange={(e) => setWa({ ...wa, wabaId: e.target.value.trim() })} />
-                  </label>
-                  <label>
-                    Systeemgebruiker-token
-                    <input type="password" autoComplete="off" required minLength={20} value={wa.token} onChange={(e) => setWa({ ...wa, token: e.target.value.trim() })} />
-                  </label>
-                  <button type="submit" className="button primary" disabled={busy}>
-                    {busy ? "Controleren…" : "WhatsApp koppelen"}
-                  </button>
-                </form>
-                </details>
-              )}
-
+              {m.provider === "gmail" && mc?.status === "connected" && <GmailImportFilter demo={demo} />}
               {m.provider === "gmail" && mc?.status === "connected" && (
                 <details className="int-section">
                   <summary>Testmail versturen</summary>
@@ -543,7 +495,7 @@ export default function IntegrationsPage() {
                   Verbinding verwijderen
                 </button>
               )}
-              {m.provider !== "whatsapp" && (
+              {(
                 <button type="button" className="button primary" disabled={busy} onClick={() => void call(m.provider!, "connect")}>
                   <RefreshCw size={14} />
                   {ms === "permission" ? "Toestemming geven" : ms === "disconnected" ? "Koppelen" : "Opnieuw verbinden"}
@@ -572,5 +524,53 @@ export default function IntegrationsPage() {
         <p>Mavix verwijdert de opgeslagen toegang. Je kunt later opnieuw koppelen.</p>
       </ConfirmDialog>
     </div>
+  );
+}
+
+/** Gmail: which e-mails come into the Inbox (only primary mail; optionally only to these addresses). */
+function GmailImportFilter({ demo }: { demo: boolean }) {
+  const [value, setValue] = useState("");
+  const [saved, setSaved] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (demo) return;
+    fetch("/api/integrations/gmail/status", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setValue(((d.importTo as string[]) || []).join(", ")))
+      .catch(() => {});
+  }, [demo]);
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setSaved("");
+    const to = value.split(/[\s,;]+/).map((v) => v.trim()).filter(Boolean);
+    const r = await fetch("/api/integrations/gmail/filter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to }) });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setError(d.error || "Opslaan is niet gelukt. Controleer de e-mailadressen.");
+    setSaved(to.length ? "Opgeslagen. Alleen e-mails naar deze adressen komen in de Inbox." : "Opgeslagen. Alle e-mails uit je primaire inbox komen in de Inbox.");
+  }
+  return (
+    <details className="int-section">
+      <summary>Welke e-mails komen in de Inbox?</summary>
+      <form className="int-form" onSubmit={(e) => void save(e)}>
+        <p className="int-hint">Mavix haalt alleen e-mails uit je primaire inbox op. Nieuwsbrieven, reclame, sociale meldingen en updates (zoals facturen en verzendberichten) blijven buiten de Inbox.</p>
+        <label>
+          Alleen e-mails naar deze adressen (optioneel)
+          <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Bijvoorbeeld: reserveringen@jouwzaak.nl, info@jouwzaak.nl" disabled={demo || busy} />
+        </label>
+        {error && (
+          <p role="alert" className="int-error">
+            {error}
+          </p>
+        )}
+        {saved && <p role="status" className="int-hint">{saved}</p>}
+        <button type="submit" className="button secondary" disabled={demo || busy}>
+          {busy ? "Opslaan…" : "Opslaan"}
+        </button>
+      </form>
+    </details>
   );
 }

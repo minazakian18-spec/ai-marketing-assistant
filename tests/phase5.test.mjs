@@ -165,7 +165,7 @@ test("integration health route never exposes configuration names or tokens", asy
 
 test("dashboard to-dos flag broken connections for every provider first", () => {
   const { buildTodos } = pure("src/lib/dashboard-todos.ts");
-  const todos = buildTodos({ brandScore: 50, review: { count: 0, href: "/" }, failed: { count: 0, href: "/" }, campaigns: 0, plannedThisWeek: 0, status: (p) => (p === "whatsapp" ? "reconnect_required" : "disconnected") });
-  assert.equal(todos[0].id, "reconnect-whatsapp");
+  const todos = buildTodos({ brandScore: 50, review: { count: 0, href: "/" }, failed: { count: 0, href: "/" }, campaigns: 0, plannedThisWeek: 0, status: (p) => (p === "messenger" ? "reconnect_required" : "disconnected") });
+  assert.equal(todos[0].id, "reconnect-messenger");
   assert.equal(todos[0].urgent, true);
 });

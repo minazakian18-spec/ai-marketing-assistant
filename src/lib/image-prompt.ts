@@ -5,6 +5,8 @@
 
 export type ImageFormat = "square" | "portrait";
 export type ImageMode = "generate" | "edit" | "inspire";
+/** What the reference images are: the business's own photos (brand) or loose inspiration. */
+export type ReferenceKind = "brand" | "inspiration";
 /** One slide of a carousel: the shared visual brief keeps all slides consistent. */
 export type SlideContext = { visualStyle: string; slideBrief: string; index: number; total: number; styleReference: boolean };
 export type BrandStyle = {
@@ -32,7 +34,7 @@ export function brandStyleOf(profile: { name?: string; industry?: string; audien
   };
 }
 
-export function buildImagePrompt(o: { brief: string; mode: ImageMode; format: ImageFormat; brand?: BrandStyle; slide?: SlideContext; references?: number }): string {
+export function buildImagePrompt(o: { brief: string; mode: ImageMode; format: ImageFormat; brand?: BrandStyle; slide?: SlideContext; references?: number; referenceKind?: ReferenceKind }): string {
   const b = o.brand || {};
   const lines: string[] = [];
   if (o.slide) {
@@ -40,7 +42,17 @@ export function buildImagePrompt(o: { brief: string; mode: ImageMode; format: Im
     lines.push(`This slide shows: ${clip(o.slide.slideBrief, 600)}.`);
     if (o.slide.styleReference) lines.push("The last input image is an earlier slide of this carousel: match its lighting, colour grade, photographic style and mood exactly so the slides belong together, but show this slide's own subject.");
   }
-  if (o.mode === "inspire") {
+  if (o.mode === "inspire" && o.referenceKind === "brand") {
+    // Branded content: the references ARE this business. The result must show
+    // its real products and place, never a generic look-alike.
+    lines.push(`Create a NEW professional marketing photograph for this business's Instagram: ${clip(o.brief, 800)}.`);
+    lines.push(
+      `The ${o.references && o.references > 1 ? "reference photos are" : "reference photo is"} of this exact business: its real products, dishes, packaging, interior, materials and colours. Show THE SAME products and setting as they really look in the references (same recipe, shape, toppings, plating, packaging, furniture, signage style). Do not invent other products, another venue, another cuisine or a generic stock-photo version. You may change the camera angle, composition, lighting, styling and props so it looks like a top-agency shoot.`,
+    );
+    lines.push("No people's faces from the references; no copied text or watermarks.");
+    lines.push(o.format === "portrait" ? "Vertical 4:5 composition, important content inside the frame." : "Square composition with a clear focal point.");
+    lines.push("Crisp detail, realistic textures, appetising and true to life, refined colour grade.");
+  } else if (o.mode === "inspire") {
     lines.push(`Create a NEW, original professional photograph for Instagram: ${clip(o.brief, 800)}.`);
     lines.push(
       `Use the ${o.references && o.references > 1 ? "reference images" : "reference image"} only as visual inspiration for composition, lighting, colour palette, photographic style, mood, camera angle and styling. Do not reproduce them: no copied people, objects, logos, text, watermarks, brand marks or distinctive designs from the references.`,

@@ -1,3 +1,4 @@
+import { postTitle } from "./instagram-publish.ts";
 import type { Post, Workspace } from "./types";
 import type { EmailCampaign } from "./email-model";
 
@@ -42,7 +43,7 @@ function postToItem(p: Post): CalendarItem {
   const { date, time } = splitLocal(p.date);
   return {
     id: "post-" + p.id,
-    title: p.prompt,
+    title: postTitle(p),
     channel: "Instagram",
     contentType: p.contentType || "Post",
     status: p.status === "draft" ? "review" : p.status,

@@ -5,8 +5,8 @@ import { defaultChannel, CHANNEL_ORDER } from "../src/lib/inbox/channel-default.
 const ch = (states) => Object.entries(states).map(([channel, state]) => ({ channel, state }));
 
 test("channel-first Inbox: always one channel, never an aggregate view", () => {
-  assert.deepEqual(CHANNEL_ORDER, ["instagram", "whatsapp", "gmail", "messenger"]);
-  for (const c of [[], ch({ gmail: "reconnect" }), ch({ whatsapp: "connected" })]) assert.ok(CHANNEL_ORDER.includes(defaultChannel(c, {}, null)));
+  assert.deepEqual(CHANNEL_ORDER, ["instagram", "gmail", "messenger"]);
+  for (const c of [[], ch({ gmail: "reconnect" }), ch({ messenger: "connected" })]) assert.ok(CHANNEL_ORDER.includes(defaultChannel(c, {}, null)));
 });
 
 test("the last choice wins while it is still connected", () => {
@@ -19,9 +19,9 @@ test("the last choice wins while it is still connected", () => {
 });
 
 test("otherwise the connected channel with the most unread, ties in the usual order", () => {
-  const channels = ch({ instagram: "connected", whatsapp: "connected", gmail: "connected" });
-  assert.equal(defaultChannel(channels, { gmail: 3, whatsapp: 1 }, null), "gmail");
-  assert.equal(defaultChannel(channels, { whatsapp: 2, gmail: 2 }, null), "whatsapp");
+  const channels = ch({ instagram: "connected", messenger: "connected", gmail: "connected" });
+  assert.equal(defaultChannel(channels, { gmail: 3, messenger: 1 }, null), "gmail");
+  assert.equal(defaultChannel(channels, { messenger: 2, instagram: 2 }, null), "instagram");
   assert.equal(defaultChannel(channels, {}, null), "instagram");
 });
 

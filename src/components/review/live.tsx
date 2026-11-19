@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { BrandIcon } from "@/components/brand-icon";
 import { API_ACCESS_TEXT } from "@/components/account/google-integration-card";
-import { REVIEW_FILTERS, type BusinessLocation, loadedStats, matchesFilter, monthlyTrend, replyQueue, type GoogleReview, type ReviewFilter, type ReviewsPage } from "@/lib/reviews/google";
+import { REVIEW_FILTERS, type BusinessLocation, loadedStats, matchesFilter, meanRating, monthlyTrend, replyQueue, type GoogleReview, type ReviewFilter, type ReviewsPage } from "@/lib/reviews/google";
 import { StarRating } from "./shared";
 import { LiveReviewCard } from "./live-card";
 
@@ -17,6 +17,8 @@ type Status = {
   apiKind?: "disabled" | "quota" | "project" | null;
 };
 type Data = { reviews: GoogleReview[]; next: string | null; average: number | null; total: number | null };
+/** 50 reviews per page; 20 pages = 1000 reviews in one go, the rest via "Meer laden". */
+const MAX_PAGES = 20;
 type Check = { state: string; message?: string; locations?: BusinessLocation[]; location?: { name: string; address: string } };
 
 async function get<T>(url: string): Promise<T> {
@@ -163,16 +165,24 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<ReviewFilter>("all");
 
+  // All reviews are loaded, 50 per page, page after page (up to MAX_PAGES), so
+  // the list and the score cover everything, not just the newest 25.
   const load = useCallback(async (pageToken?: string) => {
     setLoading(true);
     setError("");
     try {
-      const page = await get<ReviewsPage>("/api/reviews?" + new URLSearchParams({ pageSize: "25", ...(pageToken ? { pageToken } : {}) }));
-      setData((prev) =>
-        pageToken && prev
-          ? { ...prev, reviews: [...prev.reviews, ...page.reviews.filter((r) => !prev.reviews.some((p) => p.id === r.id))], next: page.nextPageToken }
-          : { reviews: page.reviews, next: page.nextPageToken, average: page.averageRating, total: page.totalReviewCount },
-      );
+      let token = pageToken;
+      for (let pages = 0; pages < MAX_PAGES; pages++) {
+        const page = await get<ReviewsPage>("/api/reviews?" + new URLSearchParams({ pageSize: "50", ...(token ? { pageToken: token } : {}) }));
+        const first = pages === 0 && !pageToken;
+        setData((prev) =>
+          !first && prev
+            ? { ...prev, reviews: [...prev.reviews, ...page.reviews.filter((r) => !prev.reviews.some((p) => p.id === r.id))], next: page.nextPageToken }
+            : { reviews: page.reviews, next: page.nextPageToken, average: page.averageRating, total: page.totalReviewCount },
+        );
+        token = page.nextPageToken || undefined;
+        if (!token) break;
+      }
     } catch (e) {
       setError((e as Error).message);
       if (!pageToken) get<Status>("/api/integrations/google_business/status").then(setStatus, () => {});
@@ -196,6 +206,13 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
   const trend = useMemo(() => monthlyTrend(reviews), [reviews]);
   const maxCount = Math.max(1, ...trend.map((m) => m.count));
   const shown = reviews.filter((r) => matchesFilter(r, filter));
+  // The score: the plain average of all reviews once they are all loaded;
+  // until then Google's own figure. Google's API figure can differ from the
+  // number on Google Maps, so it is shown as a footnote when it deviates.
+  const complete = !!data && !data.next;
+  const mean = meanRating(reviews);
+  const score = complete && mean !== null ? mean : (data?.average ?? null);
+  const apiDiffers = complete && mean !== null && data?.average !== null && data?.average !== undefined && Math.abs(data.average - mean) >= 0.2;
   const update = (next: GoogleReview) => setData((d) => (d ? { ...d, reviews: d.reviews.map((r) => (r.id === next.id ? next : r)) } : d));
 
   if (statusError)
@@ -227,16 +244,17 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
   const summary = (
     <section className="ui-card rvl-summary" aria-label="Samenvatting">
       <div className="rvl-score">
-        <strong>{data?.average !== null && data?.average !== undefined ? data.average.toLocaleString("nl-NL", { minimumFractionDigits: 1 }) : "—"}</strong>
+        <strong>{score !== null ? score.toLocaleString("nl-NL", { minimumFractionDigits: 1 }) : "—"}</strong>
         <div>
-          {data?.average ? <StarRating rating={Math.round(data.average)} /> : null}
-          <span>Gemiddelde op Google</span>
+          {score ? <StarRating rating={Math.round(score)} /> : null}
+          <span>{complete && mean !== null ? `Gemiddelde van al je ${reviews.length} reviews` : "Gemiddelde volgens Google"}</span>
+          {apiDiffers && <small className="rvl-score-note">Google rekent in zijn API met {data!.average!.toLocaleString("nl-NL", { minimumFractionDigits: 1 })}; het getal op Google Maps kan hiervan afwijken.</small>}
         </div>
       </div>
       <dl>
         <div>
           <dt>Reviews op Google</dt>
-          <dd>{data?.total ?? "—"}</dd>
+          <dd>{data?.total ?? reviews.length ?? "—"}</dd>
         </div>
         <div>
           <dt>Onbeantwoord</dt>
@@ -268,7 +286,8 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
       <p className="rvl-scope">
         <BrandIcon brand="google_business" size={13} />
         {status.location?.name}
-        {data ? ` · onbeantwoord, negatief, nieuw en het verloop zijn gebaseerd op de ${stats.loaded} geladen reviews` : ""}
+        {data ? (complete ? ` · alle ${stats.loaded} reviews geladen` : ` · ${stats.loaded} van ${data.total ?? "?"} reviews geladen`) : ""}
+        {loading && data ? " · meer laden…" : ""}
       </p>
     </section>
   );
@@ -331,7 +350,7 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
         )}
         {data?.next && (
           <button type="button" className="button secondary rvl-more" onClick={() => void load(data.next!)} disabled={loading}>
-            {loading ? "Laden…" : "Meer laden"}
+            {loading ? "Laden…" : "Alle overige reviews laden"}
           </button>
         )}
       </section>

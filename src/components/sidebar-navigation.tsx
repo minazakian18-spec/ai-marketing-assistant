@@ -75,15 +75,19 @@ export function SidebarNavigation({ onNavigate }: { onNavigate: () => void }) {
 // link stays hidden until it has confirmed. /beheer and /api/admin/* keep
 // refusing everyone else on their own.
 const ADMIN_ITEM: NavItem = { href: "/beheer", label: "Beheer", icon: ShieldCheck };
+// One request per page load, shared by every sidebar instance (desktop and
+// mobile) and kept across client-side navigation.
+let adminCheck: Promise<boolean> | null = null;
 function usePlatformAdmin() {
   const [admin, setAdmin] = useState(false);
   useEffect(() => {
     if (isBrowserDemo()) return;
     let live = true;
-    fetch("/api/admin/me", { cache: "no-store" })
+    adminCheck ??= fetch("/api/admin/me", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { admin: false }))
-      .then((d) => live && setAdmin(d.admin === true))
-      .catch(() => undefined);
+      .then((d) => d.admin === true)
+      .catch(() => false);
+    void adminCheck.then((a) => live && setAdmin(a));
     return () => {
       live = false;
     };

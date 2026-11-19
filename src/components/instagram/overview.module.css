@@ -412,3 +412,10 @@
     line-height: 1.7;
   }
 }
+
+.missedNote {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--app-muted, #6b7280);
+}

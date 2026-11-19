@@ -2,34 +2,24 @@ import type { ContentProviders, GenerationRequest } from "./contracts";
 import type { Post } from "../types";
 import {
   buildInstagramInstruction,
-  isInstagramGoal,
+  normalizeGoal,
   type InstagramGoal,
 } from "../ai/instagram-instruction.ts";
 
 const goalIntros: Record<InstagramGoal, string[]> = {
-  "product-promotie": [
-    "Ontdek wat dit voor jou kan betekenen. ✨",
-    "Hier is iets moois voor je. 💜",
-  ],
+  product: ["Ontdek wat dit voor jou kan betekenen. ✨", "Hier is iets moois voor je. 💜", "Gloednieuw. ✨"],
   aanbieding: ["Tijdelijk extra voordelig. 🔥", "Mis dit niet. ⏰"],
-  merkbekendheid: [
-    "Dit zijn wij. ✨",
-    "Een kijkje in ons verhaal. 💜",
-    "Tijd voor een nieuw perspectief. ✨",
-  ],
-  informatief: ["Goed om te weten: 📌", "Even dit delen: 💡"],
-  educatief: ["Vandaag leggen we uit: 📚", "Zo werkt het: 💡"],
-  seizoensgebonden: ["Het seizoen is aangebroken. 🍂", "Helemaal klaar voor dit moment. ✨"],
-  evenement: ["Zet het in je agenda. 📅", "We zien je daar graag. ✨"],
-  "nieuw-product": ["Gloednieuw. ✨", "Voor het eerst te zien: 👀"],
-  testimonial: ["In de woorden van een klant: 💬", "Dit raakte ons echt. 💜"],
-  engagement: ["Wij zijn benieuwd: 💬", "Vertel het ons: 👇"],
+  bekendheid: ["Dit zijn wij. ✨", "Een kijkje in ons verhaal. 💜", "Tijd voor een nieuw perspectief. ✨"],
+  tip: ["Goed om te weten: 📌", "Even dit delen: 💡", "Zo werkt het: 💡"],
+  "achter-de-schermen": ["Een kijkje achter de schermen. 👀", "Zo maken wij het. 💜"],
+  evenement: ["Zet het in je agenda. 📅", "We zien je daar graag. ✨", "Het seizoen is aangebroken. 🍂"],
+  review: ["In de woorden van een klant: 💬", "Dit raakte ons echt. 💜"],
 };
 
 export const mockProviders: ContentProviders = {
   text: {
     async generate(r) {
-      const goal = isInstagramGoal(r.goal || "") ? (r.goal as InstagramGoal) : "merkbekendheid";
+      const goal = normalizeGoal(r.goal);
       const instruction = buildInstagramInstruction({
         profile: r.profile,
         prompt: r.prompt,

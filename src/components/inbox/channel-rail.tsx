@@ -15,7 +15,6 @@ export type SortOrder = "newest" | "oldest";
 export { CHANNEL_ORDER };
 export const CHANNEL_NAME: Record<Channel, string> = {
   instagram: "Instagram Direct",
-  whatsapp: "WhatsApp Business",
   gmail: "Gmail",
   messenger: "Facebook Messenger",
 };

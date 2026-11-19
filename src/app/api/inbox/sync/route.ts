@@ -3,7 +3,7 @@ import { workspace, failure, limited, sameOrigin } from "@/lib/server/access";
 import { syncGmail } from "@/lib/server/inbox";
 
 // Gmail polling sync (History API). Throttled per workspace; Instagram,
-// Messenger and WhatsApp arrive through webhooks instead.
+// Instagram and Messenger arrive through webhooks instead.
 export async function POST(request: Request) {
   try {
     sameOrigin(request);

@@ -3,7 +3,7 @@ import type { Channel } from "./shared";
 // The Inbox is channel-first: there is always one channel selected. This
 // decides which one when the Inbox opens.
 
-export const CHANNEL_ORDER: Channel[] = ["instagram", "whatsapp", "gmail", "messenger"];
+export const CHANNEL_ORDER: Channel[] = ["instagram", "gmail", "messenger"];
 export const INBOX_CHANNEL_KEY = "mavix.inbox.channel";
 
 type State = "not_connected" | "connected" | "reconsent" | "reconnect" | "selection" | "error";

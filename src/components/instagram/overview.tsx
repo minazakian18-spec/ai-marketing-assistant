@@ -15,6 +15,8 @@ import {
 import { modeName } from "@/lib/workspace-navigation";
 import type { Post } from "@/lib/types";
 import type { InstagramSettings } from "@/lib/instagram-model";
+import { postTitle, scheduleState } from "@/lib/instagram-publish";
+import { usePublishCapability } from "./publish";
 import styles from "./overview.module.css";
 const href = (post: Post) =>
   "/social?tab=assist&post=" + encodeURIComponent(post.id);
@@ -74,16 +76,23 @@ export function InstagramOverview({
   const drafts = posts
     .filter((p) => p.status === "draft")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // One definition of "ingepland" (src/lib/instagram-publish.ts), the same as Content Studio.
   const upcoming = posts
-    .filter((p) => p.status === "scheduled" && new Date(p.date) > now)
+    .filter((p) => scheduleState(p) === "upcoming")
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 3);
+  const missed = posts.filter((p) => scheduleState(p) === "missed").sort((a, b) => b.date.localeCompare(a.date));
   const weekly = posts.filter(
     (p) =>
-      p.status === "scheduled" &&
+      scheduleState(p) === "upcoming" &&
       new Date(p.date) >= start &&
       new Date(p.date) < end,
   ).length;
+  // Reach and engagement need Meta's insights permission, not just a connection.
+  const cap = usePublishCapability();
+  const linked = !!cap && !["not_connected", "not_configured", "demo", "error"].includes(cap.code);
+  const insightsNote = linked ? "Instagram is gekoppeld. Voor bereik is extra toestemming van Meta nodig (aanvraag loopt)." : "Koppel Instagram om bereik te zien";
+  const engagementNote = linked ? "Instagram is gekoppeld. Voor engagement is extra toestemming van Meta nodig (aanvraag loopt)." : "Koppel Instagram om engagement te zien";
   const active = settings.enabled && settings.mode !== "assist";
   return (
     <div className={styles.overview}>
@@ -113,9 +122,9 @@ export function InstagramOverview({
       <div className={styles.kpis + " motion-kpis"}>
         {[
           ["Wacht op goedkeuring", String(drafts.length), "Klaar voor jouw blik"],
-          ["Gepland deze week", String(weekly), "Uit je planning"],
-          ["Bereik deze maand", "—", "Koppel Instagram om bereik te zien"],
-          ["Engagement", "—", "Koppel Instagram om engagement te zien"],
+          ["Gepland deze week", String(weekly), missed.length ? missed.length + " gemist, zie hieronder" : "Uit je planning"],
+          ["Bereik deze maand", "—", insightsNote],
+          ["Engagement", "—", engagementNote],
         ].map(([label, value, note]) => (
           <section className="panel" key={label}>
             <span>{label}</span>
@@ -126,10 +135,42 @@ export function InstagramOverview({
           </section>
         ))}
       </div>
-      <ConnectInstagram
-        title="Instagram-prestaties"
-        text="Bereik, engagement en je best presterende posts verschijnen hier zodra Instagram gekoppeld is."
-      />
+      {!linked && (
+        <ConnectInstagram
+          title="Instagram-prestaties"
+          text="Bereik, engagement en je best presterende posts verschijnen hier zodra Instagram gekoppeld is."
+        />
+      )}
+      {missed.length > 0 && (
+        <section className={"panel " + styles.upcoming} aria-labelledby="ig-missed">
+          <div className={styles.head}>
+            <h2 id="ig-missed">
+              Gemist <span className={styles.count}>{missed.length}</span>
+            </h2>
+            <CalendarDays size={17} />
+          </div>
+          <p className={styles.missedNote}>Deze posts stonden ingepland, maar zijn niet op Instagram geplaatst. Automatisch publiceren staat uit of de koppeling werkte niet op dat moment.</p>
+          <div>
+            {missed.map((post) => (
+              <div className={styles.row} key={post.id}>
+                <ContentIcon post={post} />
+                <span className={styles.copy}>
+                  <strong>{postTitle(post)}</strong>
+                  <small>
+                    {post.contentType || "Post"} · gepland {timestamp(post.date)}
+                  </small>
+                </span>
+                <Link className="button primary" href={href(post)}>
+                  Nu plaatsen
+                </Link>
+                <Link className="button secondary" href={href(post) + "&view=preview"}>
+                  Opnieuw inplannen
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <section className={"panel " + styles.upcoming}>
         <div className={styles.head}>
           <h2>Komende content</h2>
@@ -141,7 +182,7 @@ export function InstagramOverview({
               <Link className={styles.row} href={href(post)} key={post.id}>
                 <ContentIcon post={post} />
                 <span className={styles.copy}>
-                  <strong>{post.prompt}</strong>
+                  <strong>{postTitle(post)}</strong>
                   <small>
                     {post.contentType || "Post"} · {timestamp(post.date)}
                   </small>
@@ -181,7 +222,7 @@ export function InstagramOverview({
               <ContentIcon post={post} />
               <span className={styles.copy}>
                 <small>Instagram {post.contentType || "Post"}</small>
-                <strong>{post.prompt}</strong>
+                <strong>{postTitle(post)}</strong>
               </span>
               <span className={"badge draft " + styles.reviewBadge}>
                 Wacht op goedkeuring

@@ -78,7 +78,7 @@ export default function PrivacyPage() {
             <h2>
               <Plug size={18} aria-hidden="true" /> Gekoppelde diensten
             </h2>
-            <p>Instagram, Gmail, Google en WhatsApp krijgen alleen de toegang die jij goedkeurt. Je kunt die altijd intrekken.</p>
+            <p>Instagram, Gmail en Google krijgen alleen de toegang die jij goedkeurt. Je kunt die altijd intrekken.</p>
           </div>
         </div>
         <div className="account-panel-body">

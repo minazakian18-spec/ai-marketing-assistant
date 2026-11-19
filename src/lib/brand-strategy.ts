@@ -79,7 +79,7 @@ export const OBJECTIVES: { id: string; label: string; description: string }[] = 
   { id: "lokaal", label: "Lokaal beter gevonden worden", description: "Focus op je locatie, reviews en Google." },
 ];
 export const objectiveLabel = (id: string) => OBJECTIVES.find((o) => o.id === id)?.label || "";
-export const CHANNELS = ["Instagram", "Facebook", "E-mail en nieuwsbrief", "Google Bedrijfsprofiel", "Website en SEO", "WhatsApp"];
+export const CHANNELS = ["Instagram", "Facebook", "E-mail en nieuwsbrief", "Google Bedrijfsprofiel", "Website en SEO"];
 export const CTA_SUGGESTIONS = ["Reserveer nu", "Bestel online", "Bekijk het menu", "Plan een afspraak", "Bel ons", "Meld je aan", "Kom langs"];
 
 export const HEX = /^#[0-9a-f]{6}$/i;

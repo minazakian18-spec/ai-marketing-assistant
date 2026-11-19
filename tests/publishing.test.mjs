@@ -307,7 +307,7 @@ test("automation model: preference vs permission vs running; Amsterdam time; due
   assert.equal(a.workflowStatus(w, { ...base, permitted: true, requirements: [{ label: "Koppeling", met: false }] }).state, "waiting");
   assert.equal(a.workflowStatus(w, { ...base, permitted: true }).operational, true);
   const rr = a.WORKFLOWS.find((x) => x.id === "review_auto_reply");
-  assert.equal(a.workflowStatus(rr, { ...base, permitted: true }).operational, false, "designed, never running");
+  assert.equal(a.workflowStatus(rr, { ...base, permitted: true }).operational, true, "runs once permitted and the Google connection works");
   assert.equal(new Date(a.amsterdamToUtc("2026-07-01T12:00")).toISOString(), "2026-07-01T10:00:00.000Z");
   assert.equal(new Date(a.amsterdamToUtc("2026-12-01T12:00")).toISOString(), "2026-12-01T11:00:00.000Z");
   const now = Date.parse("2026-12-01T11:30:00Z");
@@ -320,13 +320,13 @@ test("automation model: preference vs permission vs running; Amsterdam time; due
   assert.equal(a.replyDecision({ rating: 5, comment: "", hasReply: true }, rules).action, "skip");
 });
 
-test("automation: permission requires a working integration; review auto reply cannot be enabled; scheduler only acts with permission", async (t) => {
+test("automation: permission requires a working integration; review auto reply needs Google; scheduler only acts with permission", async (t) => {
   quiet(t);
   process.env.CRON_SECRET = "cron-fixture-secret";
   const env = setup({ posts: [post({ status: "scheduled", date: new Date(Date.now() + 2 * 3600_000 - 60_000).toLocaleString("sv-SE", { timeZone: "Europe/Amsterdam" }).slice(0, 16).replace(" ", "T") })] });
   const calls = graphMock(t);
   const auto = env.load("src/lib/server/automation.ts");
-  await assert.rejects(auto.setPermission({ workspaceId: "w1", userId: "u1" }, "review_auto_reply", true), /nog niet beschikbaar/);
+  await assert.rejects(auto.setPermission({ workspaceId: "w1", userId: "u1" }, "review_auto_reply", true), /Koppel eerst Google Bedrijfsprofiel/);
   // Not yet due: nothing happens, with or without permission.
   await auto.runScheduled();
   assert.equal(calls.length, 0);

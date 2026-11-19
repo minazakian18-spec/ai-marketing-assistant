@@ -18,10 +18,21 @@ const has = (e: Plan["entitlements"][number]) => field((p) => p.entitlements.inc
 const size = (b: number) => (b >= 1024 ** 3 ? `${b / 1024 ** 3} GB` : `${Math.round(b / 1024 ** 2)} MB`);
 const slides = field((p) => (p.carouselSlides ? `2–${p.carouselSlides}` : false));
 
+/**
+ * What a plan's credits mean in everyday terms: posts with an AI image
+ * (caption + image) and review replies, within the plan's own monthly maxima.
+ */
+export function creditExample(p: Plan) {
+  const posts = Math.min(p.limits.image_generate ?? 0, p.limits.instagram_caption ?? 0);
+  const reviews = p.limits.review_reply ?? 0;
+  return `± ${posts} posts met AI-beeld en ${reviews} reviewantwoorden per maand`;
+}
+const POST_CREDITS = ACTIONS.instagram_caption.credits + ACTIONS.image_generate.credits;
+
 export const INFO = {
-  credits: "Je gedeelde maandtegoed voor AI-acties. Een AI-afbeelding kost 10 credits, een kort reviewantwoord 1. Daarnaast heeft elke functie een maandmaximum.",
+  credits: `Je gedeelde maandtegoed voor AI-acties. Een post met AI-beeld kost ${POST_CREDITS} credits, een reviewantwoord ${ACTIONS.review_reply.credits}. In de praktijk: ${PLAN_IDS.map((id) => PLANS[id].name + " " + creditExample(PLANS[id])).join("; ")}.`,
   instagram: "Laat Mavix Instagram-captions en hashtags schrijven die passen bij jouw bedrijf, doelgroep en merkstem. Je past alles aan voordat je het gebruikt.",
-  images: "Laat AI een nieuwe afbeelding maken op basis van jouw opdracht, vierkant of in Instagram-formaat (4:5). Je hebt geen eigen foto nodig.",
+  images: "Laat AI een nieuw beeld maken van jouw producten en jouw zaak, op basis van een paar eigen foto's in Brand Hub. Zo lijkt elk beeld op wat je klanten echt krijgen.",
   imageEdit: "Kies een eigen foto en laat AI hem aanpassen, bijvoorbeeld de sfeer of de achtergrond. Je origineel blijft bewaard.",
   inspiration: "Upload één of meer voorbeelden van afbeeldingen die je mooi vindt. Mavix gebruikt de stijl en sfeer om een nieuwe AI-afbeelding te maken; de voorbeelden worden niet gekopieerd.",
   carousel: "Maak meerdere samenhangende slides voor één Instagram-post. Mavix bedenkt het verhaal, maakt de beelden in één stijl en schrijft één caption. Elke AI-slide telt mee als AI-afbeelding.",

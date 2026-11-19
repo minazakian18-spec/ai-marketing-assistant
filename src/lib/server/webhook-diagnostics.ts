@@ -9,7 +9,7 @@ import { adminClient } from "./supabase";
 // signatures. A diagnostics problem never affects webhook handling.
 
 export const DIAG_PREFIX = "meta_webhook:";
-const OBJECTS = new Set(["instagram", "page", "whatsapp_business_account"]);
+const OBJECTS = new Set(["instagram", "page"]);
 const PER_MINUTE = 30;
 const KEEP_DAYS = 14;
 

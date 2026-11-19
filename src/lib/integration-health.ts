@@ -2,7 +2,7 @@
 // customer or the Mavix platform owner), the single next step, missing
 // required permissions and optional extras. Pure; the server supplies facts.
 
-export type ProviderId = "gmail" | "google_calendar" | "google_business" | "google_search_console" | "instagram" | "messenger" | "whatsapp" | "email_sending" | "google_ads";
+export type ProviderId = "gmail" | "google_calendar" | "google_business" | "google_search_console" | "instagram" | "messenger" | "email_sending" | "google_ads";
 
 /**
  * One status vocabulary for every integration (Integraties, Dashboard):
@@ -17,9 +17,10 @@ export type ProviderId = "gmail" | "google_calendar" | "google_business" | "goog
  * A connected account is not proof that every API call is allowed: "limited"
  * and the extras say what is missing.
  */
-export type Status = "connected" | "limited" | "action" | "reconnect" | "waiting" | "not_configured" | "coming_soon" | "not_connected";
+export type Status = "connected" | "checking" | "limited" | "action" | "reconnect" | "waiting" | "not_configured" | "coming_soon" | "not_connected";
 export const STATUS_LABEL: Record<Status, string> = {
   connected: "Verbonden",
+  checking: "Controleren…",
   limited: "Beperkt",
   action: "Actie nodig",
   reconnect: "Opnieuw koppelen",
@@ -35,6 +36,8 @@ export type HealthFacts = {
   /** External approval Mavix still waits for (for example Google API access). */
   pendingApproval?: string;
   connection: { status: string; scopes: string[]; lastSyncedAt: string | null; expiresAt: string | null } | null;
+  /** Google: whether a real API call succeeded in the last 24 hours (undefined = not checked by this provider). */
+  verified?: boolean;
 };
 export type Health = {
   provider: ProviderId;
@@ -57,7 +60,6 @@ const LABEL: Record<ProviderId, string> = {
   google_search_console: "Google Search Console",
   instagram: "Instagram",
   messenger: "Facebook Messenger",
-  whatsapp: "WhatsApp Business",
   email_sending: "E-mailcampagnes versturen",
   google_ads: "Google Ads",
 };
@@ -79,7 +81,9 @@ export function healthFor(f: HealthFacts): Health {
   const conn = f.connection?.status || "";
   const status: Status =
     h.state === "ready"
-      ? "connected"
+      ? f.verified === false
+        ? "checking"
+        : "connected"
       : h.state === "pending_approval"
         ? "waiting"
         : h.state === "pending_platform"
@@ -93,7 +97,8 @@ export function healthFor(f: HealthFacts): Health {
               : ["reconnect_required", "permission_missing", "error"].includes(conn)
                 ? "reconnect"
                 : "action";
-  return { ...h, status, statusLabel: STATUS_LABEL[status] };
+  const summary = status === "checking" ? "Verbonden. Mavix controleert of Google de toegang nog accepteert." : h.summary;
+  return { ...h, summary, status, statusLabel: STATUS_LABEL[status] };
 }
 
 function baseHealth(f: HealthFacts): Omit<Health, "status" | "statusLabel"> {
@@ -108,7 +113,7 @@ function baseHealth(f: HealthFacts): Omit<Health, "status" | "statusLabel"> {
       : { provider: f.provider, label, state: "pending_platform", summary: f.pendingApproval || "Versturen staat nog uit. Testmails werken wel.", actor: "mavix", next: null, missing: [], extras: [], lastSyncedAt: null };
   const c = f.connection;
   const scopes = c?.scopes || [];
-  const missing = c && f.provider !== "whatsapp" && scopes.length ? (REQUIRED[f.provider] || []).filter(([names]) => !names.some((n) => scopes.includes(n))).map(([, l]) => l) : [];
+  const missing = c && scopes.length ? (REQUIRED[f.provider] || []).filter(([names]) => !names.some((n) => scopes.includes(n))).map(([, l]) => l) : [];
   const extras =
     f.provider === "instagram"
       ? [

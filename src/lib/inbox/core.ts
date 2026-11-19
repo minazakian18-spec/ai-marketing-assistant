@@ -288,131 +288,6 @@ type WaStatus = {
   errors?: { code?: number; title?: string }[];
 };
 
-// WhatsApp Cloud API: object "whatsapp_business_account", messages and
-// statuses under entry[].changes[].value; metadata.phone_number_id is the
-// connected business number.
-export function parseWhatsApp(payload: unknown) {
-  const messages: NormalizedMessage[] = [];
-  const statuses: StatusUpdate[] = [];
-  const body = payload as {
-    object?: string;
-    entry?: {
-      changes?: { field?: string; value?: Record<string, unknown> }[];
-    }[];
-  };
-  if (
-    body?.object !== "whatsapp_business_account" ||
-    !Array.isArray(body.entry)
-  )
-    return { messages, statuses };
-  for (const entry of body.entry)
-    for (const change of entry?.changes || []) {
-      if (change?.field !== "messages" || !change.value) continue;
-      const value = change.value as {
-        metadata?: { phone_number_id?: string };
-        contacts?: { wa_id?: string; profile?: { name?: string } }[];
-        messages?: WaMessage[];
-        statuses?: WaStatus[];
-      };
-      const accountId = String(value.metadata?.phone_number_id || "");
-      if (!accountId) continue;
-      const names = new Map(
-        (value.contacts || []).map((c) => [
-          String(c.wa_id || ""),
-          cleanText(c.profile?.name, 200),
-        ]),
-      );
-      for (const m of value.messages || []) {
-        const from = String(m.from || "");
-        if (!m.id || !/^\d{6,20}$/.test(from)) continue;
-        const type = m.type || "";
-        const media = (m as Record<string, unknown>)[type] as
-          WaMedia | undefined;
-        const attachments: Attachment[] = [];
-        let text = "";
-        if (type === "text") text = cleanText(m.text?.body);
-        else if (
-          ["image", "video", "audio", "document", "sticker", "voice"].includes(
-            type,
-          ) &&
-          media?.id
-        ) {
-          attachments.push({
-            kind: kindOf(media.mime_type || "", type),
-            name:
-              cleanText(media.filename, 200) ||
-              type +
-                (media.mime_type
-                  ? "." + media.mime_type.split("/")[1]?.split(";")[0]
-                  : ""),
-            mimeType: media.mime_type || "",
-            ref: String(media.id),
-          });
-          text = cleanText(media.caption);
-        } else if (type === "button") text = cleanText(m.button?.text);
-        else if (type === "interactive")
-          text = cleanText(
-            m.interactive?.button_reply?.title ||
-              m.interactive?.list_reply?.title,
-          );
-        else if (type === "location" && m.location)
-          text =
-            "Locatie gedeeld: " +
-            [m.location.name, m.location.address]
-              .filter(Boolean)
-              .map((v) => cleanText(v, 300))
-              .join(", ") +
-            ` (${Number(m.location.latitude)}, ${Number(m.location.longitude)})`;
-        else if (type === "reaction") continue;
-        else text = "[Dit berichttype wordt niet ondersteund]";
-        const name = names.get(from) || undefined;
-        messages.push({
-          channel: "whatsapp",
-          accountId,
-          threadId: from,
-          messageId: m.id,
-          direction: "inbound",
-          customer: { id: from, name, phone: "+" + from },
-          from: { id: from, name, phone: "+" + from },
-          text,
-          attachments,
-          createdAt: isoFromMs(Number(m.timestamp) * 1000),
-        });
-      }
-      for (const s of value.statuses || []) {
-        if (
-          !s.id ||
-          !["sent", "delivered", "read", "failed"].includes(s.status || "")
-        )
-          continue;
-        statuses.push({
-          channel: "whatsapp",
-          accountId,
-          status: s.status as StatusUpdate["status"],
-          at: isoFromMs(Number(s.timestamp) * 1000),
-          messageId: s.id,
-          threadId: s.recipient_id,
-          error:
-            s.status === "failed"
-              ? whatsappErrorText(s.errors?.[0]?.code)
-              : undefined,
-        });
-      }
-    }
-  return { messages, statuses };
-}
-
-function whatsappErrorText(code?: number) {
-  if (code === 131047)
-    return "Het 24-uursvenster is gesloten. Gebruik een goedgekeurde template.";
-  if (code === 131026)
-    return "Het bericht kon niet worden afgeleverd bij dit nummer.";
-  if (code === 131051) return "Dit berichttype wordt niet ondersteund.";
-  if (code === 130472)
-    return "Het nummer neemt deel aan een experiment van WhatsApp; het bericht is niet afgeleverd.";
-  return "WhatsApp kon het bericht niet afleveren.";
-}
-
 // Delivery statuses only move forward; a late "delivered" never overwrites
 // "read", and "failed" only replaces states before delivery.
 const RANK: Record<DeliveryStatus, number> = {
@@ -465,10 +340,7 @@ export function mapMetaError(
   )
     return {
       status: 409,
-      message:
-        channel === "whatsapp"
-          ? "Het 24-uursvenster is gesloten. Gebruik een goedgekeurde template."
-          : "Het 24-uursvenster is gesloten. De klant moet eerst opnieuw een bericht sturen.",
+      message: "Het 24-uursvenster is gesloten. De klant moet eerst opnieuw een bericht sturen.",
       retryable: false,
     };
   if (
@@ -599,19 +471,57 @@ export function parseAddress(value?: string): { name?: string; email: string } {
 }
 
 export function header(part: GmailPart | undefined, name: string) {
-  return (
+  return cleanMailText(
     part?.headers?.find((h) => h.name?.toLowerCase() === name.toLowerCase())
-      ?.value || ""
+      ?.value || "",
   );
 }
 
+const LATIN = ["us-ascii", "ascii", "iso-8859-1", "latin1", "windows-1252", "cp1252"];
 function decodeBody(data: string, charset: string) {
   const bytes = Buffer.from(data, "base64url");
+  // Many mailers label UTF-8 text as us-ascii or latin-1. Bytes that are valid
+  // UTF-8 are read as UTF-8; otherwise the declared charset is used.
+  if (!charset || LATIN.includes(charset)) {
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      /* not UTF-8: fall through to the declared charset */
+    }
+  }
   try {
     return new TextDecoder(charset || "utf-8").decode(bytes);
   } catch {
     return bytes.toString("utf8");
   }
+}
+
+/** RFC 2047 encoded words ("=?UTF-8?B?...?=" / "=?ISO-8859-1?Q?...?=") left in a header value. */
+export function decodeMimeWords(value: string): string {
+  return (value || "")
+    .replace(/\?=\s+=\?/g, "?==?")
+    .replace(/=\?([\w-]+)(?:\*[\w-]+)?\?([bq])\?([^?]*)\?=/gi, (all, charset: string, enc: string, text: string) => {
+      try {
+        const bytes = enc.toLowerCase() === "b" ? Buffer.from(text, "base64") : Buffer.from(text.replace(/_/g, " ").replace(/=([0-9a-f]{2})/gi, (_m, h: string) => String.fromCharCode(parseInt(h, 16))), "latin1");
+        return new TextDecoder(charset.toLowerCase()).decode(bytes);
+      } catch {
+        return all;
+      }
+    });
+}
+
+/**
+ * Repairs the classic double-encoding "GabriÃ«lle" (UTF-8 read as latin-1)
+ * and removes invisible filler characters newsletters put in previews
+ * (U+034F, U+200B-D, U+2060, U+00AD, U+FEFF).
+ */
+export function cleanMailText(value: string): string {
+  let v = decodeMimeWords(value || "");
+  if (/[ÃÂ][\u0080-\u00bf]/.test(v)) {
+    const fixed = Buffer.from(v, "latin1").toString("utf8");
+    if (!fixed.includes("\ufffd") && fixed.length < v.length) v = fixed;
+  }
+  return v.replace(/[\u034f\u200b-\u200d\u2060\u00ad\ufeff]/g, "").replace(/[ \t]{2,}/g, " ");
 }
 
 const ENTITIES: Record<string, string> = {
@@ -732,7 +642,7 @@ export function parseGmailMessage(
     else if (mime === "text/html" && !html)
       html = decodeBody(part.body.data, charset);
   });
-  const content = plain || htmlToText(html) || msg.snippet || "";
+  const content = cleanMailText(plain || htmlToText(html) || msg.snippet || "");
   const text = cleanText(
     fullBody ? content : stripQuoted(content),
     fullBody ? 200000 : MAX_TEXT,
@@ -827,13 +737,34 @@ export function normalizeGmailThread(
 
 // Customer conversations only: inbox mail outside the promotions/social
 // tabs. Sent mail is only imported into threads Mavix already shows.
+/**
+ * Newsletters and other bulk mail (List-Unsubscribe, Precedence: bulk/list,
+ * auto-generated): not a customer conversation, unless the thread is
+ * already in the Inbox.
+ */
+export function isBulkMail(payload: GmailPart | undefined) {
+  return !!header(payload, "List-Unsubscribe") || /^(bulk|list|junk)$/i.test(header(payload, "Precedence")) || /^auto-generated/i.test(header(payload, "Auto-Submitted"));
+}
+
+/**
+ * Optional per-mailbox import filter (integration_connections.metadata.importFilter):
+ * only mail sent to one of the given addresses (To, Cc or Delivered-To), for
+ * example reserveringen@ or info@. Without a filter every primary mail counts.
+ */
+export function matchesImportFilter(msg: { payload?: GmailPart }, metadata: unknown) {
+  const to = ((metadata as { importFilter?: { to?: string[] } } | null)?.importFilter?.to || []).map((a) => a.toLowerCase().trim()).filter(Boolean);
+  if (!to.length) return true;
+  const got = [header(msg.payload, "To"), header(msg.payload, "Cc"), header(msg.payload, "Delivered-To")].join(",").toLowerCase();
+  return to.some((a) => got.includes(a));
+}
+
 export function shouldImportGmail(labels: string[] = [], threadKnown: boolean) {
   if (labels.some((l) => ["SPAM", "TRASH", "DRAFT", "CHAT"].includes(l)))
     return false;
   if (labels.includes("SENT") && !labels.includes("INBOX")) return threadKnown;
   if (!labels.includes("INBOX")) return threadKnown;
   return !labels.some((l) =>
-    ["CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL", "CATEGORY_FORUMS"].includes(l),
+    ["CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL", "CATEGORY_FORUMS", "CATEGORY_UPDATES"].includes(l),
   );
 }
 

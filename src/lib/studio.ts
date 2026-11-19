@@ -1,6 +1,7 @@
 import type { Post, Workspace } from "./types";
 import type { EmailCampaign } from "./email-model";
 import type { ContentVersion } from "./campaigns";
+import { postTitle, scheduleState } from "./instagram-publish.ts";
 
 // Content Studio: one overview over the content records the rest of Mavix
 // already uses. Instagram posts (workspace.posts) and e-mail campaigns
@@ -81,11 +82,12 @@ const clip = (s: string, n = 140) =>
 
 export function studioItems(data: Pick<Workspace, "posts" | "email"> & { copies?: MarketingCopy[] }): StudioItem[] {
   const posts: StudioItem[] = (data.posts || []).map((p) => {
-    const [status, statusLabel] = POST_STATUS[p.status] || ["other", p.status];
+    const missed = scheduleState(p) === "missed";
+    const [status, statusLabel] = missed ? (["failed", "Gemist"] as [StudioStatus, string]) : POST_STATUS[p.status] || ["other", p.status];
     return {
       id: p.id,
       channel: "instagram",
-      title: clip(p.prompt || p.caption, 80) || "Instagram-post",
+      title: postTitle(p),
       preview: clip(p.caption),
       status,
       statusLabel,

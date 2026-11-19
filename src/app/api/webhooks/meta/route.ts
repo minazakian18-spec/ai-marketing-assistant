@@ -4,7 +4,7 @@ import { webhookSecrets } from "@/lib/server/meta";
 import { processMetaWebhook } from "@/lib/server/inbox";
 import { recordWebhookDiagnostic } from "@/lib/server/webhook-diagnostics";
 
-// One public webhook for Instagram, Messenger and WhatsApp (Meta).
+// One public webhook for Instagram and Messenger (Meta).
 // GET: subscription handshake with META_WEBHOOK_VERIFY_TOKEN.
 // POST: X-Hub-Signature-256 checked against the raw body before anything is
 // parsed; answered with 200 right away and processed after the response.

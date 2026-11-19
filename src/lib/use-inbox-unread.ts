@@ -4,6 +4,19 @@ import { isBrowserDemo } from "@/lib/demo";
 
 export const INBOX_UNREAD_EVENT = "mavix:inbox-unread";
 
+// Every component that shows the badge (desktop and mobile sidebar) shares
+// one request: a count younger than 20 seconds, or one still loading, is reused.
+let shared: { at: number; value: Promise<number | null> } | null = null;
+function unreadCount(): Promise<number | null> {
+  if (shared && Date.now() - shared.at < 20_000) return shared.value;
+  const value = fetch("/api/inbox/unread")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => (d && typeof d.unread === "number" ? (d.unread as number) : null))
+    .catch(() => null);
+  shared = { at: Date.now(), value };
+  return value;
+}
+
 // Number of conversations with unread messages for the sidebar badge.
 // Polls once a minute while the tab is visible; the Inbox page pushes fresh
 // counts through a window event. Not shown in demo mode.
@@ -14,12 +27,9 @@ export function useInboxUnread() {
     let cancelled = false;
     const load = () => {
       if (document.visibilityState !== "visible") return;
-      fetch("/api/inbox/unread")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => {
-          if (!cancelled && d && typeof d.unread === "number") setCount(d.unread);
-        })
-        .catch(() => {});
+      void unreadCount().then((n) => {
+        if (!cancelled && n !== null) setCount(n);
+      });
     };
     const pushed = (e: Event) => {
       const n = (e as CustomEvent<number>).detail;

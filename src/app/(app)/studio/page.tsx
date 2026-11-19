@@ -4,6 +4,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowRight, CheckCircle2, FileText, Film, Instagram, Mail, Megaphone, Plus, Sparkles, X } from "lucide-react";
 import { campaignSummary } from "@/lib/campaigns";
 import { useWorkspace } from "@/components/workspace-provider";
+import { ConfirmDialog } from "@/components/account/confirm-dialog";
 import { Mavi } from "@/components/mavi";
 import { brandGaps, CHANNELS, studioCounts, studioItems, type StudioChannel, type StudioStatus } from "@/lib/studio";
 import "../../studio.css";
@@ -56,7 +57,9 @@ function when(iso: string) {
 }
 
 export default function StudioPage() {
-  const { data, ready } = useWorkspace();
+  const { data, ready, save } = useWorkspace();
+  // An empty Instagram concept (no caption): delete it, or open it to generate again.
+  const [remove, setRemove] = useState<{ id: string; title: string } | null>(null);
   const [filter, setFilter] = useState<"all" | StudioStatus>("all");
   const intro = !useSyncExternalStore(
     (l) => (introListeners.add(l), () => introListeners.delete(l)),
@@ -224,6 +227,44 @@ export default function StudioPage() {
                       <span className="st2-item-main">
                         <strong>{i.title}</strong>
                         <span>{i.preview || "Nog geen tekst"}</span>
+                        {!i.preview && i.channel === "instagram" && (
+                          <span className="st2-empty-actions">
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="st2-link"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                window.location.href = i.href;
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  window.location.href = i.href;
+                                }
+                              }}
+                            >
+                              Opnieuw genereren
+                            </span>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="st2-link is-danger"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setRemove({ id: i.id, title: i.title });
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setRemove({ id: i.id, title: i.title });
+                                }
+                              }}
+                            >
+                              Verwijderen
+                            </span>
+                          </span>
+                        )}
                       </span>
                       <span className="st2-item-meta">
                         <span className={"st2-status is-" + i.status}>{i.statusLabel}</span>
@@ -237,6 +278,19 @@ export default function StudioPage() {
               })}
             </ul>
           )}
+          <ConfirmDialog
+            open={!!remove}
+            onClose={() => setRemove(null)}
+            title="Leeg concept verwijderen?"
+            confirmLabel="Verwijderen"
+            onConfirm={() => {
+              if (!remove) return;
+              void save({ ...data, posts: data.posts.filter((p) => p.id !== remove.id) }, "Concept verwijderd.");
+              setRemove(null);
+            }}
+          >
+            {`"${remove?.title || "Instagram-post"}" heeft nog geen tekst. Het concept wordt uit Mavix verwijderd; op Instagram verandert niets.`}
+          </ConfirmDialog>
           {items.length > 0 && (
             <p className="st2-foot">
               Ingeplande content zie je ook in de <Link href="/calendar">kalender</Link>. Instagram- en e-mailconcepten vind je ook terug bij <Link href="/social?tab=assist">Social</Link> en{" "}

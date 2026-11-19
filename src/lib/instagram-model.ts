@@ -20,6 +20,8 @@ export type InstagramSettings = {
   times: Record<string, string>;
   bestTimes: boolean;
   mix: Record<string, number>;
+  /** Weekly goal plan: weekday ("0" = Sunday) → goal id (src/lib/ai/instagram-instruction.ts). */
+  goalPlan?: Record<string, string>;
   allowed: Record<string, boolean>;
   forbidden: Record<string, boolean>;
   uncertain: "review" | "skip";
@@ -164,6 +166,15 @@ export function settingsError(s: InstagramSettings): string {
     return "Onbekende feiten mogen nooit worden gepubliceerd.";
   if (!["review", "skip"].includes(s.uncertain))
     return "Kies wat Mavix bij twijfel moet doen.";
+  if (
+    s.goalPlan !== undefined &&
+    (typeof s.goalPlan !== "object" ||
+      s.goalPlan === null ||
+      Object.entries(s.goalPlan).some(
+        ([d, g]) => !/^[0-6]$/.test(d) || typeof g !== "string" || g.length > 40,
+      ))
+  )
+    return "Ongeldig weekplan.";
   const v = s.vacation;
   if (
     !v ||

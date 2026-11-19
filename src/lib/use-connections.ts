@@ -6,6 +6,16 @@ export type Connection = { provider: string; status: string; display_name?: stri
 
 // Real integration status from the server. In demo mode (or on any error) the
 // API refuses the request and everything is treated as not connected.
+// One request at a time is shared; a list younger than 30 seconds is reused.
+let shared: { at: number; value: Promise<Connection[]> } | null = null;
+function loadConnections(): Promise<Connection[]> {
+  if (shared && Date.now() - shared.at < 30_000) return shared.value;
+  const value = fetch("/api/integrations")
+    .then(async (r) => (r.ok ? (await r.json()).connections || [] : []))
+    .catch(() => []);
+  shared = { at: Date.now(), value };
+  return value;
+}
 export function useConnections() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -15,10 +25,7 @@ export function useConnections() {
       setLoaded(true);
       return;
     }
-    fetch("/api/integrations")
-      .then(async (r) => (r.ok ? (await r.json()).connections || [] : []))
-      .catch(() => [])
-      .then((list: Connection[]) => {
+    void loadConnections().then((list: Connection[]) => {
         if (cancelled) return;
         setConnections(list);
         setLoaded(true);

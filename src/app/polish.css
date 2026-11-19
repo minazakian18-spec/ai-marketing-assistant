@@ -139,11 +139,15 @@
 }
 
 /* ---------- Cards & panels ---------- */
+/* Softer, more modern surfaces: a faint edge, larger radius and a low, wide
+   shadow instead of hard boxes. */
 .ui-card,
 .main-shell .panel {
-  border-color: var(--app-border);
-  border-radius: 12px;
-  box-shadow: var(--app-shadow-xs);
+  border-color: rgba(23, 17, 42, 0.06);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(23, 17, 42, 0.03),
+    0 10px 28px -16px rgba(30, 20, 60, 0.14);
 }
 .main-shell .panel:focus-within {
   box-shadow: var(--app-shadow-sm);
@@ -1519,3 +1523,38 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Reviews: automatic replies (components/review/auto-reply-live.tsx) ---------- */
+.rvl-auto { display: grid; gap: 14px; }
+.rvl-auto-card { display: grid; gap: 16px; padding: 20px 22px; border: 1px solid rgba(23, 17, 42, 0.06); box-shadow: var(--shadow-sm); }
+.rvl-auto-head { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 14px; }
+.rvl-auto-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; background: var(--gradient-soft); color: var(--color-primary); }
+.main-shell .rvl-auto-head h2 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+.rvl-auto-head p { margin: 4px 0 0; max-width: 56ch; font-size: 13.5px; line-height: 1.55; color: var(--app-text-2); }
+.rvl-auto-state { padding: 4px 10px; border-radius: 999px; background: #f1f0f5; font-size: 12px; font-weight: 600; color: var(--app-muted); white-space: nowrap; }
+.rvl-auto-state.is-on { background: #e7f7ec; color: #14683a; }
+.rvl-auto-state.is-waiting { background: #fff4dc; color: #7a5200; }
+.rvl-auto-rules { display: grid; gap: 14px; padding: 14px 16px; border-radius: 14px; background: #faf9fd; }
+.rvl-auto-rules fieldset { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.rvl-auto-rules legend { padding: 0; font-size: 13px; font-weight: 600; color: var(--app-text); }
+.rvl-auto-stars { display: flex; flex-wrap: wrap; gap: 8px; }
+.rvl-auto-stars button {
+  height: 34px; padding: 0 14px; border: 1px solid rgba(23, 17, 42, 0.1); border-radius: 999px; background: #fff;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--app-text-2); cursor: pointer;
+}
+.rvl-auto-stars button[aria-checked="true"] { border-color: var(--color-primary); background: var(--color-bg-soft-purple); color: var(--color-primary-dark); }
+.rvl-auto-rules small[role="status"] { font-size: 12px; color: var(--app-muted); }
+.rvl-auto-guard { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--app-text-2); }
+.rvl-auto-guard li { display: flex; align-items: flex-start; gap: 8px; }
+.rvl-auto-guard svg { flex: none; margin-top: 3px; color: #14683a; }
+.rvl-auto-tone { margin: 0; font-size: 12.5px; color: var(--app-muted); }
+.rvl-auto-tone a { color: var(--color-primary); font-weight: 600; }
+.rvl-auto-reqs { margin: 0; }
+.rvl-auto-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.rvl-auto-bar small { font-size: 12.5px; color: var(--app-muted); }
+@media (max-width: 640px) {
+  .rvl-auto-head { grid-template-columns: auto 1fr; }
+  .rvl-auto-state { grid-column: 1 / -1; justify-self: start; }
+}
+
+.rvl-score-note { display: block; margin-top: 4px; font-size: 11.5px; line-height: 1.4; color: var(--app-muted); max-width: 32ch; }

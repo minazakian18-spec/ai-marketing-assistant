@@ -1,12 +1,12 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, Plug } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Plug , Loader2 } from "lucide-react";
 import { isBrowserDemo } from "@/lib/demo";
 import type { Health } from "@/lib/integration-health";
 
 // One line per provider: the real state, who has to act, and one next step.
-const ICON: Record<Health["status"], typeof Clock> = { connected: CheckCircle2, limited: AlertTriangle, action: AlertTriangle, reconnect: AlertTriangle, waiting: Clock, not_configured: Clock, coming_soon: Clock, not_connected: Plug };
+const ICON: Record<Health["status"], typeof Clock> = { connected: CheckCircle2, checking: Loader2, limited: AlertTriangle, action: AlertTriangle, reconnect: AlertTriangle, waiting: Clock, not_configured: Clock, coming_soon: Clock, not_connected: Plug };
 const ATTENTION: Health["status"][] = ["limited", "action", "reconnect"];
 
 export function IntegrationHealth() {

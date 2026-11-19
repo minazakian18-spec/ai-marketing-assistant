@@ -28,6 +28,8 @@ const input = z.object({
   photo: z.string().max(12_000_000).optional(),
   references: z.array(z.string().max(12_000_000)).max(5).default([]),
   useBrand: z.boolean().default(true),
+  /** "brand": the references are the business's own photos (products and place must match). */
+  referenceKind: z.enum(["brand", "inspiration"]).default("inspiration"),
   slide: z
     .object({
       visualStyle: z.string().trim().max(600),
@@ -84,6 +86,7 @@ export async function POST(request: Request) {
       format: body.format,
       brand: brandStyleOf(profile as Parameters<typeof brandStyleOf>[0]),
       references: body.references.length,
+      referenceKind: body.referenceKind,
       slide: body.slide ? { visualStyle: body.slide.visualStyle, slideBrief: body.slide.slideBrief, index: body.slide.index, total: body.slide.total, styleReference: !!body.slide.styleReference } : undefined,
     });
     const plan = imagePlan(body.format);

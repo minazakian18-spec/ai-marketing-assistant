@@ -94,7 +94,7 @@ andere Mavix-werkruimte. Ontkoppel het daar eerst."
 | `META_CLIENT_ID` | Meta App ID |
 | `META_CLIENT_SECRET` | App Secret of that app |
 | `META_INSTAGRAM_CONFIG_ID` | Configuration id (User access token type) |
-| `META_WEBHOOK_VERIFY_TOKEN` | As for WhatsApp |
+| `META_WEBHOOK_VERIFY_TOKEN` | Verify token for the Meta webhook (Instagram and Messenger) |
 | `OAUTH_ENCRYPTION_KEY` | Already set |
 
 `INSTAGRAM_APP_ID`/`INSTAGRAM_APP_SECRET` are not needed. If

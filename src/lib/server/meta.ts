@@ -12,11 +12,9 @@ import {mapMetaError,type Channel} from '../inbox/core';
 //   "Business Login for Instagram" (graph.instagram.com, INSTAGRAM_APP_ID)
 //   keep working; that flow is only offered when no configuration id is set.
 // - Messenger via Facebook Login + a Facebook Page access token.
-// - WhatsApp via the Cloud API with a system-user token the workspace owner
-//   enters in Mavix (stored encrypted; Embedded Signup is the production path).
 // Tokens never leave the server.
 
-export type MetaProvider='instagram'|'messenger'|'whatsapp';
+export type MetaProvider='instagram'|'messenger';
 export const metaScopes={
  instagram:['instagram_business_basic','instagram_business_manage_messages'],
  messenger:['pages_show_list','pages_manage_metadata','pages_messaging'],
@@ -55,7 +53,7 @@ export function missingMetaConfig(provider:MetaProvider){
  return need.filter(n=>!process.env[n]);
 }
 export const metaConfigured=(provider:MetaProvider)=>missingMetaConfig(provider).length===0;
-// Webhook signatures: Page, WhatsApp and Instagram-with-Facebook-Login events
+// Webhook signatures: Page and Instagram-with-Facebook-Login events
 // are signed with the Meta app secret; Instagram events of the older Business
 // Login for Instagram with the Instagram app secret. "instagram" events are
 // accepted with either, so both kinds of connection keep working.
@@ -250,30 +248,6 @@ export async function selectPage(workspaceId:string,pageId:string){
  return page.name;
 }
 
-// WhatsApp: the number must be one of the phone numbers Meta lists for the
-// given WhatsApp Business Account (read with the supplied token). Nothing is
-// subscribed or stored before this check passes.
-type WaInput={phoneNumberId:string;wabaId:string;token:string};
-const invalidInput=(e:unknown)=>e instanceof HttpError&&e.status!==429&&!(e as {provider?:{retryable?:boolean}}).provider?.retryable;
-export async function verifyWhatsAppNumber(input:WaInput){
- const auth={headers:{Authorization:'Bearer '+input.token}};
- // Temporary Meta problems (rate limits, 5xx) keep their own message; anything
- // else means the IDs or the token's access are wrong.
- const rethrow=(message:string)=>(e:unknown)=>{throw invalidInput(e)?new HttpError(400,message):e;};
- let url:string|undefined=graph('/'+input.wabaId+'/phone_numbers?fields=id,display_phone_number,verified_name&limit=100');
- for(let i=0;url&&i<5;i++){
-  const d:{data?:{id?:string;display_phone_number?:string;verified_name?:string}[];paging?:{next?:string}}=await metaJson(url,auth,'whatsapp').catch(rethrow('Mavix kon dit WhatsApp Business-account niet controleren. Controleer de WABA ID en of het token toegang heeft (whatsapp_business_management).'));
-  const number=(d.data||[]).find(n=>String(n.id)===input.phoneNumberId);
-  if(number)return {display:String(number.verified_name||number.display_phone_number||'WhatsApp'),phone:String(number.display_phone_number||'')};
-  url=d.paging?.next&&d.paging.next.startsWith('https://graph.facebook.com/')?d.paging.next:undefined;
- }
- throw new HttpError(400,'Deze Phone Number ID hoort niet bij het opgegeven WhatsApp Business-account. Controleer beide ID\'s in WhatsApp Manager.');
-}
-// Subscribe the Meta app to the WhatsApp Business Account's webhooks.
-export async function subscribeWhatsApp(input:WaInput){
- await metaJson(graph('/'+input.wabaId+'/subscribed_apps'),{method:'POST',headers:{Authorization:'Bearer '+input.token}},'whatsapp').catch(e=>{throw invalidInput(e)?new HttpError(400,'Mavix kon zich niet abonneren op dit WhatsApp Business-account. Controleer de rechten van het token.'):e;});
-}
-
 // Decrypted credentials for a Meta connection. Instagram long-lived tokens
 // are refreshed when they are older than a day and expire within 10 days.
 export async function metaConnection(workspaceId:string,provider:MetaProvider,{messaging=false}:{messaging?:boolean}={}){
@@ -312,38 +286,10 @@ export async function sendMetaText(workspaceId:string,provider:MetaProvider,reci
   if(provider==='instagram'&&viaFacebook(c)){const pageId=String((c.metadata as {pageId?:string}).pageId||creds.page_id||'');if(!/^\d{1,30}$/.test(pageId))throw new HttpError(409,'Verbind Instagram opnieuw.');const d=await metaJson(graph('/'+pageId+'/messages'),{method:'POST',headers,body:JSON.stringify({recipient:{id:recipient},messaging_type:'RESPONSE',message:{text}})},'instagram');return String(d.message_id);}
   if(provider==='instagram'){const d=await metaJson(igGraph('/me/messages'),{method:'POST',headers,body:JSON.stringify({recipient:{id:recipient},message:{text}})},'instagram');return String(d.message_id);}
   if(provider==='messenger'){const d=await metaJson(graph('/'+c.provider_account_id+'/messages'),{method:'POST',headers,body:JSON.stringify({recipient:{id:recipient},messaging_type:'RESPONSE',message:{text}})},'messenger');return String(d.message_id);}
-  const d=await metaJson(graph('/'+c.provider_account_id+'/messages'),{method:'POST',headers,body:JSON.stringify({messaging_product:'whatsapp',recipient_type:'individual',to:recipient,type:'text',text:{body:text,preview_url:false}})},'whatsapp');
-  return String(d.messages?.[0]?.id);
+  throw new HttpError(400,'Dit kanaal wordt niet ondersteund.');
  }catch(e){await flag(c.id,e);throw e;}
 }
 
-export type Template={name:string;language:string;body:string;variables:number};
-export async function whatsappTemplates(workspaceId:string):Promise<Template[]>{
- const {creds,c}=await metaConnection(workspaceId,'whatsapp');
- const waba=(c.metadata as {wabaId?:string})?.wabaId;if(!waba)return [];
- const d=await metaJson(graph('/'+waba+'/message_templates?fields=name,language,status,components&limit=100'),{headers:{Authorization:'Bearer '+creds.access_token}},'whatsapp');
- return (d.data||[]).filter((t:{status?:string})=>t.status==='APPROVED').map((t:{name:string;language:string;components?:{type?:string;text?:string;format?:string}[]})=>{const body=t.components?.find(x=>x.type==='BODY')?.text||'';const header=t.components?.find(x=>x.type==='HEADER');return header&&header.format&&header.format!=='TEXT'?null:{name:t.name,language:t.language,body,variables:(body.match(/\{\{\d+\}\}/g)||[]).length};}).filter(Boolean);
-}
-export async function sendWhatsAppTemplate(workspaceId:string,to:string,template:{name:string;language:string;variables:string[]}):Promise<string>{
- const {creds,c}=await metaConnection(workspaceId,'whatsapp');
- const components=template.variables.length?[{type:'body',parameters:template.variables.map(text=>({type:'text',text}))}]:undefined;
- try{const d=await metaJson(graph('/'+c.provider_account_id+'/messages'),{method:'POST',headers:{Authorization:'Bearer '+creds.access_token,'Content-Type':'application/json'},body:JSON.stringify({messaging_product:'whatsapp',recipient_type:'individual',to,type:'template',template:{name:template.name,language:{code:template.language},...(components?{components}:{})}})},'whatsapp');return String(d.messages?.[0]?.id);}
- catch(e){await flag(c.id,e);throw e;}
-}
-
-// WhatsApp media: resolve the media id to a short-lived URL, then download it
-// with the token. Only for the authenticated attachment proxy.
-export async function whatsappMedia(workspaceId:string,mediaId:string){
- if(!/^\d{1,40}$/.test(mediaId))throw new HttpError(400,'Ongeldige bijlage.');
- const {creds}=await metaConnection(workspaceId,'whatsapp');
- const meta=await metaJson(graph('/'+mediaId),{headers:{Authorization:'Bearer '+creds.access_token}},'whatsapp');
- if(Number(meta.file_size)>25*1024*1024)throw new HttpError(413,'Deze bijlage is te groot om te tonen.');
- const url=new URL(String(meta.url));
- if(url.protocol!=='https:'||!/(^|\.)(fbcdn\.net|whatsapp\.net|facebook\.com|fbsbx\.com)$/.test(url.hostname))throw new HttpError(502,'Onverwachte bijlagelocatie.');
- const r=await fetch(url,{headers:{Authorization:'Bearer '+creds.access_token},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(20000)});
- if(!r.ok)throw new HttpError(502,'De bijlage kon niet worden opgehaald.');
- return {data:Buffer.from(await r.arrayBuffer()),mimeType:String(meta.mime_type||'application/octet-stream')};
-}
 
 // Best-effort customer profile for a new conversation (name/username).
 export async function metaProfile(workspaceId:string,provider:'instagram'|'messenger',id:string){

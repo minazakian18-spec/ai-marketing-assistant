@@ -1,5 +1,6 @@
 import type { Post } from "./types";
 import { isMediaRef } from "./media-ref.ts";
+import { amsterdamToUtc } from "./automation.ts";
 
 // Rules of Instagram's Content Publishing API that Mavix checks before a post
 // can be scheduled or published (browser and server use the same checks).
@@ -70,4 +71,37 @@ export function publishStatusText(cap: PublishCapabilityView | null) {
   if (cap.code === "permission_missing") return "Instagram gekoppeld, publiceren wacht op toestemming van Meta";
   if (cap.code === "reconnect") return "Koppel Instagram opnieuw";
   return cap.message;
+}
+
+/** A scheduled post counts as missed this long after its moment (the planner runs every 5 minutes). */
+export const MISSED_AFTER_MS = 15 * 60_000;
+/**
+ * One definition of "ingepland" for Social, Content Studio and the calendar:
+ * upcoming = scheduled, moment still ahead (or just now); missed = scheduled,
+ * but the moment passed without a publication. Dates are Amsterdam local time.
+ */
+export function scheduleState(p: Pick<Post, "status" | "date">, now = Date.now()): "upcoming" | "missed" | null {
+  if (p.status !== "scheduled" || !p.date) return null;
+  const t = amsterdamToUtc(p.date);
+  if (!Number.isFinite(t)) return null;
+  return t + MISSED_AFTER_MS < now ? "missed" : "upcoming";
+}
+
+/**
+ * A short, readable title for a post: the saved title, otherwise the first
+ * sentence of the prompt or caption without markdown, at most 60 characters.
+ */
+export function postTitle(p: Pick<Post, "prompt" | "caption"> & { title?: string }) {
+  const clean = (v: string) =>
+    (v || "")
+      .replace(/^\s*(#{1,6}|[-*•>]|\d+[.)])\s+/gm, "")
+      .replace(/[*_`~]/g, "")
+      .replace(/\[(.*?)\]\([^)]*\)/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim();
+  const src = clean(p.title || "") || clean(p.prompt || "") || clean(p.caption || "");
+  if (!src) return "Instagram-post";
+  const first = src.split(/(?<=[.!?])\s/)[0];
+  const t = first.length <= 60 ? first : first.slice(0, 60).replace(/\s+\S*$/, "") + "…";
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }

@@ -20,7 +20,7 @@ https://mavix.webbo-solutions.nl/api/integrations/google_calendar/callback
    the new backend. It adds `account_email`, a connection generation UUID, and
    the matching generation on OAuth state records. RLS and revoked browser
    grants protect both tables. Existing provider support is preserved (Gmail,
-   Business Profile, Instagram, Messenger and WhatsApp).
+   Business Profile, Instagram and Messenger).
 2. Configure the server environment on Hostinger:
    - `APP_URL=https://mavix.webbo-solutions.nl`
    - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for the integration OAuth client

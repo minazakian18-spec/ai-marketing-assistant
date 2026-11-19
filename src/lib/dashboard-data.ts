@@ -1,3 +1,4 @@
+import { postTitle } from "./instagram-publish.ts";
 import { publishedLabel, sentLabel } from "./status-labels.ts";
 import type { EmailCampaign } from "./email-model";
 import type { Post } from "./types";
@@ -142,7 +143,7 @@ export function localDashboardItems(posts: Post[]): DashboardItem[] {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((p) => ({
       id: p.id,
-      title: p.prompt,
+      title: postTitle(p),
       channel: "Instagram",
       kind: "Instagram " + (p.contentType || "Post"),
       status: p.status === "draft" ? "review" : p.status,
@@ -248,7 +249,7 @@ export function recentActivity(
       const label = p.status === "published" ? publishedLabel(!!p.instagram) : base;
       return {
         id: "post-" + p.id,
-        title: p.prompt || p.caption.slice(0, 80) || "Instagram-post",
+        title: postTitle(p),
         channel: "Instagram" as const,
         label: p.status === "scheduled" && p.date ? label + " voor " + shortDate(p.date) : label,
         at: when(p.status, p.date, p.createdAt),

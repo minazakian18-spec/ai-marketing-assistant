@@ -16,8 +16,10 @@
    Component: components/glow-border.tsx (SVG on the border's centre line;
    the light is a set of centred dashes moved by stroke-dashoffset, so it
    follows the real perimeter at a constant speed and adapts on resize). */
-.composer {
+.composer,
+.glow-host {
   isolation: isolate;
+  position: relative;
   --gb-share: 0.1; /* length of the light, as a share of the perimeter */
   --gb-width: 2px; /* thickness of the line */
   --gb-speed: 5.2s; /* one full lap (typing and thinking alike: no jump when switching) */
@@ -28,7 +30,8 @@
   --gb-edge: rgba(24, 18, 43, 0.07);
   border-color: var(--gb-edge);
 }
-.composer:focus-within {
+.composer:focus-within,
+.glow-host:focus-within {
   /* Focus is shown by the whole input (edge + stronger glow), so the global
      textarea ring would only draw a second box inside it. */
   --gb-edge: rgba(109, 40, 217, 0.26);
@@ -41,7 +44,8 @@
 .app-shell .composer textarea:focus-visible {
   box-shadow: none !important;
 }
-.composer > * {
+.composer > *,
+.glow-host > * {
   position: relative;
   z-index: 2;
 }
@@ -49,7 +53,8 @@
   position: absolute;
   z-index: 3;
 }
-.composer > .glow-border {
+.composer > .glow-border,
+.glow-host > .glow-border {
   position: absolute;
   z-index: 1;
   top: -1px;
@@ -65,7 +70,11 @@
    (data-glow, set by AgentComposer). When it stops, the animation is paused,
    not removed: it resumes from the same spot, so switching between typing
    and thinking never restarts or jumps. */
-.composer[data-glow] > .glow-border[data-ready] {
+/* ... and whenever the input has focus: clicking into the chat starts the
+   light, a slow, smooth lap in the brand colour. */
+.composer[data-glow] > .glow-border[data-ready],
+.composer:focus-within > .glow-border[data-ready],
+.glow-host:focus-within > .glow-border[data-ready] {
   opacity: 1;
 }
 /* Each dash is --gb-part of the full length and centred on the same point;
@@ -81,8 +90,30 @@
   animation: gb-glide var(--gb-speed) linear infinite;
   animation-play-state: paused;
 }
-.composer[data-glow]:not([data-paused]) .glow-border rect {
+.composer[data-glow]:not([data-paused]) .glow-border rect,
+.composer:focus-within .glow-border rect,
+.glow-host:focus-within .glow-border rect {
   animation-play-state: running;
+}
+/* Focus: a clearly visible, smooth lap of brand-purple light; still soft. */
+.composer:focus-within,
+.glow-host:focus-within {
+  --gb-glow-strength: 0.3;
+  --gb-share: 0.16;
+}
+.composer:focus-within .gb-line rect,
+.glow-host:focus-within .gb-line rect {
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer .glow-border rect,
+  .glow-host .glow-border rect {
+    animation: none;
+  }
+  .composer:focus-within > .glow-border,
+  .glow-host:focus-within > .glow-border {
+    opacity: 0.6;
+  }
 }
 .gb-line {
   filter: blur(1px);

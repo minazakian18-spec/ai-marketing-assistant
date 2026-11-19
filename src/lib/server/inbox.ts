@@ -11,8 +11,6 @@ import {
   metaConnection,
   metaProfile,
   sendMetaText,
-  sendWhatsAppTemplate,
-  whatsappMedia,
   type MetaProvider,
 } from "./meta";
 import {
@@ -25,8 +23,9 @@ import {
   MESSAGE_PAGE,
   nextStatus,
   parseGmailMessage,
+  isBulkMail,
+  matchesImportFilter,
   parseMetaMessaging,
-  parseWhatsApp,
   preview,
   shouldImportGmail,
   validateUploads,
@@ -164,9 +163,9 @@ export async function channelStates(
     .from("integration_connections")
     .select("provider,status,scopes,display_name,provider_account_id")
     .eq("workspace_id", workspaceId)
-    .in("provider", ["gmail", "instagram", "messenger", "whatsapp"]);
+    .in("provider", ["gmail", "instagram", "messenger"]);
   if (error) throw error;
-  return (["gmail", "instagram", "messenger", "whatsapp"] as Channel[]).map(
+  return (["gmail", "instagram", "messenger"] as Channel[]).map(
     (channel) => {
       const c = data?.find((d) => d.provider === channel);
       if (!c || c.status === "disconnected")
@@ -434,10 +433,10 @@ async function workspacesFor(provider: MetaProvider, accountId: string) {
     .eq("provider_account_id", accountId)
     .in("status", ["connected", "permission_missing"]);
   const ids = (data || []).map((d) => d.workspace_id as string);
-  // A WhatsApp number or Instagram account belongs to exactly one workspace
+  // An Instagram account belongs to exactly one workspace
   // (unique indexes). Should an older duplicate still exist, deliver to nobody
   // rather than leak a customer's messages into another workspace.
-  if ((provider === "whatsapp" || provider === "instagram") && ids.length > 1) {
+  if (provider === "instagram" && ids.length > 1) {
     log("inbox_webhook_ambiguous_account", { provider, workspaces: ids.length });
     return [];
   }
@@ -457,7 +456,7 @@ async function firstDelivery(
   throw error;
 }
 
-// Process a verified Meta webhook body (Instagram, Messenger or WhatsApp).
+// Process a verified Meta webhook body (Instagram or Messenger).
 export async function processMetaWebhook(payload: unknown) {
   const object = (payload as { object?: string })?.object;
   const provider: MetaProvider | null =
@@ -465,14 +464,9 @@ export async function processMetaWebhook(payload: unknown) {
       ? "instagram"
       : object === "page"
         ? "messenger"
-        : object === "whatsapp_business_account"
-          ? "whatsapp"
-          : null;
+        : null;
   if (!provider) return;
-  const { messages, statuses } =
-    provider === "whatsapp"
-      ? parseWhatsApp(payload)
-      : parseMetaMessaging(payload, provider);
+  const { messages, statuses } = parseMetaMessaging(payload, provider);
   const cache = new Map<string, string[]>();
   const targets = async (accountId: string) => {
     if (!cache.has(accountId))
@@ -625,6 +619,7 @@ async function importGmail(
     provider_account_id: string;
     display_name: string;
     connection_generation: string;
+    metadata?: unknown;
   },
   refs: { id: string; threadId: string; labelIds?: string[] }[],
   initial: boolean,
@@ -677,7 +672,9 @@ async function importGmail(
     for (const msg of full) {
       if (
         !msg ||
-        !shouldImportGmail(msg.labelIds, known.has(msg.threadId || ""))
+        !shouldImportGmail(msg.labelIds, known.has(msg.threadId || "")) ||
+        (!known.has(msg.threadId || "") && isBulkMail(msg.payload)) ||
+        !matchesImportFilter(msg, account.metadata)
       )
         continue;
       await hydrateGmailBody(
@@ -822,7 +819,7 @@ export async function syncGmail(workspaceId: string, force = false) {
       let page = "";
       for (let i = 0; i < 2; i++) {
         const q = new URLSearchParams({
-          q: "in:inbox newer_than:30d -category:promotions -category:social -category:forums",
+          q: "in:inbox newer_than:30d -category:promotions -category:social -category:forums -category:updates",
           maxResults: "50",
           ...(page ? { pageToken: page } : {}),
         });
@@ -886,7 +883,7 @@ export async function syncGmail(workspaceId: string, force = false) {
 // (Gmail nextPageToken), never the whole mailbox. The page token lives in the
 // connection's metadata, which is reset on every (re)connect. Shares the sync
 // lease so it never overlaps a regular sync.
-const BACKFILL_QUERY = "in:inbox -category:promotions -category:social -category:forums";
+const BACKFILL_QUERY = "in:inbox -category:promotions -category:social -category:forums -category:updates";
 type BackfillState = { pageToken?: string; done?: boolean };
 
 export async function backfillGmail(workspaceId: string) {
@@ -1073,7 +1070,7 @@ export async function listConversations(
 // Gmail counts only the mailbox that is linked right now.
 export async function unreadByChannel(workspaceId: string): Promise<Record<Channel, number>> {
   const gmailAccount = await visibleGmailAccount(workspaceId);
-  const channels: Channel[] = ["gmail", "instagram", "messenger", "whatsapp"];
+  const channels: Channel[] = ["gmail", "instagram", "messenger"];
   const counts = await Promise.all(
     channels.map(async (channel) => {
       if (channel === "gmail" && !gmailAccount) return 0;
@@ -1224,11 +1221,7 @@ export async function sendReply(
   const caps = capabilities[row.provider];
   const body = cleanText(
     input.body,
-    row.provider === "gmail"
-      ? 20000
-      : row.provider === "whatsapp"
-        ? 4096
-        : 1000,
+    row.provider === "gmail" ? 20000 : 1000,
   );
   const attachments = input.attachments || [];
   if (attachments.length && !caps.outboundAttachments)
@@ -1243,7 +1236,7 @@ export async function sendReply(
   if (input.template && !caps.templates)
     throw new HttpError(
       400,
-      "Templates zijn alleen beschikbaar voor WhatsApp.",
+      "Berichtsjablonen worden voor dit kanaal niet ondersteund.",
     );
   if (!input.template && !body.trim() && !attachments.length)
     throw new HttpError(400, "Schrijf eerst een bericht.");
@@ -1251,9 +1244,7 @@ export async function sendReply(
   if (win.applies && !win.open && !input.template)
     throw new HttpError(
       409,
-      row.provider === "whatsapp"
-        ? "Het 24-uursvenster is gesloten. Stuur een goedgekeurde template."
-        : "Het 24-uursvenster is gesloten. Je kunt pas weer antwoorden als de klant opnieuw een bericht stuurt.",
+      "Het 24-uursvenster is gesloten. Je kunt pas weer antwoorden als de klant opnieuw een bericht stuurt.",
     );
   const text = input.template
     ? `Template: ${input.template.name}` +
@@ -1325,12 +1316,6 @@ export async function sendReply(
         attachments,
       );
       providerId = String(sent.id);
-    } else if (input.template) {
-      providerId = await sendWhatsAppTemplate(
-        ctx.workspaceId,
-        row.provider_thread_id,
-        input.template,
-      );
     } else {
       providerId = await sendMetaText(
         ctx.workspaceId,
@@ -1477,7 +1462,7 @@ export async function updateConversation(
   if (error) throw error;
 }
 
-// Attachment proxy: Gmail attachments and WhatsApp media need the stored
+// Attachment proxy: Gmail attachments need the stored
 // token, so the browser fetches them through Mavix.
 export async function attachment(
   workspaceId: string,
@@ -1513,10 +1498,6 @@ export async function attachment(
       mimeType: a.mimeType || "application/octet-stream",
       name: a.name,
     };
-  }
-  if (msg.provider === "whatsapp") {
-    const media = await whatsappMedia(workspaceId, a.ref);
-    return { ...media, name: a.name };
   }
   throw new HttpError(404, "Bijlage niet gevonden.");
 }

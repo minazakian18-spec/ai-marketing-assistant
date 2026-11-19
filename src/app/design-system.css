@@ -868,3 +868,119 @@ button:focus-visible > .cs-chip, .cs-chip:focus-visible { outline: none; box-sha
 .cr-panel hr { width: 100%; margin: 6px 0; border: 0; border-top: 1px solid var(--ds-border, #e7e4ef); }
 @media (max-width: 900px) { .cr-editor { grid-template-columns: 1fr; } .cr-grid { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .cs-dropzone { transition: none; } }
+
+/* ================= Instagram Content Studio: three steps, one brief =================
+   (components/instagram/create.tsx) Soft surfaces instead of boxed panels. */
+.cs-studio { border-color: rgba(23, 17, 42, 0.06); box-shadow: var(--shadow-sm); }
+.cs-start { display: grid; gap: 6px; padding: 8px 0 18px; }
+.cs-step { display: grid; gap: 12px; padding: 18px 24px; }
+.cs-step + .cs-step { border-top: 1px solid rgba(23, 17, 42, 0.05); }
+.cs-step > header { display: flex; align-items: center; gap: 10px; }
+.cs-step > header h3 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; color: var(--ds-heading); }
+.cs-step-n {
+  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--gradient-primary); color: #fff; font-size: 12px; font-weight: 700;
+  box-shadow: 0 4px 10px rgba(109, 40, 217, 0.22);
+}
+.cs-link {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 4px 8px; border: 0; border-radius: 8px;
+  background: transparent; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ds-accent); cursor: pointer;
+}
+.cs-link:hover { background: var(--ds-accent-soft); }
+.cs-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 240px)); gap: 10px; }
+.cs-kinds button {
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 12px; align-items: center; text-align: left;
+  padding: 12px 14px; border: 1px solid rgba(23, 17, 42, 0.08); border-radius: 14px; background: #fff; font: inherit; cursor: pointer;
+  transition: border-color var(--ds-fast) ease, box-shadow var(--ds-fast) ease, transform var(--ds-fast) ease;
+}
+.cs-kinds button:hover { border-color: var(--ds-accent-line); box-shadow: var(--shadow-sm); }
+.cs-kinds button[aria-checked="true"] { border-color: var(--ds-accent); background: linear-gradient(180deg, #faf8ff, #f4efff); box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.1); }
+.cs-kinds button:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+.cs-kind-icon { grid-row: 1 / 3; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--ds-accent-soft); color: var(--ds-accent); }
+.cs-kinds strong { font-size: 14px; color: var(--ds-heading); }
+.cs-kinds small { font-size: 12px; line-height: 1.4; color: var(--ds-muted); }
+.cs-goals { display: flex; flex-wrap: wrap; gap: 8px; }
+.cs-goals button {
+  display: grid; gap: 1px; text-align: left; padding: 8px 12px; border: 1px solid rgba(23, 17, 42, 0.08); border-radius: 12px; background: #fff;
+  font: inherit; cursor: pointer; transition: border-color var(--ds-fast) ease, background var(--ds-fast) ease, box-shadow var(--ds-fast) ease;
+}
+.cs-goals button:hover:not(:disabled) { border-color: var(--ds-accent-line); }
+.cs-goals button[aria-checked="true"] { border-color: var(--ds-accent); background: var(--ds-accent-soft); box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.08); }
+.cs-goals button:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+.cs-goals strong { font-size: 13px; font-weight: 600; color: var(--ds-heading); }
+.cs-goals small { font-size: 11.5px; color: var(--ds-muted); }
+.cs-plan-hint strong { color: var(--ds-heading); }
+.cs-weekplan { display: grid; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--ds-surface-2); }
+.cs-weekplan > p { margin: 0; font-size: 13px; color: var(--ds-text-2); }
+.cs-weekplan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; }
+.cs-weekplan-grid label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ds-text-2); }
+.cs-weekplan-grid select { height: 34px; padding: 0 10px; border: 1px solid var(--ds-border); border-radius: 9px; background: #fff; font: inherit; font-size: 13px; font-weight: 500; color: var(--ds-text); }
+
+/* The one brief: a calm input with the Mavix light running round it on focus. */
+.cs-step-brief .cs-brief { padding: 14px 16px; border-radius: 16px; background: #fff; }
+.cs-brief.is-compact { padding: 10px 12px; }
+.cs-brief:focus-within { border-color: rgba(109, 40, 217, 0.28); box-shadow: 0 10px 30px -18px rgba(76, 29, 149, 0.35); }
+.app-shell .cs-brief textarea { font-size: 15px; }
+.app-shell .cs-brief.is-compact textarea { font-size: 14px; }
+/* Inside the brief card the textarea has no box of its own: the card (and its light) shows focus. */
+.app-shell .cs-brief textarea,
+.app-shell .cs-brief textarea:focus,
+.app-shell .cs-brief textarea:focus-visible { border: 0 !important; outline: none !important; box-shadow: none !important; background: transparent; }
+.cs-brief-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-tool {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border: 1px solid rgba(23, 17, 42, 0.08); border-radius: 999px;
+  background: #fff; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ds-text-2); cursor: pointer;
+  transition: border-color var(--ds-fast) ease, color var(--ds-fast) ease, background var(--ds-fast) ease;
+}
+.cs-tool:hover:not(:disabled) { border-color: var(--ds-accent-line); color: var(--ds-accent); background: #faf8ff; }
+.cs-tool:disabled { opacity: 0.5; cursor: not-allowed; }
+.cs-tool.is-busy { opacity: 0.6; }
+.cs-tool input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.cs-tool:focus-within { box-shadow: var(--ds-ring); }
+.cs-go { height: 38px; padding: 0 18px; border-radius: 999px; }
+.cs-attach { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-attach span { position: relative; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: #eee; }
+.cs-attach img { width: 100%; height: 100%; object-fit: cover; }
+.cs-attach button { position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: rgba(20, 18, 30, 0.72); color: #fff; cursor: pointer; }
+.cs-plan-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ds-text-2); }
+.cs-plan-note svg { flex: none; margin-top: 3px; color: var(--ds-accent); }
+.cs-brand-nudge {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px;
+  background: linear-gradient(135deg, #fbf7ff, #f3ecff); color: var(--ds-text-2);
+}
+.cs-brand-nudge > svg { color: var(--ds-accent); }
+.cs-brand-nudge div { display: grid; gap: 2px; font-size: 12.5px; line-height: 1.5; }
+.cs-brand-nudge strong { font-size: 13.5px; color: var(--ds-heading); }
+.cs-brand-nudge .button { position: relative; white-space: nowrap; }
+.cs-brand-nudge .button.is-busy { opacity: 0.6; }
+.cs-step .cs-more { border-top: 0; padding-top: 0; }
+.cs-step .cs-more > summary { color: var(--ds-muted); }
+.cs-step .cs-more[open] { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 16px; }
+.cs-step .cs-more[open] > summary { grid-column: 1 / -1; }
+
+/* Editor + preview after the first result. */
+.cs-grid-ig { grid-template-columns: minmax(0, 1fr) 340px; }
+.cs-goal-inline { display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--ds-muted); }
+.cs-goal-inline select { height: 28px; padding: 0 8px; border: 1px solid var(--ds-border); border-radius: 999px; background: #fff; font: inherit; font-size: 12px; font-weight: 600; color: var(--ds-text); }
+.cs-image-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-image-actions .cs-tool { height: 30px; padding: 0 10px; font-size: 12px; }
+.cs-edit-panel { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: #fff; border: 1px solid var(--ds-border); }
+.app-shell .cs-edit-panel textarea { min-height: 0; font-size: 13px; }
+.cs-photos .cs-photo-pick { position: static; display: block; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: pointer; }
+.cs-photos .cs-photo-pick:disabled { cursor: default; opacity: 1; }
+.cs-photos .cs-photo-pick img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cs-remove-image { justify-self: start; margin: 0; }
+@media (max-width: 1080px) {
+  .cs-grid-ig { grid-template-columns: minmax(0, 1fr); }
+  .cs-studio .cs-view-switch { display: inline-flex; }
+}
+@media (max-width: 760px) {
+  .cs-step { padding: 16px 14px; }
+  .cs-kinds { grid-template-columns: 1fr 1fr; }
+  .cs-brand-nudge { grid-template-columns: auto 1fr; }
+  .cs-brand-nudge .button { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 480px) {
+  .cs-kinds { grid-template-columns: 1fr; }
+  .cs-goals button { flex: 1 1 100%; }
+}
