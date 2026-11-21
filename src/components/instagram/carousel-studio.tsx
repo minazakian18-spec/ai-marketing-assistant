@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, GripVertical, ImagePlus, Images, Plus, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, GripVertical, Image as ImageIcon, ImagePlus, Images, PenLine, Plus, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { GlowBorder } from "@/components/glow-border";
 import { LibraryPicker } from "@/components/library/library-picker";
 import { UpgradeNotice, usePlan } from "@/components/plan-gate";
 import { generateCarouselPlan, generateImage, type CarouselPlanResult } from "@/lib/api-client";
@@ -20,12 +21,13 @@ import { InspirationPicker } from "./inspiration-picker";
 // slide 4 keeps slides 1-3; only failed slides need a retry. Slide texts are
 // an editable layer (exact spelling), drawn on the images when downloading.
 
-const GOALS: [string, string][] = [
-  ["merkbekendheid", "Merkbekendheid"],
-  ["verkoop", "Verkoop"],
-  ["reserveringen", "Reserveringen"],
-  ["betrokkenheid", "Betrokkenheid"],
-  ["informeren", "Informeren"],
+// Carousel goals (the ids the carousel API accepts), shown like the post goals.
+const GOALS: [string, string, string][] = [
+  ["merkbekendheid", "Meer bekendheid", "Laat zien wie je bent en waar je voor staat."],
+  ["verkoop", "Meer verkoop", "Een product, gerecht of actie centraal."],
+  ["reserveringen", "Meer reserveringen", "Mensen naar je zaak of agenda halen."],
+  ["betrokkenheid", "Meer interactie", "Reacties, saves en gedeelde posts."],
+  ["informeren", "Tip of uitleg", "Kennis delen in een paar slides."],
 ];
 
 async function ownPhoto(file: File): Promise<string> {
@@ -252,11 +254,13 @@ export function CarouselStudio({ profile, editPost, initialBrief = "", onPersist
     <div className="cs-studio cr">
       <div className="cs-toolbar">
         <div className="cs-toolbar-title">
-          <h2>{post ? planMeta?.title || "Instagram-carrousel" : "Nieuwe Instagram-carrousel"}</h2>
+          <h2>{post ? planMeta?.title || "Instagram-carrousel" : "Nieuwe Instagram-post"}</h2>
         </div>
-        <button type="button" className="button secondary" onClick={onSingle}>
-          <ArrowLeft size={15} aria-hidden="true" /> Enkele post
-        </button>
+        {slides.length > 0 && (
+          <button type="button" className="button secondary" onClick={onSingle}>
+            <ArrowLeft size={15} aria-hidden="true" /> Enkele post
+          </button>
+        )}
       </div>
 
       {!entitled && plan !== undefined && (
@@ -265,6 +269,7 @@ export function CarouselStudio({ profile, editPost, initialBrief = "", onPersist
         </UpgradeNotice>
       )}
 
+      {slides.length > 0 && (
       <ol className="cr-steps" aria-label="Stappen">
         {STEPS.map((s, i) => (
           <li key={s} className={i === step ? "is-current" : i < step ? "is-done" : ""} aria-current={i === step ? "step" : undefined}>
@@ -272,64 +277,117 @@ export function CarouselStudio({ profile, editPost, initialBrief = "", onPersist
           </li>
         ))}
       </ol>
+      )}
 
       {!slides.length ? (
-        <section className="cr-setup" aria-label="Carrouselinstellingen">
-          <label className="cs-label" htmlFor="cr-brief">
-            Wat wil je maken?
-          </label>
-          <textarea id="cr-brief" rows={4} maxLength={1000} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="Bijvoorbeeld: een gezellige Italiaanse avond. Begin met een grap, laat pizza, pasta en cocktails zien en eindig met een uitnodiging om te reserveren." />
-          <div className="cr-grid">
-            <label>
-              <span className="cs-label">Doel</span>
-              <select value={goal} onChange={(e) => setGoal(e.target.value)}>
-                {GOALS.map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span className="cs-label">
-                Aantal slides <small>(2–{entitled ? maxSlides || 10 : 10})</small>
+        <div className="cs-start">
+          <section className="cs-step" aria-labelledby="cr-step-1">
+            <header>
+              <span className="cs-step-n" aria-hidden="true">
+                1
               </span>
-              <input type="number" min={MIN_SLIDES} max={entitled ? maxSlides || 10 : 10} value={count} onChange={(e) => setCount(Math.max(MIN_SLIDES, Math.min(entitled ? maxSlides || 10 : 10, Number(e.target.value) || MIN_SLIDES)))} />
-            </label>
-            <label>
-              <span className="cs-label">Product of dienst (optioneel)</span>
-              <input value={product} maxLength={160} onChange={(e) => setProduct(e.target.value)} />
-            </label>
-            <label>
-              <span className="cs-label">Call-to-action (optioneel)</span>
-              <input value={cta} maxLength={120} onChange={(e) => setCta(e.target.value)} placeholder="Bijvoorbeeld: Reserveer je tafel" />
-            </label>
-          </div>
-          <InspirationPicker value={inspiration} onChange={setInspiration} max={plan?.inspirationMax ?? 3} disabled={!!busy} />
-          <div className="cs-visual-format" role="radiogroup" aria-label="Afbeeldingsformaat">
-            <button type="button" role="radio" aria-checked={format === "portrait"} onClick={() => setFormat("portrait")}>
-              Staand 4:5 (aanbevolen)
-            </button>
-            <button type="button" role="radio" aria-checked={format === "square"} onClick={() => setFormat("square")}>
-              Vierkant
-            </button>
-          </div>
-          <label className="cs-check">
-            <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} />
-            <span>Brand Hub meenemen (toon, kleuren, doelgroep), als die is ingevuld</span>
-          </label>
-          <p className="cr-estimate">
-            <Sparkles size={14} aria-hidden="true" /> Eerst maakt Mavix een plan (2 credits). Je controleert het plan en kiest daarna zelf of je de afbeeldingen laat maken: maximaal {estimate} credits in totaal, 10 per AI-slide. Elke AI-slide telt mee in je maandlimiet voor AI-afbeeldingen.
-          </p>
-          <div className="cr-actions">
-            <button type="button" className="button primary" disabled={!!busy || !entitled} onClick={() => void makePlan()}>
-              <Wand2 size={15} aria-hidden="true" /> {busy ? "Plan wordt gemaakt…" : "Carrouselplan maken"}
-            </button>
-            <button type="button" className="button secondary" disabled={!!busy || !entitled} onClick={startManual}>
-              Zelf samenstellen
-            </button>
-          </div>
-        </section>
+              <h3 id="cr-step-1">Wat maak je?</h3>
+            </header>
+            <div className="cs-kinds" role="radiogroup" aria-labelledby="cr-step-1">
+              <button type="button" role="radio" aria-checked={false} onClick={onSingle}>
+                <span className="cs-kind-icon">
+                  <ImageIcon size={20} aria-hidden="true" />
+                </span>
+                <strong>Post</strong>
+                <small>Eén beeld met caption en hashtags</small>
+              </button>
+              <button type="button" role="radio" aria-checked={true}>
+                <span className="cs-kind-icon">
+                  <Images size={20} aria-hidden="true" />
+                </span>
+                <strong>Carrousel</strong>
+                <small>Meerdere slides die samen één verhaal vertellen</small>
+              </button>
+            </div>
+          </section>
+
+          <section className="cs-step" aria-labelledby="cr-step-2">
+            <header>
+              <span className="cs-step-n" aria-hidden="true">
+                2
+              </span>
+              <h3 id="cr-step-2">Doel van deze carrousel</h3>
+            </header>
+            <div className="cs-goals" role="radiogroup" aria-labelledby="cr-step-2">
+              {GOALS.map(([v, l, h]) => (
+                <button key={v} type="button" role="radio" aria-checked={goal === v} disabled={!!busy} onClick={() => setGoal(v)}>
+                  <strong>{l}</strong>
+                  <small>{h}</small>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="cs-step cs-step-brief" aria-labelledby="cr-step-3">
+            <header>
+              <span className="cs-step-n" aria-hidden="true">
+                3
+              </span>
+              <h3 id="cr-step-3">Wat moet de carrousel vertellen?</h3>
+            </header>
+            <form
+              className="cs-brief glow-host"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void makePlan();
+              }}
+            >
+              <GlowBorder />
+              <label className="sr-only" htmlFor="cr-brief">
+                Wat moet de carrousel vertellen?
+              </label>
+              <textarea id="cr-brief" rows={3} maxLength={1000} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="Bijvoorbeeld: een gezellige Italiaanse avond. Begin met een grap, laat pizza, pasta en cocktails zien en eindig met een uitnodiging om te reserveren." />
+              <div className="cs-brief-bar">
+                <div className="cs-brief-tools">
+                  <button type="button" className="cs-tool" disabled={!!busy || !entitled} onClick={startManual}>
+                    <PenLine size={15} aria-hidden="true" />
+                    Zelf samenstellen
+                  </button>
+                </div>
+                <button className="button primary cs-go" disabled={!!busy || !entitled || brief.trim().length < 5}>
+                  <Wand2 size={15} aria-hidden="true" /> {busy ? "Plan wordt gemaakt…" : "Maak mijn carrousel"}
+                </button>
+              </div>
+            </form>
+            <p className="cs-plan-note">
+              <Sparkles size={14} aria-hidden="true" /> Eerst maakt Mavix een plan met teksten per slide (2 credits). Jij controleert het en kiest daarna of Mavix de beelden maakt: maximaal {estimate} credits, 10 per AI-slide.
+            </p>
+            <details className="cs-more">
+              <summary>Meer opties</summary>
+              <label className="cs-field">
+                <span>
+                  Aantal slides (2–{entitled ? maxSlides || 10 : 10})
+                </span>
+                <input type="number" min={MIN_SLIDES} max={entitled ? maxSlides || 10 : 10} value={count} onChange={(e) => setCount(Math.max(MIN_SLIDES, Math.min(entitled ? maxSlides || 10 : 10, Number(e.target.value) || MIN_SLIDES)))} />
+              </label>
+              <label className="cs-field">
+                <span>Product of dienst</span>
+                <input value={product} maxLength={160} onChange={(e) => setProduct(e.target.value)} />
+              </label>
+              <label className="cs-field">
+                <span>Call-to-action</span>
+                <input value={cta} maxLength={120} onChange={(e) => setCta(e.target.value)} placeholder="Bijvoorbeeld: Reserveer je tafel" />
+              </label>
+              <label className="cs-switch">
+                <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} />
+                <span>
+                  <strong>Brand Hub meenemen (toon, kleuren, doelgroep)</strong>
+                </span>
+              </label>
+              <InspirationPicker value={inspiration} onChange={setInspiration} max={plan?.inspirationMax ?? 3} disabled={!!busy} />
+            </details>
+            {(error || message) && (
+              <p role={error ? "alert" : "status"} className={error ? "cs-error" : "cs-message"}>
+                {error || message}
+              </p>
+            )}
+          </section>
+        </div>
       ) : (
         <section className="cr-editor" aria-label="Carrousel-editor">
           <div className="cr-stage">
