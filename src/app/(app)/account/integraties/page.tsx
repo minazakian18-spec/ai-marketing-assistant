@@ -29,12 +29,15 @@ type Integration = {
 };
 
 // Sections in the order people need them; every integration appears once.
-const GROUPS: [Group, string, string][] = [
+const ALL_GROUPS: [Group, string, string][] = [
   ["recommended", "Aanbevolen", "De belangrijkste kanalen voor je marketing. Begin hier."],
   ["communication", "Communicatie", "Klantgesprekken komen samen in je Inbox."],
   ["productivity", "Productiviteit en inzicht", "Planning en je zoekresultaten in Google."],
   ["other", "Binnenkort", "Deze koppelingen zijn in voorbereiding en nog niet te gebruiken."],
 ];
+
+// Only groups that still contain an integration (no empty headings or tabs).
+const GROUPS = (): [Group, string, string][] => ALL_GROUPS.filter(([g]) => INTEGRATIONS.some((i) => i.group === g));
 
 const INTEGRATIONS: Integration[] = [
   { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", group: "recommended", provider: "instagram" },
@@ -220,7 +223,7 @@ export default function IntegrationsPage() {
     }
   }
 
-  const groups = GROUPS.filter(([g]) => group === "all" || g === group);
+  const groups = GROUPS().filter(([g]) => group === "all" || g === group);
   const m = manage;
   const mc = m ? conn(m) : undefined;
   const ms = m ? stateOf(m, mc) : "disconnected";
@@ -248,7 +251,7 @@ export default function IntegrationsPage() {
         <button type="button" role="tab" aria-selected={group === "all"} onClick={() => setGroup("all")}>
           Alle integraties
         </button>
-        {GROUPS.map(([id, label]) => (
+        {GROUPS().map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={group === id} onClick={() => setGroup(id)}>
             {label}
           </button>

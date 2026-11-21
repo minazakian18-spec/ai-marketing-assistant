@@ -87,29 +87,6 @@ export function InstagramOverview({
   const active = settings.enabled && settings.mode !== "assist";
   return (
     <div className={styles.overview}>
-      <section className={"panel " + styles.mode}>
-        <div>
-          <span className={styles.modeIcon}>
-            <Instagram size={23} />
-          </span>
-          <div>
-            <small>Huidige modus</small>
-            <h2>{modeName(settings.mode)}</h2>
-          </div>
-          <span
-            data-autopilot={
-              active && !settings.requireApproval ? "active" : undefined
-            }
-            className={"badge " + (active ? "approved" : "draft")}
-          >
-            {active ? "Automatisering aan" : "Automatisering uit"}
-          </span>
-        </div>
-        <Link className="button primary" href="/social?tab=assist">
-          <Plus size={16} />
-          Nieuwe content maken
-        </Link>
-      </section>
       <div className={styles.kpis + " motion-kpis"}>
         {[
           ["Wacht op goedkeuring", String(drafts.length), "Klaar voor jouw blik"],

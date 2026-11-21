@@ -680,7 +680,7 @@ function TopActions({ report, tasks, onOpen }: { report: ScanReport; tasks: Task
 }
 
 function Header() {
-  return <PageHeading eyebrow="Marketing" title="SEO Intelligence" description="Ontdek hoe goed je website vindbaar is en wat je kunt verbeteren." />;
+  return <PageHeading title="SEO Intelligence" description="Ontdek hoe goed je website vindbaar is en wat je kunt verbeteren." />;
 }
 
 function HowCalculated({ report }: { report: ScanReport }) {

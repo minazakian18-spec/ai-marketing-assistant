@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Plug,
   Sparkles,
+  Plus,
 } from "lucide-react";
 import { PageHeading } from "@/components/ui";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -151,29 +152,23 @@ function Workspace() {
   return (
     <div className="instagram-workspace email-workspace">
       <PageHeading
-        eyebrow="Marketing"
         title="E-mail"
         description="Maak, plan en automatiseer je e-mailcampagnes."
         action={
-          <Link className="button secondary" href="/account/integraties">
-            <Plug size={15} />
-            Integraties
-          </Link>
+          <div className="page-heading-actions">
+            <Link className="button secondary" href="/account/integraties">
+              <Plug size={15} />
+              Integraties
+            </Link>
+            <Link className="button primary" href="/email?tab=assist">
+              <Plus size={15} />
+              Nieuwe e-mail
+            </Link>
+          </div>
         }
       />
 
       <WorkspaceNav root="/email" channel="E-mail" view={tab} />
-      {tab !== "overview" && (
-        <div className="channel-context">
-          <span>
-            Actieve modus: <strong>{modeName(settings.mode)}</strong> ·{" "}
-            {settings.enabled && settings.mode !== "assist"
-              ? "Automatisering aan"
-              : "Automatisering uit"}
-          </span>
-          <small>Campagnes worden niet automatisch verstuurd</small>
-        </div>
-      )}
       <p role="status" className="ig-feedback ig-top-feedback">
         {message}
       </p>

@@ -12,7 +12,7 @@ import { workspaceView, modeName } from "@/lib/workspace-navigation";
 import { readPlanningContext, weekdayOf } from "@/lib/calendar/planning";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Sparkles, PenLine, Orbit, CheckCheck, CalendarDays, Plug } from "lucide-react";
+import { Sparkles, PenLine, Orbit, CheckCheck, CalendarDays, Plug, Plus } from "lucide-react";
 import { InstagramLogo as Instagram } from "@/components/brand-logos";
 import { PageHeading } from "@/components/ui";
 import { useWorkspace } from "@/components/workspace-provider";
@@ -186,42 +186,23 @@ function Workspace() {
   return (
     <div className="instagram-workspace">
       <PageHeading
-        eyebrow="Marketing"
         title="Social"
         description="Maak, plan en automatiseer content voor je social kanalen."
         action={
-          <Link className="button secondary" href="/account/integraties">
-            <Plug size={15} />
-            Integraties
-          </Link>
+          <div className="page-heading-actions">
+            <Link className="button secondary" href="/account/integraties">
+              <Plug size={15} />
+              Integraties
+            </Link>
+            <Link className="button primary" href="/social?tab=assist">
+              <Plus size={15} />
+              Nieuwe post
+            </Link>
+          </div>
         }
       />
 
-      <div className="social-platforms" role="group" aria-label="Platform">
-        <span className="social-platform is-active" aria-current="true">
-          <Instagram size={15} />
-          Instagram
-        </span>
-        {["Facebook", "LinkedIn"].map((name) => (
-          <span key={name} className="social-platform is-soon" aria-disabled="true">
-            {name}
-            <small>Binnenkort</small>
-          </span>
-        ))}
-      </div>
-
       <WorkspaceNav root="/social" channel="Social" view={tab} />
-      {tab !== "overview" && (
-        <div className="channel-context">
-          <span>
-            Actieve modus: <strong>{modeName(settings.mode)}</strong> ·{" "}
-            {settings.enabled && settings.mode !== "assist"
-              ? "Automatisering aan"
-              : "Automatisering uit"}
-          </span>
-          <small>{publishStatusText(publishCap)}</small>
-        </div>
-      )}
       <p role="status" className="ig-feedback ig-top-feedback">
         {message}
       </p>

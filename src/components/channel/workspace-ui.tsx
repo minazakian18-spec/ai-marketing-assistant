@@ -134,24 +134,6 @@ export function ChannelOverview({
   const autoPublishing = active && !requireApproval;
   return (
     <>
-      <section className="panel channel-summary">
-        <div>
-          <span className="channel-summary-icon">
-            <Icon size={22} />
-          </span>
-          <div>
-            <small>Huidige modus</small>
-            <h2>{modeName(mode)}</h2>
-            <p data-autopilot={autoPublishing ? "active" : undefined}>
-              Automatisering {active ? "aan" : "uit"}
-            </p>
-          </div>
-        </div>
-        <Link className="button primary" href={root + "?tab=assist"}>
-          <Plus size={16} />
-          Nieuwe content maken
-        </Link>
-      </section>
       <div className="channel-kpis">
         {[
           [
@@ -227,40 +209,7 @@ export function ChannelOverview({
           );
         })}
       </div>
-      {!email && (
-      <section className="channel-mode-section">
-        <div className="ig-section-title">
-          <h2>Welke modus gebruik je?</h2>
-          <span>Werk op jouw manier</span>
-        </div>
-        <div className="channel-mode-cards">
-          {(
-            [
-              ["assist", "Maak content wanneer jij dat wilt.", PenLine],
-              [
-                "auto",
-                email
-                  ? "Mavix maakt automatisch e-mails. Jij kiest of dat met of zonder jouw goedkeuring gebeurt."
-                  : "Mavix maakt automatisch content. Jij kiest of dat met of zonder jouw goedkeuring gebeurt.",
-                Layers,
-              ],
-            ] as const
-          ).map(([m, description, Icon]) => (
-            <Link key={m} href={root + "?tab=" + m}>
-              <Icon size={22} />
-              <strong>{modeName(m)}</strong>
-              <p>{description}</p>
-              <span>
-                {mode === m
-                  ? "Huidige modus bekijken"
-                  : "Ontdek " + modeName(m)}{" "}
-                <ArrowUpRight size={14} />
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
-      )}
+
     </>
   );
 }

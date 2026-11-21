@@ -199,7 +199,7 @@ export function WorkspaceProvider({
       }}
     >
       {demo && (
-        <div className="mkt-auth-banner mkt-auth-banner-info" role="status">
+        <div className="demo-banner" role="status">
           Testmodus — voorbeeldgegevens, lokaal opgeslagen. AI-content is
           gesimuleerd. Koppelingen, facturatie en accountbeheer vereisen een
           echt account.{" "}

@@ -1,0 +1,178 @@
+/* Minimal, business-like layer (21-11-2026), loaded last in the app.
+   Model: a clean control panel. Flat light canvas, white cards with one thin
+   border, one purple accent, no glows or coloured edges, clear typography.
+   Status colours (errors, success) are untouched. */
+
+.app-shell {
+  --min-canvas: #f4f5f9;
+  --min-card: #ffffff;
+  --min-line: #e6e7ee;
+  --min-line-strong: #d9dae4;
+  --min-ink: var(--text-heading, #2a0f5c); /* project rule: dark purple for main titles */
+  --min-muted: #5f5d72;
+  --min-accent: #6d28d9;
+  --min-accent-soft: #f3effd;
+  --min-radius: 12px;
+  --min-shadow: 0 1px 2px rgba(29, 27, 47, 0.04);
+  background: var(--min-canvas);
+}
+
+/* Top bar: solid white with a hairline, no blur or glow. */
+.app-shell .topbar {
+  background: #fff;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--min-line);
+  box-shadow: none;
+}
+.app-shell .topbar::before,
+.app-shell .topbar::after {
+  display: none;
+}
+
+/* Page heading: title, one line of context, actions on the right. */
+.app-shell .page-heading {
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.app-shell .page-heading h1 {
+  font-size: clamp(24px, 2.2vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--min-ink);
+}
+.app-shell .page-heading .muted {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--min-muted);
+}
+.page-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Cards: white, one thin border, a barely-there shadow. */
+.app-shell :is(.panel, .card, .cs-studio, .int-row, .dash-card, .quick-action, .ig-card) {
+  background: var(--min-card);
+  border: 1px solid var(--min-line);
+  border-radius: var(--min-radius);
+  box-shadow: var(--min-shadow);
+}
+.app-shell :is(a.panel, a.card, .quick-action, a.ig-card):hover {
+  border-color: var(--min-line-strong);
+  box-shadow: 0 2px 8px rgba(29, 27, 47, 0.06);
+  transform: none;
+}
+
+/* No coloured top edges on KPI cards, no accent bars before section titles. */
+.app-shell :is(.instagram-workspace, .rv-workspace, .ads) :is(.channel-kpis, .motion-kpis, .ws-metrics) > * {
+  box-shadow: var(--min-shadow);
+}
+.app-shell :is(.instagram-workspace, .rv-workspace, .ads) .ig-section-title h2::before {
+  display: none;
+}
+.app-shell .ig-section-title h2 {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--min-ink);
+}
+
+/* KPI numbers: calm, readable. */
+.app-shell :is(.channel-kpis, .motion-kpis, .ws-metrics) strong {
+  color: var(--min-ink);
+  letter-spacing: -0.01em;
+}
+
+/* In-page tabs: plain text with one accent underline. */
+.app-shell .ws-tabs {
+  border-bottom: 1px solid var(--min-line);
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.app-shell .ws-tabs a {
+  color: var(--min-muted);
+  font-weight: 550;
+}
+.app-shell .ws-tabs a[aria-current="page"] {
+  color: var(--min-accent);
+}
+
+/* Buttons: flat primary, quiet secondary. */
+.app-shell .button.primary {
+  background: var(--min-accent);
+  background-image: none;
+  box-shadow: none;
+}
+.app-shell .button.primary:hover:not(:disabled) {
+  background: #5b21b6;
+}
+.app-shell .button.secondary {
+  background: #fff;
+  border: 1px solid var(--min-line-strong);
+  box-shadow: none;
+}
+.app-shell .button.secondary:hover:not(:disabled) {
+  border-color: #c9cad6;
+  background: #fafafc;
+}
+
+/* Decorative glows inside banners are switched off. */
+.app-shell .creative-banner::before,
+.app-shell .creative-banner::after {
+  display: none;
+}
+
+/* Sidebar: quiet labels, a soft accent pill for the active item. */
+.app-shell .sidebar {
+  background: #fff;
+  border-right: 1px solid var(--min-line);
+}
+.app-shell .sidebar .side-nav .nav-item[aria-current="page"],
+.app-shell .sidebar .side-nav .nav-item.active {
+  background: var(--min-accent-soft);
+  color: var(--min-accent);
+  box-shadow: none;
+}
+
+/* Demo banner: one neat line instead of loose text. */
+.app-shell .demo-banner,
+.demo-banner {
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 12px;
+  padding: 7px 16px;
+  background: #1d1b2f;
+  color: #ecebf5;
+}
+.demo-banner button {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.demo-banner button:hover { background: rgba(255, 255, 255, 0.1); }
+.demo-banner button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* The fixed sidebar (240px) covers the left of the page: keep the text clear of it. */
+@media (min-width: 900px) {
+  .demo-banner { padding-left: 256px; }
+}
+
+/* Stars stay gold, whatever the accent. */
+.app-shell .rv-workspace .rv-stars,
+.app-shell .rv-stars { color: #f5a623; }
+
+/* Account pages: the same dark title and quiet eyebrow as everywhere else. */
+.app-shell :is(.account-content, .acc-main, .account-main) h1 { color: var(--min-ink); }
+.app-shell .page-heading .eyebrow { color: var(--min-muted); font-weight: 600; letter-spacing: 0.08em; }

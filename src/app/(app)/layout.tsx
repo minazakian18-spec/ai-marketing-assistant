@@ -17,6 +17,7 @@ import "../polish.css";
 import "../design-system.css";
 import "../channel-themes.css";
 import "../motion.css";
+import "../minimal.css";
 // The logged-in workspace is private: never indexed.
 export const metadata: Metadata = {
   title: { default: "Mavix", template: "%s | Mavix" },

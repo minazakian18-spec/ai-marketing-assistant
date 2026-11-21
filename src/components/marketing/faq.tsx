@@ -21,7 +21,7 @@ export const generalFaq: FaqItem[] = [
   },
   {
     q: "Welke marketingkanalen kan ik beheren?",
-    a: "Google-reviews, Instagram (posts, AI-afbeeldingen en carrousels), e-mailmarketing en klantgesprekken in je Inbox. Daarnaast helpen SEO Intelligence en Inzichten je met vindbaarheid en resultaten. Google Ads is in ontwikkeling. Facebook en LinkedIn volgen later.",
+    a: "Google-reviews, Instagram (posts, AI-afbeeldingen en carrousels), e-mailmarketing en klantgesprekken in je Inbox. Daarnaast helpen SEO Intelligence en Inzichten je met vindbaarheid en resultaten. Google Ads is in ontwikkeling.",
   },
   {
     q: "Kan ik mijn bestaande accounts koppelen?",

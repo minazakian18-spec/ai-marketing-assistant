@@ -52,13 +52,6 @@ export function ReviewOverview({
           <span>Automatisch beantwoord</span>
         </span>
       </section>
-      <div className="rv-mode-banner">
-        <Sparkles size={16} />
-        <span>
-          Actieve modus: <strong>{responseModeName(mode)}</strong> ·{" "}
-          {enabled ? "Auto Reply actief · simulatie" : "Auto Reply uitgeschakeld"}
-        </span>
-      </div>
       <div className="channel-kpis">
         {[
           ["Wacht op goedkeuring", String(pending.length), "Jouw blik maakt het verschil"],
