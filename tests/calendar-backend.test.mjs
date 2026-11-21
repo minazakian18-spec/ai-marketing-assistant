@@ -330,12 +330,12 @@ test("automatic refresh preserves refresh token; a 401 triggers one refresh and 
   assert.ok(Date.parse(c.expires_at) > Date.now());
   let attempts = 0;
   f.network.handle = (url, init) =>
-    url.includes("/calendarList") && attempts++ === 0
+    url.includes("/events") && attempts++ === 0
       ? f.reply({ error: {} }, 401)
       : url.includes("/token")
         ? f.reply(f.tokenResponse({ access_token: "retry-access" }))
         : normal(url, init);
-  assert.equal((await f.action("calendars")).status, 200);
+  assert.equal((await f.events.GET(f.request("GET", undefined, origin + "/api/calendar/events?start=2026-10-01T00:00:00Z&end=2026-11-01T00:00:00Z&calendars=primary"))).status, 200);
   assert.equal(attempts, 2);
 });
 
@@ -412,16 +412,9 @@ test("disconnect during refresh prevents refresh from restoring credentials", as
 test("calendars paginate; list, create, update and delete events operate on Google", async (t) => {
   const f = setup(t);
   await f.connect();
-  const normal = f.network.handle;
-  f.network.handle = async (url, init) =>
-    url.includes("/calendarList") && !url.includes("pageToken")
-      ? f.reply({
-          items: [{ id: "secondary", accessRole: "reader" }],
-          nextPageToken: "page2",
-        })
-      : normal(url, init);
+  // Only calendar.events is granted: Mavix uses the primary calendar.
   const calendars = await (await f.action("calendars")).json();
-  assert.equal(calendars.calendars.length, 2);
+  assert.deepEqual(calendars.calendars.map((c) => c.id), ["primary"]);
   const listUrl =
     origin +
     "/api/calendar/events?start=2026-10-01T00:00:00Z&end=2026-11-01T00:00:00Z&calendars=primary";
@@ -549,7 +542,7 @@ test("invalid IDs, reversed ranges, Google rate limits and missing permissions r
   ]) {
     f.network.handle = async () =>
       f.reply({ error: { message: "SECRET", errors: [{ reason }] } }, status);
-    const response = await f.action("calendars");
+    const response = await f.events.GET(f.request("GET", undefined, origin + "/api/calendar/events?start=2026-10-01T00:00:00Z&end=2026-11-01T00:00:00Z&calendars=primary"));
     assert.equal(response.status, expected);
     assert.doesNotMatch(await response.text(), /SECRET/);
   }
@@ -591,13 +584,13 @@ test("a second Google 401 requires reconnect and does not retry indefinitely", a
   const normal = f.network.handle;
   let calls = 0;
   f.network.handle = (url, init) => {
-    if (url.includes("/calendarList")) {
+    if (url.includes("/events")) {
       calls++;
       return f.reply({ error: {} }, 401);
     }
     return normal(url, init);
   };
-  assert.equal((await f.action("calendars")).status, 409);
+  assert.equal((await f.events.GET(f.request("GET", undefined, origin + "/api/calendar/events?start=2026-10-01T00:00:00Z&end=2026-11-01T00:00:00Z&calendars=primary"))).status, 409);
   assert.equal(calls, 2);
   assert.equal(
     f.tables.integration_connections[0].status,

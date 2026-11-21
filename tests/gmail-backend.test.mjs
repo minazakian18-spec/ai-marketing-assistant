@@ -169,12 +169,12 @@ test("callback stores encrypted credentials and safe status; state cannot be rep
   assert.equal(status.connected, true);
   assert.ok(!JSON.stringify(status).includes("credentials"));
 });
-test("missing read scope cannot connect; offline refresh token is mandatory", async (t) => {
+test("missing send scope cannot connect; offline refresh token is mandatory", async (t) => {
   const f = setup(t);
   f.network.handle = async () =>
     f.reply(
       f.token({
-        scope: "openid email https://www.googleapis.com/auth/gmail.send",
+        scope: "openid email",
       }),
     );
   const res = await f.complete(await f.start());
@@ -445,21 +445,10 @@ function syncFixture(f,cursor='10') {
  const row={workspace_id:'w1',provider:'gmail',provider_account_id:'account1',cursor,last_synced_at:null};f.tables.inbox_sync_state=[row];
  f.db.rpc=async(name,p)=>{if(name==='claim_gmail_sync'){if(row.lease_owner)return {data:false,error:null};row.lease_owner=p.p_owner;}return {data:true,error:null};};return row;
 }
-test('incremental sync imports more than 100 references without dropping them and resumes history pagination',async t=>{
- const f=setup(t);await f.connect();const state=syncFixture(f),inbox=f.load('src/lib/server/inbox.ts');let page=0;
- f.network.handle=async url=>{
-  if(url.includes('/history?')){page++;return f.reply(page===1?{historyId:'900',nextPageToken:'page2',history:[{messagesAdded:Array.from({length:105},(_,i)=>({message:{id:'m'+i,threadId:'t1',labelIds:['INBOX']}}))}]}:{historyId:'901',history:[]});}
-  if(url.includes('/messages/'))return f.reply(fixtureMessage(new URL(url).pathname.split('/').at(-1)));
-  throw Error('Unexpected sync fixture');
- };
- assert.equal((await inbox.syncGmail('w1',true)).imported,105);
- assert.equal(f.tables.inbox_messages.length,105);assert.deepEqual(JSON.parse(state.cursor),{start:'10',page:'page2'});assert.equal(state.lease_owner,null);
- await inbox.syncGmail('w1',true);assert.equal(state.cursor,'901');assert.ok(f.requests.some(r=>r.url.includes('pageToken=page2')));
-});
-test('sync failure retains cursor, releases lease; busy sync does not contact Google',async t=>{const f=setup(t);await f.connect();const state=syncFixture(f),inbox=f.load('src/lib/server/inbox.ts');state.lease_owner='other';const before=f.requests.length;assert.equal((await inbox.syncGmail('w1',true)).status,'busy');assert.equal(f.requests.length,before);state.lease_owner=null;f.network.handle=async()=>f.reply({},500);await assert.rejects(inbox.syncGmail('w1',true));assert.equal(state.cursor,'10');assert.equal(state.lease_owner,null);});
-test('expired history cursor uses bounded recent-mail bootstrap',async t=>{const f=setup(t);await f.connect();const state=syncFixture(f),inbox=f.load('src/lib/server/inbox.ts');f.network.handle=async url=>url.includes('/history?')?f.reply({},404):url.endsWith('/profile')?f.reply({historyId:'222'}):f.reply({messages:[]});await inbox.syncGmail('w1',true);assert.equal(state.cursor,'222');const list=f.requests.find(r=>r.url.includes('/messages?'));assert.equal(new URL(list.url).searchParams.get('maxResults'),'50');assert.match(new URL(list.url).searchParams.get('q'),/newer_than:30d/);});
+test('Gmail reading is switched off: sync and Meer laden import nothing and never call Google',async t=>{const f=setup(t);await f.connect();syncFixture(f);const inbox=f.load('src/lib/server/inbox.ts');const before=f.requests.length;assert.equal(inbox.GMAIL_READING,false);assert.equal((await inbox.syncGmail('w1',true)).imported,0);assert.equal((await inbox.backfillGmail('w1')).imported,0);assert.equal(f.requests.length,before);assert.equal((f.tables.inbox_messages||[]).length,0);});
 test('missing offline access and denied consent never create a connected mailbox',async t=>{const f=setup(t),base=f.network.handle;f.network.handle=(url,init)=>url.includes('/token')?f.reply(f.token({refresh_token:undefined})):base(url,init);const res=await f.complete(await f.start());assert.match(res.headers.get('location'),/offline_access/);assert.equal(f.tables.integration_connections[0].status,'disconnected');const url=await f.start();const denied=await f.action('callback','GET','?error=access_denied&state='+url.searchParams.get('state'));assert.match(denied.headers.get('location'),/error=denied/);assert.equal(f.tables.oauth_states.length,0);});
-test('Gmail connection missing read scope blocks API calls before network access',async t=>{const f=setup(t),c=await f.connect();c.scopes=['https://www.googleapis.com/auth/gmail.send'];const count=f.requests.length;await assert.rejects(f.creds.gmailToken('w1'),e=>e.status===403);assert.equal(f.requests.length,count);assert.equal(c.status,'permission_missing');});
+test('Gmail connection missing the send scope blocks API calls before network access',async t=>{const f=setup(t),c=await f.connect();c.scopes=['openid','email'];const count=f.requests.length;await assert.rejects(f.creds.gmailToken('w1'),e=>e.status===403);assert.equal(f.requests.length,count);assert.equal(c.status,'permission_missing');});
+test('a send-only Gmail grant is enough: Mavix no longer asks for gmail.readonly',async t=>{const f=setup(t),c=await f.connect();c.scopes=['https://www.googleapis.com/auth/gmail.send'];await f.creds.gmailToken('w1');assert.notEqual(c.status,'permission_missing');assert.deepEqual(f.creds.GMAIL_SCOPES.filter(s=>s.includes('gmail')),['https://www.googleapis.com/auth/gmail.send']);});
 test('authenticated attachment proxy rejects old mailbox data and foreign workspaces',async t=>{const f=setup(t);await f.connect();const id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';f.tables.inbox_messages=[{id,workspace_id:'w1',provider:'gmail',provider_account_id:'old-account',provider_message_id:'m1',attachments:[{name:'file.pdf',ref:'a1',mimeType:'application/pdf'}]}];const inbox=f.load('src/lib/server/inbox.ts');await assert.rejects(inbox.attachment('w1',id,0),e=>e.status===409);await assert.rejects(inbox.attachment('w2',id,0),e=>e.status===404);});
 test('MIME body attachment is retrieved server-side; nested HTML is converted to plain text',async t=>{const f=setup(t);await f.connect();const msg=fixtureMessage();msg.payload.mimeType='multipart/mixed';delete msg.payload.body;msg.payload.parts=[{mimeType:'multipart/alternative',parts:[{mimeType:'text/html',body:{attachmentId:'body1',size:100}}]},{mimeType:'application/pdf',filename:'test.pdf',body:{attachmentId:'file1',size:500}}];f.network.handle=async url=>url.includes('/attachments/body1')?f.reply({data:Buffer.from('<script>bad()</script><p>Good<br>mail</p><img src="https://tracker.invalid/a">').toString('base64url')}):f.reply({id:'t1',messages:[msg]});const gmail=f.load('src/lib/server/gmail.ts');const thread=await gmail.getGmailThread('w1','t1');assert.equal(thread.messages[0].body,'Good\nmail');assert.equal(thread.messages[0].attachments[0].attachmentId,'file1');assert.ok(!f.requests.some(r=>r.url.includes('tracker.invalid')));});
 test('successful sends are cached in the unified Inbox, not a Gmail-only database',async t=>{const f=setup(t);await f.connect();const gmail=f.load('src/lib/server/gmail.ts');const sent=await gmail.sendNewGmail('w1',{to:'customer@example.com',subject:'Hi',body:'Hello'});assert.equal(sent.status,'sent');assert.equal(sent.inboxSynced,true);assert.equal(f.tables.inbox_conversations[0].provider,'gmail');assert.equal(f.tables.inbox_messages[0].workspace_id,'w1');});
@@ -482,36 +471,6 @@ test("conversations from a disconnected or previous Gmail account are hidden, no
   await assert.rejects(inbox.getConversation("w1", id), (e) => e.status === 404);
   assert.equal(f.tables.inbox_conversations.length, 1, "cached rows are kept, only hidden");
   assert.equal(f.tables.inbox_sync_state.length, 0, "sync cursor is cleared on disconnect");
-});
-test("Meer laden imports one bounded page via nextPageToken, remembers it and releases the lease", async (t) => {
-  const f = setup(t);
-  const c = await f.connect();
-  const state = syncFixture(f);
-  const inbox = f.load("src/lib/server/inbox.ts");
-  const lists = [];
-  f.network.handle = async (url) => {
-    if (url.includes("/messages?")) {
-      const u = new URL(url);
-      lists.push(u.searchParams.get("pageToken") || "");
-      assert.equal(u.searchParams.get("maxResults"), "50");
-      assert.doesNotMatch(u.searchParams.get("q"), /newer_than/);
-      return lists.length === 1
-        ? f.reply({ messages: [{ id: "old1", threadId: "t5", labelIds: ["INBOX"] }], nextPageToken: "p2" })
-        : f.reply({ messages: [] });
-    }
-    if (url.includes("/messages/")) return f.reply(fixtureMessage("old1", { threadId: "t5" }));
-    throw Error("Unexpected backfill fixture " + url);
-  };
-  const first = await inbox.backfillGmail("w1");
-  assert.deepEqual([first.imported, first.done], [1, false]);
-  assert.deepEqual(c.metadata.backfill, { pageToken: "p2", done: false });
-  assert.equal(state.lease_owner, null);
-  const second = await inbox.backfillGmail("w1");
-  assert.equal(second.done, true);
-  assert.deepEqual(lists, ["", "p2"]);
-  const count = f.requests.length;
-  assert.equal((await inbox.backfillGmail("w1")).status, "done");
-  assert.equal(f.requests.length, count, "a finished backfill does not call Google again");
 });
 test("new e-mail returns the Inbox conversation so the UI can open it", async (t) => {
   const f = setup(t);

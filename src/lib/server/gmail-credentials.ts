@@ -6,7 +6,6 @@ import { encrypt, decrypt } from "./crypto";
 export const GMAIL_SCOPES = [
   "openid",
   "email",
-  "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
 ];
 export type GmailCredentials = {

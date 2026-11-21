@@ -7,7 +7,6 @@ export const CALENDAR_SCOPES = [
   "openid",
   "email",
   "https://www.googleapis.com/auth/calendar.events",
-  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 ];
 export type CalendarCredentials = {
   access_token: string;

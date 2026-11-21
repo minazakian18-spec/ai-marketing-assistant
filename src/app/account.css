@@ -1397,3 +1397,14 @@ details.int-section summary {
   margin-top: 4px;
   color: #92400e;
 }
+
+/* One Google account (components/account/google-account-card.tsx). */
+.int-google-services { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.int-google-services li { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px; font-size: 12.5px; }
+.int-google-services li > svg { color: var(--color-text-muted); }
+.int-google-services li.is-ok > svg { color: #15803d; }
+.int-google-services li.is-warn > svg { color: #b45309; }
+.int-google-services strong { font-weight: 600; color: var(--ink); }
+.int-google-services small { color: var(--color-text-muted); }
+.int-google-state { font-weight: 600; color: var(--color-text-secondary); white-space: nowrap; }
+@media (max-width: 640px) { .int-google-services li { grid-template-columns: auto 1fr; } .int-google-state { grid-column: 2; } }

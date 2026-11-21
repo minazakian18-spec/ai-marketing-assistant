@@ -1,6 +1,7 @@
 import { handleCalendarIntegration } from "@/lib/server/calendar-oauth";
 import { handleBusinessIntegration } from "@/lib/server/google-business-oauth";
 import { handleSearchConsoleIntegration } from "@/lib/server/search-console-oauth";
+import { handleGoogleAccount } from "@/lib/server/google-account";
 import { oauthStateMatches } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -116,6 +117,7 @@ export async function POST(request: Request, { params }: Context) {
       return handleCalendarIntegration(request, route.action);
     if (route.provider === "google_business")
       return handleBusinessIntegration(request, route.action);
+    if (route.provider === "google") return handleGoogleAccount(request, route.action);
     if (route.provider === "google_search_console")
       return handleSearchConsoleIntegration(request, route.action);
     sameOrigin(request);
@@ -346,6 +348,7 @@ export async function GET(request: Request, { params }: Context) {
       return handleCalendarIntegration(request, route.action);
     if (route.provider === "google_business")
       return handleBusinessIntegration(request, route.action);
+    if (route.provider === "google") return handleGoogleAccount(request, route.action);
     if (route.provider === "google_search_console")
       return handleSearchConsoleIntegration(request, route.action);
     if (!PROVIDERS.includes(route.provider))

@@ -699,7 +699,11 @@ async function importGmail(
 
 // Gmail is polled (History API), not pushed: Mavix does not claim real-time
 // e-mail. Called by the inbox page roughly once a minute and throttled here.
+/** Reading Gmail is switched off (restricted scope); nothing is imported. */
+export const GMAIL_READING = false;
+
 export async function syncGmail(workspaceId: string, force = false) {
+  if (!GMAIL_READING) return { imported: 0, skipped: "gmail_reading_off" as const };
   const account = await gmailConnection(workspaceId);
   if (!account) return { status: "not_ready" as const, imported: 0 };
   const request = (path: string) =>
@@ -885,6 +889,7 @@ const BACKFILL_QUERY = "in:inbox -category:promotions -category:social -category
 type BackfillState = { pageToken?: string; done?: boolean };
 
 export async function backfillGmail(workspaceId: string) {
+  if (!GMAIL_READING) return { imported: 0, done: true, skipped: "gmail_reading_off" as const };
   const account = await gmailConnection(workspaceId);
   if (!account) throw new HttpError(409, "Verbind eerst Gmail.");
   const full = await activeGmailConnection(workspaceId);

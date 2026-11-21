@@ -195,38 +195,14 @@ export async function saveSettings(
     throw new HttpError(503, "Instellingen opslaan is niet gelukt.");
 }
 
+/**
+ * Mavix only asks Google for calendar.events (the verified minimal scope), not
+ * for the list of all calendars. It works with the user's primary calendar.
+ */
 export async function listCalendars(ctx: Ctx): Promise<CalendarInfo[]> {
-  const items: Record<string, unknown>[] = [];
-  let pageToken = "";
-  do {
-    const res = await google<{
-      items?: Record<string, unknown>[];
-      nextPageToken?: string;
-    }>(
-      ctx,
-      "/users/me/calendarList?" +
-        new URLSearchParams({
-          maxResults: "100",
-          fields:
-            "nextPageToken,items(id,summary,summaryOverride,backgroundColor,accessRole,primary,hidden)",
-          ...(pageToken ? { pageToken } : {}),
-        }),
-    );
-    items.push(...(res.items || []));
-    pageToken = res.nextPageToken || "";
-    if (pageToken && items.length >= 10000)
-      throw new HttpError(422, "Te veel agenda’s om tegelijk op te halen.");
-  } while (pageToken);
-  return items
-    .filter((c) => !c.hidden && c.accessRole !== "freeBusyReader")
-    .map((c) => ({
-      id: String(c.id),
-      summary: String(c.summaryOverride || c.summary || "Agenda"),
-      color: String(c.backgroundColor || "#7c6bd6"),
-      accessRole: String(c.accessRole),
-      primary: !!c.primary,
-    }))
-    .sort((a, b) => Number(b.primary) - Number(a.primary));
+  // Still enforces connection, ownership and membership.
+  await connection(ctx.workspaceId, ctx.userId);
+  return [{ id: "primary", summary: "Mijn agenda", color: "#7c6bd6", accessRole: "owner", primary: true }];
 }
 
 async function calendarMeta(

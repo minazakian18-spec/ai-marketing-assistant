@@ -32,7 +32,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 const uuid = () => crypto.randomUUID();
 const CONNECT_TEXT: Record<Channel, string> = {
   instagram: "Koppel je professionele Instagram-account om Direct-berichten hier te ontvangen en te beantwoorden.",
-  gmail: "Koppel Gmail om klantmails in Mavix te lezen en te beantwoorden.",
+  gmail: "E-mail lezen komt later beschikbaar.",
 };
 const byNewest = (a: ConversationView, b: ConversationView) => b.lastMessageAt.localeCompare(a.lastMessageAt) || b.id.localeCompare(a.id);
 const byOldest = (a: ConversationView, b: ConversationView) => -byNewest(a, b);
@@ -460,14 +460,20 @@ export default function InboxPage() {
   // Empty states of the conversation list: per channel a connect or repair
   // prompt, so every channel can be opened from the rail.
   const current = channel ? channels?.find((c) => c.channel === channel) : undefined;
-  const listEmpty = demo || channel === "" ? undefined : nothingLinked ? (
+  const listEmpty = demo || channel === "" ? undefined : channel === "gmail" ? (
+    // Gmail is not read into the Inbox (restricted Google scope); sending from Mavix still works.
+    <div className="ib-list-connect">
+      <BrandIcon brand="gmail" size={22} />
+      <p>E-mail lezen komt later beschikbaar. Je kunt wel e-mails en campagnes versturen vanaf je eigen adres.</p>
+    </div>
+  ) : nothingLinked ? (
     <div className="ib-list-connect">
       <div className="ib-empty-brands" aria-hidden="true">
         {(["instagram", "gmail"] as Channel[]).map((c) => (
           <BrandIcon key={c} brand={c} size={20} />
         ))}
       </div>
-      <p>Koppel Instagram of Gmail om je klantgesprekken hier te ontvangen en te beantwoorden.</p>
+      <p>Koppel Instagram om je klantgesprekken hier te ontvangen en te beantwoorden.</p>
       <Link className="button primary" href="/account/integraties">
         <Plug size={15} />
         Kanaal koppelen
@@ -485,9 +491,7 @@ export default function InboxPage() {
     <div className="ib-list-connect">
       <BrandIcon brand={channel} size={22} />
       <p>
-        {channel === "gmail" && current.state === "reconnect"
-          ? "Je Gmail-koppeling is verlopen. Bestaande e-mails blijven zichtbaar, nieuwe komen pas binnen na opnieuw koppelen."
-          : `${CHANNEL_NAME[channel]} ${PROBLEM[current.state]}.`}
+        {`${CHANNEL_NAME[channel]} ${PROBLEM[current.state]}.`}
       </p>
       <Link className="button primary" href="/account/integraties">
         {current.state === "selection" ? "Keuze maken" : "Opnieuw koppelen"}

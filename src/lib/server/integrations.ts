@@ -19,14 +19,12 @@ export const scopes = {
     "openid",
     "email",
     "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/gmail.readonly",
   ],
   instagram: ["instagram_business_basic", "instagram_business_manage_messages"],
   google_calendar: [
     "openid",
     "email",
     "https://www.googleapis.com/auth/calendar.events",
-    "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
   ],
 };
 export type Credentials = {

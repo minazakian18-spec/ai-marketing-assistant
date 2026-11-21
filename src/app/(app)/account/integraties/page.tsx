@@ -5,7 +5,7 @@ import { RefreshCw, X } from "lucide-react";
 import { PageHeading, IconButton } from "@/components/ui";
 import { BrandIcon, type Brand } from "@/components/brand-icon";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";
-import { BUSINESS_CARD, CALENDAR_CARD, GMAIL_CARD, GoogleIntegrationCard, SEARCH_CONSOLE_CARD } from "@/components/account/google-integration-card";
+import { GoogleAccountCard } from "@/components/account/google-account-card";
 import { isBrowserDemo } from "@/lib/demo";
 
 type Connection = {
@@ -38,23 +38,17 @@ const GROUPS: [Group, string, string][] = [
 
 const INTEGRATIONS: Integration[] = [
   { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", group: "recommended", provider: "instagram" },
-  { id: "gmail", brand: "gmail", name: "Gmail", description: "E-mails versturen en klantmails in de Inbox lezen.", group: "recommended", provider: "gmail" },
-  { id: "google_business", brand: "google_business", name: "Google Bedrijfsprofiel", description: "Bedrijfsprofiel en Google-reviews, met één koppeling.", group: "recommended", provider: "google_business" },
-  { id: "google_calendar", brand: "google_calendar", name: "Google Agenda", description: "Je afspraken naast je Mavix-planning, in twee richtingen gesynchroniseerd.", group: "productivity", provider: "google_calendar" },
-  { id: "google_search_console", brand: "search_console", name: "Google Search Console", description: "Klikken, vertoningen en zoekwoorden van je website.", group: "productivity", provider: "google_search_console" },
+  { id: "google", brand: "google_business", name: "Google-account", description: "Bedrijfsprofiel en reviews, Agenda, Search Console en e-mail versturen, met één koppeling.", group: "recommended", provider: "google" },
   { id: "linkedin", brand: "linkedin", name: "LinkedIn", description: "Posts plannen voor je bedrijfspagina.", group: "other", planned: true },
   { id: "shopify", brand: "shopify", name: "Shopify", description: "Producten en bestellingen gebruiken in je marketing.", group: "other", planned: true },
   { id: "google_ads", brand: "google_ads", name: "Google Ads", description: "Campagneresultaten en zoektermen bekijken.", group: "other", planned: true },
   { id: "meta_ads", brand: "meta_ads", name: "Meta Ads", description: "Resultaten van Facebook- en Instagram-advertenties.", group: "other", planned: true },
 ];
-const GOOGLE_CARDS = { gmail: GMAIL_CARD, google_business: BUSINESS_CARD, google_calendar: CALENDAR_CARD, google_search_console: SEARCH_CONSOLE_CARD } as const;
 const SCOPE_LABEL: Record<string, string> = {
   openid: "Je Google-account herkennen",
   email: "Je e-mailadres bekijken",
   "https://www.googleapis.com/auth/gmail.send": "E-mails versturen namens jou",
-  "https://www.googleapis.com/auth/gmail.readonly": "E-mails lezen voor de Inbox",
   "https://www.googleapis.com/auth/calendar.events": "Afspraken bekijken en wijzigen",
-  "https://www.googleapis.com/auth/calendar.calendarlist.readonly": "Je lijst met agenda's bekijken",
   "https://www.googleapis.com/auth/business.manage": "Bedrijfsprofiel en reviews beheren",
   instagram_business_basic: "Basisgegevens van je Instagram-account",
   instagram_business_manage_messages: "Instagram-berichten lezen en beantwoorden",
@@ -66,7 +60,6 @@ const SCOPE_LABEL: Record<string, string> = {
   pages_show_list: "Je Facebook-pagina's bekijken",
   pages_manage_metadata: "Berichtmeldingen voor je pagina instellen",
 };
-const GMAIL_READ = "https://www.googleapis.com/auth/gmail.readonly";
 const NOTICES: Record<string, string> = {
   "connected=instagram": "Instagram is verbonden.",
   "connected=gmail": "Gmail is gekoppeld. Je klantmails verschijnen zo in de Inbox.",
@@ -86,6 +79,7 @@ const NOTICES: Record<string, string> = {
   "error=state": "Deze koppelpoging is verlopen, al gebruikt of hoort niet bij jouw sessie. Klik opnieuw op Koppelen en rond de toestemming binnen 10 minuten af.",
   "error=session": "Je was niet meer ingelogd bij Mavix toen Meta je terugstuurde. Log in en klik opnieuw op Koppelen.",
   "error=meta": "Meta heeft de koppeling afgebroken. Controleer of je de juiste Facebook-pagina en het Instagram-account hebt geselecteerd en probeer het opnieuw. Blijft dit gebeuren, neem dan contact op met de beheerder.",
+  "connected=google": "Google is gekoppeld. Elke dienst toont hieronder of hij werkt.",
   "connected=google_business": "Google Bedrijfsprofiel is gekoppeld. Je reviews staan nu onder Reviews.",
   "select=google_business": "Google-account gekoppeld. Kies hieronder je bedrijfslocatie.",
   "error=location_access": "Google-account gekoppeld, maar dit account mag de reviews van de gekozen locatie niet lezen. Kies een andere locatie of koppel het account dat eigenaar of beheerder is.",
@@ -111,7 +105,6 @@ function stateOf(item: Integration, c?: Connection): State {
   if (c.status === "permission_missing") return "permission";
   if (c.status === "selection_required") return "selection";
   if (c.status !== "connected") return "error";
-  if (item.provider === "gmail" && !(c.scopes || []).includes(GMAIL_READ)) return "permission";
   return "connected";
 }
 
@@ -272,16 +265,7 @@ export default function IntegrationsPage() {
           </header>
           <ul className="int-list ui-card">
             {INTEGRATIONS.filter((i) => i.group === g).map((item) => {
-              if (item.id in GOOGLE_CARDS)
-                return (
-                  <GoogleIntegrationCard
-                    key={item.id}
-                    config={GOOGLE_CARDS[item.id as keyof typeof GOOGLE_CARDS]}
-                    demo={demo}
-                    onNotice={setNotice}
-                    openPicker={item.id === "google_business" && gbpPicker}
-                  />
-                );    const c = conn(item);
+              if (item.id === "google") return <GoogleAccountCard key="google" onNotice={setNotice} />;    const c = conn(item);
               const state = loaded ? stateOf(item, c) : item.planned ? "planned" : "disconnected";
               const linked = !item.planned && state !== "disconnected";
               return (
@@ -438,7 +422,6 @@ export default function IntegrationsPage() {
                 </div>
               )}
 
-              {m.provider === "gmail" && mc?.status === "connected" && <GmailImportFilter demo={demo} />}
               {m.provider === "gmail" && mc?.status === "connected" && (
                 <details className="int-section">
                   <summary>Testmail versturen</summary>
@@ -498,53 +481,5 @@ export default function IntegrationsPage() {
         <p>Mavix verwijdert de opgeslagen toegang. Je kunt later opnieuw koppelen.</p>
       </ConfirmDialog>
     </div>
-  );
-}
-
-/** Gmail: which e-mails come into the Inbox (only primary mail; optionally only to these addresses). */
-function GmailImportFilter({ demo }: { demo: boolean }) {
-  const [value, setValue] = useState("");
-  const [saved, setSaved] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (demo) return;
-    fetch("/api/integrations/gmail/status", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => setValue(((d.importTo as string[]) || []).join(", ")))
-      .catch(() => {});
-  }, [demo]);
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    setSaved("");
-    const to = value.split(/[\s,;]+/).map((v) => v.trim()).filter(Boolean);
-    const r = await fetch("/api/integrations/gmail/filter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to }) });
-    const d = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) return setError(d.error || "Opslaan is niet gelukt. Controleer de e-mailadressen.");
-    setSaved(to.length ? "Opgeslagen. Alleen e-mails naar deze adressen komen in de Inbox." : "Opgeslagen. Alle e-mails uit je primaire inbox komen in de Inbox.");
-  }
-  return (
-    <details className="int-section">
-      <summary>Welke e-mails komen in de Inbox?</summary>
-      <form className="int-form" onSubmit={(e) => void save(e)}>
-        <p className="int-hint">Mavix haalt alleen e-mails uit je primaire inbox op. Nieuwsbrieven, reclame, sociale meldingen en updates (zoals facturen en verzendberichten) blijven buiten de Inbox.</p>
-        <label>
-          Alleen e-mails naar deze adressen (optioneel)
-          <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Bijvoorbeeld: reserveringen@jouwzaak.nl, info@jouwzaak.nl" disabled={demo || busy} />
-        </label>
-        {error && (
-          <p role="alert" className="int-error">
-            {error}
-          </p>
-        )}
-        {saved && <p role="status" className="int-hint">{saved}</p>}
-        <button type="submit" className="button secondary" disabled={demo || busy}>
-          {busy ? "Opslaan…" : "Opslaan"}
-        </button>
-      </form>
-    </details>
   );
 }
