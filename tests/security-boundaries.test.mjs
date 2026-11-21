@@ -42,6 +42,7 @@ const PUBLIC = {
   "/calendar/webhook": "channel token",
   "/automation/cron": "CRON_SECRET",
   "/seo/cron": "CRON_SECRET",
+  "/cron/publish": "CRON_SECRET",
 };
 
 test("every API route either requires a signed-in member or is a documented public endpoint", () => {
@@ -56,7 +57,7 @@ test("every API route either requires a signed-in member or is a documented publ
 });
 
 test("every state-changing handler checks the request origin, unless it is a signed webhook or cron", () => {
-  const signed = ["/webhooks/meta", "/webhooks/resend", "/billing/webhook", "/calendar/webhook", "/automation/cron", "/seo/cron", "/newsletter/subscribe", "/newsletter/confirm", "/newsletter/unsubscribe"];
+  const signed = ["/webhooks/meta", "/webhooks/resend", "/billing/webhook", "/calendar/webhook", "/automation/cron", "/seo/cron", "/cron/publish", "/newsletter/subscribe", "/newsletter/confirm", "/newsletter/unsubscribe"];
   for (const f of routes("src/app/api")) {
     const src = fs.readFileSync(f, "utf8");
     const writes = /export (async )?function (POST|PUT|PATCH|DELETE)\b/.test(src);

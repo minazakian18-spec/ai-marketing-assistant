@@ -1,5 +1,5 @@
 "use client";
-import { postTitle } from "@/lib/instagram-publish";
+import { postCounts, postTitle } from "@/lib/instagram-publish";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import {
@@ -172,9 +172,9 @@ function Workspace() {
         setMessage(
           posts.length +
             " concepten gemaakt: " +
-            posts.filter((p) => p.status === "draft").length +
+            postCounts(posts).drafts +
             " in de goedkeuringswachtrij, " +
-            posts.filter((p) => p.status === "scheduled").length +
+            postCounts(posts).upcoming +
             " in de planning." +
             (skipped
               ? " " + skipped + " overgeslagen bij ontbrekende informatie."

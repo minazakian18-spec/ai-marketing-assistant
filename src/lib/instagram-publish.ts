@@ -105,3 +105,16 @@ export function postTitle(p: Pick<Post, "prompt" | "caption"> & { title?: string
   const t = first.length <= 60 ? first : first.slice(0, 60).replace(/\s+\S*$/, "") + "…";
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
+
+/** One set of counts for Social, the planner and messages (uses scheduleState). */
+export function postCounts(posts: Pick<Post, "status" | "date">[], now = Date.now()) {
+  const c = { drafts: 0, upcoming: 0, missed: 0, published: 0, failed: 0 };
+  for (const p of posts) {
+    const s = scheduleState(p, now);
+    if (s) c[s]++;
+    else if (p.status === "draft") c.drafts++;
+    else if (p.status === "published") c.published++;
+    else if (p.status === "failed") c.failed++;
+  }
+  return c;
+}
