@@ -9,7 +9,11 @@ export type Testimonial = {
 
 // No fabricated quotes. Pass real, verified testimonials in here once they
 // exist — until then this list stays empty and the section renders nothing.
-const realTestimonials: Testimonial[] = [];
+const realTestimonials: Testimonial[] = [
+  // TODO(Telepizza): spot for the quote of Telepizza Amstelveen (beta partner).
+  // Fill in only the literal, approved text and uncomment; nothing is invented here.
+  // { quote: "…", name: "…", role: "Telepizza Amstelveen", rating: 5 },
+];
 
 export function Testimonials() {
   if (realTestimonials.length === 0) return null;

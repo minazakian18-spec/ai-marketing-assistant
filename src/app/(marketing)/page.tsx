@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Hero } from "@/components/marketing/hero";
 import { PartnersStrip } from "@/components/marketing/partners-strip";
+import { Testimonials } from "@/components/marketing/testimonials";
 import { CoreProducts } from "@/components/marketing/core-products";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { Audiences } from "@/components/marketing/audiences";
@@ -35,6 +36,8 @@ export default function MarketingHome() {
       <HashScroll />
       <Hero />
       <PartnersStrip />
+      {/* Renders only once a real, approved quote is filled in (components/marketing/testimonials.tsx). */}
+      <Testimonials />
       <Audiences />
       <CoreProducts />
       <HowItWorks />
