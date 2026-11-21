@@ -10,7 +10,18 @@ export function Pending({ children }: { children: ReactNode }) {
 }
 
 /** Who is responsible, with only the details that are confirmed. */
-export function Controller() {
+export function Controller({ lang = "nl" }: { lang?: "nl" | "en" }) {
+  if (lang === "en")
+    return (
+      <ul className="lg-facts">
+        <li>
+          <strong>Company:</strong> {LEGAL.entity ?? "Follows."}
+        </li>
+        <li>
+          <strong>Contact:</strong> {LEGAL.privacyEmail ? <a href={"mailto:" + LEGAL.privacyEmail}>{LEGAL.privacyEmail}</a> : "Follows."}
+        </li>
+      </ul>
+    );
   return (
     <ul className="lg-facts">
       <li>
@@ -30,20 +41,52 @@ export function Controller() {
   );
 }
 
-export function LegalDocument({ title, intro, sections, current }: { title: string; intro: ReactNode; sections: LegalSection[]; current: string }) {
+const EN_PAGES = [
+  { href: "/en/privacy", label: "Privacy Policy" },
+  { href: "/en/terms", label: "Terms of Service" },
+] as const;
+
+export function LegalDocument({
+  title,
+  intro,
+  sections,
+  current,
+  lang = "nl",
+  alternate,
+}: {
+  title: string;
+  intro: ReactNode;
+  sections: LegalSection[];
+  current: string;
+  lang?: "nl" | "en";
+  /** The same page in the other language. */
+  alternate?: string;
+}) {
+  const en = lang === "en";
+  const pages: readonly { href: string; label: string }[] = en ? EN_PAGES : LEGAL_PAGES;
   return (
-    <main className="lg">
+    <main className="lg" lang={en ? "en" : undefined}>
       <div className="mkt-container lg-wrap">
         <header className="lg-head">
-          <span className="mkt-eyebrow">Juridisch</span>
+          <span className="mkt-eyebrow">{en ? "Legal" : "Juridisch"}</span>
           <h1>{title}</h1>
           <p className="lg-intro">{intro}</p>
-          <p className="lg-meta">Laatst bijgewerkt: {LEGAL.updated}</p>
-          <p className="lg-draft">Mavix is in besloten beta. Deze tekst is een zorgvuldig opgesteld concept en wordt vóór de commerciële lancering juridisch gecontroleerd. Waar een gegeven nog ontbreekt, staat dat er eerlijk bij.</p>
+          <p className="lg-meta">
+            {en ? "Last updated: " + LEGAL.updatedEn : "Laatst bijgewerkt: " + LEGAL.updated}
+            {alternate && (
+              <>
+                {" · "}
+                <Link href={alternate} hrefLang={en ? "nl" : "en"} lang={en ? "nl" : "en"}>
+                  {en ? "Nederlands" : "English"}
+                </Link>
+              </>
+            )}
+          </p>
+          {!en && <p className="lg-draft">Mavix is in besloten beta. Deze tekst is een zorgvuldig opgesteld concept en wordt vóór de commerciële lancering juridisch gecontroleerd. Waar een gegeven nog ontbreekt, staat dat er eerlijk bij.</p>}
         </header>
         <div className="lg-layout">
-          <nav className="lg-toc" aria-label="Inhoud van deze pagina">
-            <p>Inhoud</p>
+          <nav className="lg-toc" aria-label={en ? "Contents of this page" : "Inhoud van deze pagina"}>
+            <p>{en ? "Contents" : "Inhoud"}</p>
             <ol>
               {sections.map((s) => (
                 <li key={s.id}>
@@ -63,8 +106,8 @@ export function LegalDocument({ title, intro, sections, current }: { title: stri
             ))}
           </article>
         </div>
-        <nav className="lg-related" aria-label="Andere juridische pagina's">
-          {LEGAL_PAGES.filter((p) => p.href !== current).map((p) => (
+        <nav className="lg-related" aria-label={en ? "Other legal pages" : "Andere juridische pagina's"}>
+          {pages.filter((p) => p.href !== current).map((p) => (
             <Link key={p.href} href={p.href}>
               {p.label}
             </Link>

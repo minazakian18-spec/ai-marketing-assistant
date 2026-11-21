@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Controller, LegalDocument, Pending, type LegalSection } from "@/components/marketing/legal-document";
+import { LEGAL } from "@/lib/legal";
 import { pageMetadata } from "@/lib/site";
 
 export const metadata: Metadata = pageMetadata({
@@ -44,7 +45,7 @@ const sections: LegalSection[] = [
           <strong>Bestanden:</strong> foto&apos;s, logo&apos;s en AI-beelden in je Bibliotheek. Ze staan in afgeschermde opslag en zijn alleen via tijdelijke, beveiligde links te bekijken.
         </li>
         <li>
-          <strong>Klantgegevens die jij beheert:</strong> contacten en hun toestemming voor nieuwsbrieven, afmeldingen, reviews van je Google-bedrijfsprofiel en berichten uit gekoppelde kanalen (Gmail en Instagram) in je Inbox.
+          <strong>Klantgegevens die jij beheert:</strong> contacten en hun toestemming voor nieuwsbrieven, afmeldingen, reviews van je Google-bedrijfsprofiel en berichten uit Instagram in je Inbox, en e-mails die je zelf via Mavix verstuurt. Mavix leest je Gmail-postvak niet.
         </li>
         <li>
           <strong>AI-gegevens:</strong> de opdrachten die je geeft, de context uit je Brand Hub die daarbij hoort, en de gegenereerde teksten en beelden. Per AI-aanvraag houden we bij hoeveel tokens en kosten er zijn gebruikt, niet de inhoud.
@@ -96,6 +97,9 @@ const sections: LegalSection[] = [
           Voor AI-teksten en AI-afbeeldingen stuurt Mavix je opdracht en de benodigde context naar OpenAI. Mavix stuurt alleen wat voor die opdracht nodig is. AI-resultaten zijn altijd concepten: jij beslist wat ermee gebeurt.
         </p>
         <p>
+          AI wordt alleen gebruikt voor de functie die je zelf aanvraagt, zoals een reviewantwoord, een post of een e-mail. Mavix gebruikt jouw gegevens en gegevens uit Google-diensten <strong>niet om algemene AI-modellen te trainen</strong>, niet voor advertenties en verkoopt ze niet.
+        </p>
+        <p>
           Hoe lang OpenAI gegevens bewaart en of ze worden gebruikt voor training, hangt af van de voorwaarden van OpenAI voor zakelijke API-klanten. <Pending>De precieze afspraken en het bewaarbeleid worden hier vermeld zodra ze zijn vastgelegd.</Pending>
         </p>
       </>
@@ -106,28 +110,66 @@ const sections: LegalSection[] = [
     title: "Koppelingen met Meta en Google",
     body: (
       <>
-        <p>Je koppelt diensten zelf vanuit Integraties. Mavix vraagt alleen de toestemmingen die nodig zijn voor de functie die je gebruikt:</p>
-        <ul>
-          <li>
-            <strong>Instagram en Facebook (Meta):</strong> je professionele Instagram-account en de gekoppelde Facebook-pagina vinden, berichten ontvangen en beantwoorden in je Inbox, en (zodra beschikbaar) posts publiceren.
-          </li>
-          <li>
-          </li>
-          <li>
-            <strong>Gmail:</strong> e-mails lezen voor je Inbox en namens jou versturen.
-          </li>
-          <li>
-            <strong>Google Agenda:</strong> afspraken en geplande content tonen en aanmaken in je agenda.
-          </li>
-          <li>
-            <strong>Google Search Console:</strong> gegevens over hoe je website in Google wordt gevonden, voor SEO Intelligence.
-          </li>
-          <li>
-            <strong>Google-bedrijfsprofiel:</strong> reviews lezen en beantwoorden.
-          </li>
-        </ul>
+        <p>Je koppelt diensten zelf vanuit Integraties. Mavix vraagt alleen de toestemmingen die nodig zijn voor de functie die je gebruikt.</p>
         <p>
-          Toegangssleutels worden versleuteld opgeslagen, per werkruimte, en nooit naar je browser gestuurd. Je kunt een koppeling altijd verbreken in Integraties, en de toegang ook intrekken bij Google of Meta zelf. Mavix gebruikt gegevens uit Google-diensten alleen om de functies te leveren die je in Mavix gebruikt.
+          <strong>Instagram en Facebook (Meta):</strong> je professionele Instagram-account en de gekoppelde Facebook-pagina vinden, berichten ontvangen en beantwoorden in je Inbox, en posts publiceren die jij hebt goedgekeurd of ingepland.
+        </p>
+        <p>
+          <strong>Google:</strong> je koppelt Google met één Google-account. Per toestemming (scope) gebruiken we dit, en niets anders:
+        </p>
+        <div className="lg-table-wrap">
+          <table className="lg-table">
+            <thead>
+              <tr>
+                <th scope="col">Toestemming</th>
+                <th scope="col">Welke gegevens</th>
+                <th scope="col">Waarvoor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <code>openid</code>, <code>email</code>, <code>profile</code>
+                </td>
+                <td>Je naam, e-mailadres en Google-account-ID</td>
+                <td>Inloggen en laten zien welk Google-account gekoppeld is.</td>
+              </tr>
+              <tr>
+                <td>
+                  <code>business.manage</code>
+                </td>
+                <td>Je bedrijfsprofiel, locaties en de reviews daarop</td>
+                <td>Reviews tonen en jouw antwoorden plaatsen. Jij keurt elk antwoord goed, of zet zelf automatisch antwoorden aan.</td>
+              </tr>
+              <tr>
+                <td>
+                  <code>calendar.events</code>
+                </td>
+                <td>Afspraken in je hoofdagenda</td>
+                <td>Je marketingplanning tonen en afspraken die je in Mavix maakt in je agenda zetten.</td>
+              </tr>
+              <tr>
+                <td>
+                  <code>webmasters.readonly</code>
+                </td>
+                <td>Zoekcijfers van je website (klikken, vertoningen, zoekwoorden)</td>
+                <td>Laten zien hoe je website in Google wordt gevonden. Alleen lezen; we wijzigen niets.</td>
+              </tr>
+              <tr>
+                <td>
+                  <code>gmail.send</code>
+                </td>
+                <td>Alleen het versturen van e-mail</td>
+                <td>E-mails en antwoorden versturen vanaf je eigen adres, als jij op Versturen klikt. Mavix leest, wijzigt of verwijdert je e-mail niet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Gegevens uit Google-diensten worden niet verkocht, niet gebruikt voor advertenties en niet gebruikt om algemene AI-modellen te trainen. Medewerkers van Mavix kunnen ze niet inzien, behalve met jouw toestemming voor support, als de wet dat vraagt of om misbruik te onderzoeken.</p>
+        <p lang="en">Mavix&apos;s use and transfer of information received from Google APIs to any other app will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+        <p>
+          <strong>Ontkoppelen:</strong> ga naar Integraties en klik op Ontkoppelen. Mavix trekt de toegang dan ook bij Google in en wist de opgeslagen sleutels. Je kunt de toegang ook zelf intrekken via{" "}
+          <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
         </p>
       </>
     ),
@@ -172,9 +214,12 @@ const sections: LegalSection[] = [
     title: "Hoe lang we gegevens bewaren",
     body: (
       <>
+        <p>Gegevens staan in de database en opslag van Supabase in de Europese Unie (Ierland). Toegangssleutels van koppelingen zijn versleuteld met AES-256-GCM.</p>
         <p>We bewaren gegevens niet langer dan nodig voor het doel waarvoor ze zijn verzameld. Wat we nu al concreet doen:</p>
         <ul>
-          <li>Verbreek je een koppeling, dan verwijdert Mavix de toegangssleutels van die koppeling.</li>
+          <li>Verbreek je een koppeling, dan verwijdert Mavix direct de toegangssleutels van die koppeling. Bij Google trekken we de toegang ook in.</li>
+          <li>Reviews, agenda-afspraken en zoekcijfers uit Google worden opgehaald wanneer je ze bekijkt en alleen bewaard zolang de koppeling actief is.</li>
+          <li>Vraag je verwijdering aan, dan verwijderen we je werkruimte en de bijbehorende gegevens binnen 30 dagen.</li>
           <li>Een beveiligingscode voor het koppelen van een dienst is maximaal 10 minuten geldig.</li>
           <li>Deactiveer je een werkruimte, dan verliest iedereen direct de toegang. De gegevens blijven tijdelijk bewaard, zodat een vergissing hersteld kan worden. Wil je dat ze definitief worden verwijderd, dien dan een verwijderverzoek in.</li>
           <li>Gegevens die we wettelijk moeten bewaren, zoals facturen zodra betaalde abonnementen actief zijn, bewaren we zolang de wet dat voorschrijft (voor de belastingdienst in Nederland in de regel zeven jaar).</li>
@@ -212,7 +257,7 @@ const sections: LegalSection[] = [
             <strong>Correctie:</strong> pas je gegevens aan in je account en in de Brand Hub.
           </li>
           <li>
-            <strong>Verwijdering:</strong> zie <Link href="/gegevens-verwijderen">Gegevens verwijderen</Link>.
+            <strong>Verwijdering:</strong> mail naar {LEGAL.privacyEmail} of zie <Link href="/gegevens-verwijderen">Gegevens verwijderen</Link>.
           </li>
         </ul>
         <p>
@@ -245,6 +290,7 @@ export default function PrivacyPage() {
     <LegalDocument
       title="Privacybeleid"
       current="/privacy"
+      alternate="/en/privacy"
       intro="Hoe Mavix omgaat met de gegevens van ondernemers die Mavix gebruiken en van hun klanten: welke gegevens, waarom, met welke diensten en welke rechten je hebt."
       sections={sections}
     />

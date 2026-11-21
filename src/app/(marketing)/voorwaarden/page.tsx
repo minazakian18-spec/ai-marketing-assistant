@@ -77,6 +77,9 @@ const sections: LegalSection[] = [
       <ul>
         <li>Je koppelt zelf accounts van Google, Meta en andere diensten. Die accounts blijven van jou of van je bedrijf. Mavix wordt geen eigenaar van je pagina&apos;s, accounts of bedrijfsportfolio&apos;s.</li>
         <li>Je kunt een koppeling altijd verbreken in Mavix of bij het platform zelf.</li>
+        <li>
+          Gegevens uit Google-diensten gebruikt Mavix alleen voor de functies die jij in Mavix gebruikt, zoals beschreven in het <Link href="/privacy#koppelingen">privacybeleid</Link>. Ze worden niet verkocht, niet voor advertenties gebruikt en niet gebruikt om algemene AI-modellen te trainen.
+        </li>
         <li>Mavix is afhankelijk van die platforms. Als een platform zijn regels, toegang of techniek verandert, kan een functie tijdelijk of blijvend minder werken. Daar heeft Mavix geen invloed op.</li>
       </ul>
     ),
@@ -179,6 +182,7 @@ export default function TermsPage() {
     <LegalDocument
       title="Algemene voorwaarden"
       current="/voorwaarden"
+      alternate="/en/terms"
       intro="De afspraken tussen Mavix en de ondernemers die Mavix gebruiken, tijdens de besloten beta en daarna."
       sections={sections}
     />

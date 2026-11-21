@@ -41,6 +41,8 @@ function LoginForm() {
       footer={
         <p className="mkt-auth-footer-link">
           Nog geen account? <Link href="/aanvragen">Account aanvragen</Link>
+          <br />
+          <Link href="/privacy">Privacybeleid</Link> · <Link href="/voorwaarden">Voorwaarden</Link> · <Link href="/en/privacy" hrefLang="en">Privacy (EN)</Link>
         </p>
       }
     >

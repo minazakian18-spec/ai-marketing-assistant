@@ -65,6 +65,8 @@ export function MarketingFooter() {
             <Link href="/privacy">Privacy</Link>
             <Link href="/voorwaarden">Voorwaarden</Link>
             <Link href="/cookies">Cookies</Link>
+            <Link href="/en/privacy" hrefLang="en">Privacy (EN)</Link>
+            <Link href="/en/terms" hrefLang="en">Terms (EN)</Link>
           </div>
         </div>
       </div>
