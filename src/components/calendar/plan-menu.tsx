@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, Film, ImagePlus, Instagram, Mail } from "lucide-react";
+import { CalendarPlus, Film, ImagePlus } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { PLAN_OPTIONS, planningHref, type PlanKind, type PlanSlot } from "@/lib/calendar/planning";
 
 export const PLAN_ICONS: Record<PlanKind, typeof Mail> = {

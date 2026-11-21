@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, CalendarDays, CalendarClock, Instagram, Mail } from "lucide-react";
+import { ArrowUpRight, CalendarDays, CalendarClock } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { Card, EmptyState, SectionHeader } from "@/components/ui";
 
 export type PlanItem = {

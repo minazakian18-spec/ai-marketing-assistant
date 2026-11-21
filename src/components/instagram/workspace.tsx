@@ -12,15 +12,8 @@ import { workspaceView, modeName } from "@/lib/workspace-navigation";
 import { readPlanningContext, weekdayOf } from "@/lib/calendar/planning";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Sparkles,
-  PenLine,
-  Orbit,
-  CheckCheck,
-  CalendarDays,
-  Instagram,
-  Plug,
-} from "lucide-react";
+import { Sparkles, PenLine, Orbit, CheckCheck, CalendarDays, Plug } from "lucide-react";
+import { InstagramLogo as Instagram } from "@/components/brand-logos";
 import { PageHeading } from "@/components/ui";
 import { useWorkspace } from "@/components/workspace-provider";
 import {

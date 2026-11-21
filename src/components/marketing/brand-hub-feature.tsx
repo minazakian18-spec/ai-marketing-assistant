@@ -1,4 +1,5 @@
-import { Building2, Goal, Mail, MessageSquareQuote, Package, Palette, ScrollText, Star, Users, Volume2 } from "lucide-react";
+import { Building2, Goal, MessageSquareQuote, Package, Palette, ScrollText, Star, Users, Volume2 } from "lucide-react";
+import { GmailLogo as Mail } from "@/components/brand-logos";
 import { BrandIcon } from "@/components/brand-icon";
 import { Reveal } from "./reveal";
 import { InView } from "./in-view";

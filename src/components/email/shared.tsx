@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Check, AlertCircle, Mail, ArrowUpRight } from "lucide-react";
+import { Check, AlertCircle, ArrowUpRight } from "lucide-react";
+import { GmailLogo as Mail } from "@/components/brand-logos";
 import {
   emailReadiness,
   type EmailCampaign,

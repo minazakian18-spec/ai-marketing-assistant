@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { Star, Instagram, Mail, CalendarDays } from "lucide-react";
+import { Star, CalendarDays } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { Reveal } from "./reveal";
 
 const demos = [

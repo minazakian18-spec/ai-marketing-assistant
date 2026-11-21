@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Check, Copy, ExternalLink, FileText, History, ImageIcon, Instagram, Loader2, Mail, RefreshCw, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Copy, ExternalLink, FileText, History, ImageIcon, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Mavi } from "@/components/mavi";
 import { generateCampaignDraft, type CampaignDraft } from "@/lib/api-client";

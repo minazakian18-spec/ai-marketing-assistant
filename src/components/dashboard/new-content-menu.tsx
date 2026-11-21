@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { usePresence } from "@/components/use-presence";
 import { useEffect, useRef, useState } from "react";
-import { Plus, ChevronDown, Instagram, Mail } from "lucide-react";
+import { Plus, ChevronDown } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 export function NewContentMenu() {
   const [open, setOpen] = useState(false);
   const present = usePresence(open);

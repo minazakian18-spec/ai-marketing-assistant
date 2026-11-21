@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Send, Mail, Newspaper, Tag, Reply, HeartHandshake, RefreshCw, Wand2, Monitor, Smartphone, Save, Check, CalendarClock, Copy, Undo2, Eye, PenLine, ChevronDown } from "lucide-react";
+import { Send, Newspaper, Tag, Reply, HeartHandshake, RefreshCw, Wand2, Monitor, Smartphone, Save, Check, CalendarClock, Copy, Undo2, Eye, PenLine, ChevronDown } from "lucide-react";
+import { GmailLogo as Mail } from "@/components/brand-logos";
 import { GenerationSkeleton, previewMock } from "@/components/generation-skeleton";
 import { GlowBorder } from "@/components/glow-border";
 import { Mavi } from "@/components/mavi";

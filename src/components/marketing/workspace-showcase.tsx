@@ -1,7 +1,8 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, BarChart3, CalendarDays, Inbox, LayoutDashboard, Mail, MessageSquareText, PenSquare, Sparkles, Star, type LucideIcon } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, Inbox, LayoutDashboard, MessageSquareText, PenSquare, Sparkles, Star, type LucideIcon } from "lucide-react";
+import { GmailLogo as Mail } from "@/components/brand-logos";
 import { BrandIcon } from "@/components/brand-icon";
 import { Reveal } from "./reveal";
 

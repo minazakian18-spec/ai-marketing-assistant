@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Mail, CalendarDays } from "lucide-react";
+import { CalendarDays } from "lucide-react";
+import { GmailLogo as Mail } from "@/components/brand-logos";
 import { campaignError, type EmailCampaign } from "@/lib/email-model";
 import { recipients } from "@/lib/contact-data";
 import { EmailStatus } from "./shared";

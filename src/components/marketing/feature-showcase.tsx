@@ -1,13 +1,5 @@
-import {
-  Star,
-  Instagram,
-  Mail,
-  CalendarDays,
-  ChartNoAxesCombined,
-  Images,
-  Plug,
-  Check,
-} from "lucide-react";
+import { Star, CalendarDays, ChartNoAxesCombined, Images, Plug, Check } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { Reveal } from "./reveal";
 
 const features = [

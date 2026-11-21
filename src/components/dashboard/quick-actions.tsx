@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarPlus, ChartNoAxesCombined, Instagram, Mail, MessageSquareReply } from "lucide-react";
+import { ArrowUpRight, CalendarPlus, ChartNoAxesCombined, MessageSquareReply } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 
 // Tool shortcuts. `tone` picks a calm icon tint (see .qa-tone-* in polish.css).
 const ACTIONS = [

@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronDown, FileText, Film, Instagram, Mail, PenLine, Wand2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, FileText, Film, PenLine, Wand2 } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { CHANNELS, COPY_KINDS, type CopyKind, type StudioChannel } from "@/lib/studio";
 import "../../../studio.css";
 

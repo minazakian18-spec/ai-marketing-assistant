@@ -1,14 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import {
-  Instagram,
-  Mail,
-  Film,
-  ArrowUpRight,
-  CalendarDays,
-  CheckCircle2,
-} from "lucide-react";
+import { Film, ArrowUpRight, CalendarDays, CheckCircle2 } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { Artwork } from "@/components/ui";
 import { shortDate, type DashboardItem } from "@/lib/dashboard-data";
 export function ChannelIcon({ item }: { item: DashboardItem }) {

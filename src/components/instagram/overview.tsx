@@ -1,17 +1,8 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import {
-  Instagram,
-  Plus,
-  ArrowUpRight,
-  CalendarDays,
-  CheckCheck,
-  Image as ImageIcon,
-  Film,
-  Layers,
-  Plug,
-} from "lucide-react";
+import { Plus, ArrowUpRight, CalendarDays, CheckCheck, Image as ImageIcon, Film, Layers, Plug } from "lucide-react";
+import { InstagramLogo as Instagram } from "@/components/brand-logos";
 import { modeName } from "@/lib/workspace-navigation";
 import type { Post } from "@/lib/types";
 import type { InstagramSettings } from "@/lib/instagram-model";

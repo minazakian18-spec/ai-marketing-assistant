@@ -1,19 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  X,
-  Pencil,
-  Copy,
-  Trash2,
-  Check,
-  XCircle,
-  CalendarClock,
-  Sparkles,
-  Instagram,
-  Mail,
-  Eye,
-} from "lucide-react";
+import { X, Pencil, Copy, Trash2, Check, XCircle, CalendarClock, Sparkles, Eye } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { contentHref } from "@/lib/calendar/planning";
 import { usePresence } from "@/components/use-presence";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";

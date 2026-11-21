@@ -1,5 +1,6 @@
 "use client";
-import { CalendarDays, Instagram, Lightbulb, ListChecks, Mail, type LucideIcon } from "lucide-react";
+import { CalendarDays, Lightbulb, ListChecks, type LucideIcon } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { AGENT_SUGGESTIONS } from "@/lib/agent/capabilities";
 
 // Example prompts, only ones the agent can really handle (capability registry).

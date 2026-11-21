@@ -1,15 +1,7 @@
 import Link from "next/link";
 import { publishedLabel, sentLabel } from "@/lib/status-labels";
-import {
-  LayoutDashboard,
-  PenLine,
-  Layers,
-  ArrowUpRight,
-  Plus,
-  CalendarDays,
-  Mail,
-  Instagram,
-} from "lucide-react";
+import { LayoutDashboard, PenLine, Layers, ArrowUpRight, Plus, CalendarDays } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import type { ReactNode } from "react";
 import { modeName, type WorkspaceView } from "@/lib/workspace-navigation";
 // In-page sections of a channel workspace. The ?tab= values (overview,
@@ -235,6 +227,7 @@ export function ChannelOverview({
           );
         })}
       </div>
+      {!email && (
       <section className="channel-mode-section">
         <div className="ig-section-title">
           <h2>Welke modus gebruik je?</h2>
@@ -267,6 +260,7 @@ export function ChannelOverview({
           ))}
         </div>
       </section>
+      )}
     </>
   );
 }

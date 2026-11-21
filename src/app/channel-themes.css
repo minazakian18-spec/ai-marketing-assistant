@@ -1,4 +1,6 @@
-/* Marketing module colours. Each module has ONE accent (Social Mavix purple, E-mail
+/* One business-like accent: every module uses Mavix purple (21-11-2026).
+   The per-module tokens stay, so a module colour can return in one place.
+   Former note: Marketing module colours. Each module has ONE accent (Social Mavix purple, E-mail
    red, Reviews yellow, Google Ads green), defined once below as --mod-*
    tokens. Inside a module root the shared accent tokens (buttons, tabs,
    focus rings, soft surfaces) are pointed at that module's tokens, so shared
@@ -27,28 +29,27 @@
   --mod-on: #fff;
 }
 .email-workspace {
-  --mod: #dc2626;
-  --mod-hover: #b91c1c;
-  --mod-strong: #b91c1c;
-  --mod-soft: #fef2f2;
-  --mod-line: rgba(220, 38, 38, 0.24);
+  --mod: #6d28d9;
+  --mod-hover: #5b21b6;
+  --mod-strong: #5b21b6;
+  --mod-soft: #f3effd;
+  --mod-line: rgba(109, 40, 217, 0.24);
   --mod-on: #fff;
 }
 .rv-workspace {
-  --mod: #eab308;
-  --mod-hover: #ca8a04;
-  --mod-strong: #854d0e; /* yellow is unreadable as text: dark amber instead */
-  --mod-soft: #fefce8;
-  --mod-line: rgba(202, 138, 4, 0.32);
-  --mod-on: #422006; /* dark text on yellow buttons */
+  --mod: #6d28d9;
+  --mod-hover: #5b21b6;
+  --mod-strong: #5b21b6;
+  --mod-soft: #f3effd;
+  --mod-line: rgba(109, 40, 217, 0.24);
+  --mod-on: #fff;
 }
 .ads {
-  --mod: #16a34a;
-  --mod-fill: #15803d; /* white text on #16a34a is only 3.3:1; this is 5.0:1 */
-  --mod-hover: #166534;
-  --mod-strong: #15803d;
-  --mod-soft: #f0fdf4;
-  --mod-line: rgba(22, 163, 74, 0.24);
+  --mod: #6d28d9;
+  --mod-hover: #5b21b6;
+  --mod-strong: #5b21b6;
+  --mod-soft: #f3effd;
+  --mod-line: rgba(109, 40, 217, 0.24);
   --mod-on: #fff;
 }
 

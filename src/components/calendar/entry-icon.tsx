@@ -1,4 +1,5 @@
-import { CalendarDays, CheckSquare, Instagram, Mail, Repeat } from "lucide-react";
+import { CalendarDays, CheckSquare, Repeat } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import type { Entry } from "./model";
 
 // Subtle source marker: Instagram/Mail for Mavix content, a checkbox for

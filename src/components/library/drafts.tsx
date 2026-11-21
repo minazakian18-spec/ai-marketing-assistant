@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { Instagram, Mail } from "lucide-react";
+
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { EmptyState } from "@/components/ui";
 import type { Workspace } from "@/lib/types";
 

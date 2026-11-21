@@ -142,6 +142,8 @@ export function CreateStudio({
   const [imageState, setImageState] = useState<{ state: "idle" | "loading" | "error"; message?: string }>({ state: "idle" });
   const [editOpen, setEditOpen] = useState(false);
   const [editBrief, setEditBrief] = useState("");
+  // What happens with the own photo: used as it is, or adjusted with AI in the house style.
+  const [ownMode, setOwnMode] = useState<"as-is" | "ai">("as-is");
   const [status, setStatus] = useState<SaveStatus>(editPost ? "saved" : "idle");
   const [history, setHistory] = useState<{ caption: string; hashtags: string }[]>([]);
   const [alternatives, setAlternatives] = useState<string[]>([]);
@@ -281,6 +283,20 @@ export function CreateStudio({
         },
       });
       showImageOutcome(r, again);
+      // Own photo + "Pas aan met AI": one click, no separate instruction needed.
+      if (hasOwn && ownMode === "ai" && r.media[0]) {
+        setBusy("image");
+        setMessage("Caption klaar. Mavix past je foto nu aan in jouw huisstijl…");
+        try {
+          const image = await generateImage({ mode: "edit", brief: (prompt.trim() + ". Maak de foto mooier en professioneler in de huisstijl van het merk; houd het product en de zaak herkenbaar.").slice(0, 900), format: "square", photo: r.media[0], useBrand: true });
+          const next = [image, ...r.media].slice(0, 4);
+          setPhotos(next);
+          await keepImage(next, r.post);
+          setMessage("Klaar: je foto is aangepast in je huisstijl. Het origineel staat er nog naast.");
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Je foto kon niet met AI worden aangepast. Je originele foto wordt gebruikt.");
+        }
+      }
     } catch (e) {
       setStatus(post ? "saved" : "idle");
       setError(e instanceof Error ? e.message : "Genereren is niet gelukt. Probeer het opnieuw.");
@@ -551,13 +567,20 @@ export function CreateStudio({
         maxLength={2000}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
+        onPaste={(e) => {
+          // Ctrl/Cmd+V with a screenshot or image: attach it as an own photo.
+          const files = Array.from(e.clipboardData?.files || []).filter((f) => ["image/png", "image/jpeg", "image/webp"].includes(f.type));
+          if (!files.length) return;
+          e.preventDefault();
+          void addOwnPhotos(files);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             void generate(!!post);
           }
         }}
-        placeholder={post ? "Pas je opdracht aan en genereer opnieuw" : "Bijvoorbeeld: onze pizza van de maand, voor gezinnen in het weekend"}
+        placeholder={post ? "Pas je opdracht aan en genereer opnieuw" : "Bijvoorbeeld: onze pizza van de maand, voor gezinnen in het weekend. Tip: plak een foto of screenshot met Ctrl+V."}
       />
       {/* Own photos attached to this post (they take the place of the AI image). */}
       {!post && hasOwn && (
@@ -573,6 +596,24 @@ export function CreateStudio({
                 </button>
               </span>
             ))}
+        </div>
+      )}
+      {!post && hasOwn && (
+        <div className="cs-own-mode" role="radiogroup" aria-label="Wat doet Mavix met je foto?">
+          <button type="button" role="radio" aria-checked={ownMode === "as-is"} disabled={!!busy} onClick={() => setOwnMode("as-is")}>
+            <Check size={14} aria-hidden="true" />
+            <span>
+              <strong>Gebruik mijn foto zoals hij is</strong>
+              <small>Mavix schrijft alleen de caption.</small>
+            </span>
+          </button>
+          <button type="button" role="radio" aria-checked={ownMode === "ai"} disabled={!!busy} onClick={() => setOwnMode("ai")}>
+            <Wand2 size={14} aria-hidden="true" />
+            <span>
+              <strong>Pas de foto aan met AI</strong>
+              <small>Mooier en in jouw huisstijl. Het origineel blijft bewaard.</small>
+            </span>
+          </button>
         </div>
       )}
       <div className="cs-brief-bar">
@@ -614,7 +655,7 @@ export function CreateStudio({
   // What Mavix will do with the brief, said plainly before the first click.
   const imagePlanNote = hasOwn ? (
     <p className="cs-plan-note">
-      <Check size={14} aria-hidden="true" /> Mavix schrijft de caption bij jouw eigen foto.
+      <Check size={14} aria-hidden="true" /> {ownMode === "ai" ? "Mavix schrijft de caption en past je foto aan in jouw huisstijl." : "Mavix schrijft de caption bij jouw eigen foto."}
     </p>
   ) : brandPhotos.length ? (
     <p className="cs-plan-note">

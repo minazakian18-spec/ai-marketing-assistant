@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { History, Instagram, Mail } from "lucide-react";
+import { History } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { Badge, Card, EmptyState, SectionHeader } from "@/components/ui";
 import { relativeTime, type Activity } from "@/lib/dashboard-data";
 

@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { ArrowRight, CheckCircle2, FileText, Film, Instagram, Mail, Megaphone, Plus, Sparkles, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, FileText, Film, Megaphone, Plus, Sparkles, X } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { campaignSummary } from "@/lib/campaigns";
 import { useWorkspace } from "@/components/workspace-provider";
 import { ConfirmDialog } from "@/components/account/confirm-dialog";

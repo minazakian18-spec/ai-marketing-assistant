@@ -96,7 +96,9 @@ const MULTI: Partial<Record<Brand, { viewBox: string; body: React.ReactNode }>> 
             <stop offset="1" stopColor="#5851DB" />
           </radialGradient>
         </defs>
-        <path fill="url(#bi-instagram)" d={siInstagram.path} />
+        {/* The official app icon: brand gradient tile with the white glyph. */}
+        <rect width="24" height="24" rx="6" fill="url(#bi-instagram)" />
+        <path fill="#fff" transform="translate(4.2 4.2) scale(0.65)" d={siInstagram.path} />
       </>
     ),
   },

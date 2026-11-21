@@ -39,8 +39,6 @@ const GROUPS: [Group, string, string][] = [
 const INTEGRATIONS: Integration[] = [
   { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", group: "recommended", provider: "instagram" },
   { id: "google", brand: "google_business", name: "Google-account", description: "Bedrijfsprofiel en reviews, Agenda, Search Console en e-mail versturen, met één koppeling.", group: "recommended", provider: "google" },
-  { id: "linkedin", brand: "linkedin", name: "LinkedIn", description: "Posts plannen voor je bedrijfspagina.", group: "other", planned: true },
-  { id: "shopify", brand: "shopify", name: "Shopify", description: "Producten en bestellingen gebruiken in je marketing.", group: "other", planned: true },
   { id: "google_ads", brand: "google_ads", name: "Google Ads", description: "Campagneresultaten en zoektermen bekijken.", group: "other", planned: true },
   { id: "meta_ads", brand: "meta_ads", name: "Meta Ads", description: "Resultaten van Facebook- en Instagram-advertenties.", group: "other", planned: true },
 ];

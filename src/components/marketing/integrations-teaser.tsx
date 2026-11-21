@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Star, Instagram, Mail } from "lucide-react";
+import { Star } from "lucide-react";
+import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
 import { Reveal } from "./reveal";
 
 // Only integrations Mavix actually supports (or is actively building) are

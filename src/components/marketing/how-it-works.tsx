@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { CalendarDays, Check, Clock, FileText, Mail, MessageSquareReply, Plug, ShieldCheck, Sparkles, ToggleLeft } from "lucide-react";
+import { CalendarDays, Check, Clock, FileText, MessageSquareReply, Plug, ShieldCheck, Sparkles, ToggleLeft } from "lucide-react";
+import { GmailLogo as Mail } from "@/components/brand-logos";
 import { BrandIcon, type Brand } from "@/components/brand-icon";
 import { Reveal } from "./reveal";
 import { InView } from "./in-view";
