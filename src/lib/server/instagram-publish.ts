@@ -157,6 +157,49 @@ async function publishToInstagram(workspaceId: string, post: Post) {
   }
 }
 
+/**
+ * Publishes the same photos and caption to the Facebook Page that belongs to
+ * the connected Instagram account (Instagram via Facebook Login). Needs the
+ * Page permission pages_manage_posts in the Meta app.
+ */
+async function publishToFacebook(workspaceId: string, post: Post) {
+  const { creds, c } = await metaConnection(workspaceId, "instagram");
+  const meta = (c.metadata || {}) as { authMode?: string; pageId?: string };
+  const pageId = String(meta.pageId || (creds as { page_id?: string }).page_id || "");
+  if (meta.authMode !== "facebook" || !/^\d{1,30}$/.test(pageId)) throw new HttpError(409, "Facebook is niet gekoppeld. Koppel Instagram via Facebook om ook op je Facebook-pagina te plaatsen.");
+  const headers = { Authorization: "Bearer " + creds.access_token, "Content-Type": "application/json" };
+  const uploaded: string[] = [];
+  try {
+    const urls: string[] = [];
+    for (const m of post.media || []) {
+      const path = `facebook-publish/${workspaceId}/${randomUUID()}.jpg`;
+      const { error } = await db().storage.from(BUCKET).upload(path, await toJpeg(workspaceId, m), { contentType: "image/jpeg", upsert: false });
+      if (error) throw new HttpError(503, "De foto kon niet worden klaargezet voor Facebook.");
+      uploaded.push(path);
+      const { data } = await db().storage.from(BUCKET).createSignedUrl(path, 3600);
+      if (!data?.signedUrl) throw new HttpError(503, "De foto kon niet worden klaargezet voor Facebook.");
+      urls.push(data.signedUrl);
+    }
+    const message = instagramCaption(post);
+    let id: string;
+    if (urls.length <= 1) {
+      const d = urls.length
+        ? await call(graph("/" + pageId + "/photos"), { method: "POST", headers, body: JSON.stringify({ url: urls[0], caption: message }) })
+        : await call(graph("/" + pageId + "/feed"), { method: "POST", headers, body: JSON.stringify({ message }) });
+      id = String(d.post_id || d.id || "");
+    } else {
+      // Several photos: upload them unpublished, then one post with all of them.
+      const media: { media_fbid: string }[] = [];
+      for (const url of urls) media.push({ media_fbid: String((await call(graph("/" + pageId + "/photos"), { method: "POST", headers, body: JSON.stringify({ url, published: false }) })).id) });
+      id = String((await call(graph("/" + pageId + "/feed"), { method: "POST", headers, body: JSON.stringify({ message, attached_media: media }) })).id || "");
+    }
+    if (!/^[\d_]{1,80}$/.test(id)) throw new HttpError(502, "Facebook gaf geen bevestiging terug. Controleer je Facebook-pagina.");
+    return { postId: id, permalink: "https://www.facebook.com/" + id };
+  } finally {
+    if (uploaded.length) await db().storage.from(BUCKET).remove(uploaded).catch(() => {});
+  }
+}
+
 /** A claim older than this without result was interrupted (Meta calls take seconds). */
 const STALE_MS = 15 * 60 * 1000;
 
@@ -167,7 +210,7 @@ export type PublishResult ={ status: "published"; mediaId: string; permalink?: s
  * `trigger` is "manual" (a user clicked Publish) or "automation" (scheduler,
  * only with an explicit automation permission, see automation.ts).
  */
-export async function publishPost(o: { workspaceId: string; userId: string | null; trigger: "manual" | "automation" }, postId: string): Promise<PublishResult> {
+export async function publishPost(o: { workspaceId: string; userId: string | null; trigger: "manual" | "automation"; platforms?: ("instagram" | "facebook")[] }, postId: string): Promise<PublishResult> {
   if (!/^[\w-]{1,80}$/.test(postId)) throw new HttpError(404, "Deze post bestaat niet.");
   const { data: done } = await db().from("instagram_publications").select("id,status,media_id,permalink,updated_at").eq("workspace_id", o.workspaceId).eq("post_id", postId).in("status", ["publishing", "published"]).limit(1);
   const previous = done?.[0];
@@ -204,12 +247,26 @@ export async function publishPost(o: { workspaceId: string; userId: string | nul
   console.info(JSON.stringify({ event: "instagram_publish_started", trigger: o.trigger }));
 
   try {
-    const r = await publishToInstagram(o.workspaceId, post);
+    const targets = o.platforms?.length ? o.platforms : post.platforms?.length ? post.platforms : ["instagram"];
+    const r = targets.includes("instagram") ? await publishToInstagram(o.workspaceId, post) : { mediaId: "", permalink: undefined as string | undefined };
+    // Facebook second: when Instagram already worked, a Facebook failure is
+    // reported but does not undo or repeat the Instagram post.
+    let fb: { postId: string; permalink?: string } | null = null;
+    let fbError = "";
+    if (targets.includes("facebook")) {
+      try {
+        fb = await publishToFacebook(o.workspaceId, post);
+      } catch (e) {
+        if (!targets.includes("instagram")) throw e;
+        fbError = "Op Instagram geplaatst, maar niet op Facebook: " + (e instanceof HttpError ? e.message : "Facebook gaf een fout.");
+      }
+    }
+    if (!r.mediaId && fb) r.mediaId = fb.postId;
     const now = new Date().toISOString();
     await db().from("instagram_publications").update({ status: "published", media_id: r.mediaId, permalink: r.permalink || null, updated_at: now }).eq("id", claim.id);
     // Instagram has the post now; record it in the workspace (retrying on concurrent saves).
     await mutateWorkspace(o.workspaceId, (data) => ({
-      data: { ...data, posts: ((data.posts || []) as Post[]).map((p) => (p.id === postId ? { ...p, status: "published", failureReason: undefined, updatedAt: now, instagram: { mediaId: r.mediaId, permalink: r.permalink, publishedAt: now } } : p)) },
+      data: { ...data, posts: ((data.posts || []) as Post[]).map((p) => (p.id === postId ? { ...p, status: "published", failureReason: fbError || undefined, updatedAt: now, ...(targets.includes("instagram") ? { instagram: { mediaId: r.mediaId, permalink: r.permalink, publishedAt: now } } : {}), ...(fb ? { facebook: { ...fb, publishedAt: now } } : {}) } : p)) },
       result: null,
     })).catch((e) => console.error(JSON.stringify({ event: "instagram_publish_record_failed", code: (e as HttpError).status || "error" })));
     console.info(JSON.stringify({ event: "instagram_published", trigger: o.trigger }));

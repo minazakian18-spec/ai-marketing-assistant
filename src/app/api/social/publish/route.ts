@@ -4,7 +4,7 @@ import { workspace, failure, limited, sameOrigin, audit, HttpError } from "@/lib
 import { publishCapability, publishPost, recentPublications } from "@/lib/server/instagram-publish";
 
 const headers = { "Cache-Control": "private, no-store" };
-const input = z.object({ postId: z.string().min(1).max(80), confirm: z.literal(true) });
+const input = z.object({ postId: z.string().min(1).max(80), confirm: z.literal(true), platforms: z.array(z.enum(["instagram", "facebook"])).min(1).max(2).optional() });
 
 // Whether this workspace can publish to Instagram, and the latest attempts.
 export async function GET() {
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
     sameOrigin(request);
     const auth = await workspace(["OWNER", "ADMIN"]);
     await limited("ig-publish:" + auth.workspaceId, 10);
-    const { postId } = input.parse(await request.json());
-    const result = await publishPost({ workspaceId: auth.workspaceId, userId: auth.user.id, trigger: "manual" }, postId);
+    const { postId, platforms } = input.parse(await request.json());
+    const result = await publishPost({ workspaceId: auth.workspaceId, userId: auth.user.id, trigger: "manual", platforms }, postId);
     if (!result.repeated) await audit(auth.workspaceId, auth.user.id, "instagram_published").catch(() => {});
     return NextResponse.json(result, { headers });
   } catch (e) {

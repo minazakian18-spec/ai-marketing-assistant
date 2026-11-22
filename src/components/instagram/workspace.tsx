@@ -187,6 +187,7 @@ function Workspace() {
   return (
     <div className="instagram-workspace">
       <PageHeading
+        logos={["instagram", "facebook"]}
         title="Social"
         description="Maak, plan en automatiseer content voor je social kanalen."
         action={

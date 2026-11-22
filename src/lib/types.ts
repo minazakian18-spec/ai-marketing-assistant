@@ -72,6 +72,9 @@ export type Post = {
    * comes from the earlier simulation.
    */
   instagram?: { mediaId: string; permalink?: string; publishedAt: string };
+  /** Where the post goes when it is published (default: Instagram only). */
+  platforms?: ("instagram" | "facebook")[];
+  facebook?: { postId: string; permalink?: string; publishedAt: string };
   /**
    * Instagram carousel (contentType "Carousel"): the slides in order with
    * their editable text layers and the plan they came from. `media` mirrors

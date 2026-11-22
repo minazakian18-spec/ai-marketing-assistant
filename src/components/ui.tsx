@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { BrandIcon, type Brand } from "@/components/brand-icon";
 import type { Post } from "@/lib/types";
 import { publishedLabel } from "@/lib/status-labels";
 
@@ -107,15 +108,25 @@ export function PageHeading({
   title,
   description,
   action,
+  logos,
 }: {
   eyebrow?: string;
   title: string;
   description: string;
   action?: ReactNode;
+  /** Official logo(s) of the channel, shown in a tile left of the title. */
+  logos?: Brand[];
 }) {
   return (
-    <header className="page-heading">
-      <div>
+    <header className={"page-heading" + (logos?.length ? " has-logo" : "")}>
+      {logos?.length ? (
+        <span className={"page-logo" + (logos.length > 1 ? " is-pair" : "")} aria-hidden="true">
+          {logos.map((b) => (
+            <BrandIcon key={b} brand={b} size={logos.length > 1 ? 22 : 28} />
+          ))}
+        </span>
+      ) : null}
+      <div className="page-heading-text">
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1>{title}</h1>
         <p className="muted">{description}</p>

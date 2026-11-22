@@ -4,6 +4,8 @@ import { ArrowRight, BarChart3, Check, Clock, ExternalLink, LineChart, ListCheck
 import { BrandIcon } from "@/components/brand-icon";
 import { useWorkspace } from "@/components/workspace-provider";
 import { readiness } from "@/lib/instagram-model";
+import { useState } from "react";
+import { GoogleAdsConnect } from "@/components/ads/google-ads-connect";
 
 // Google Ads: planned module. There is no Google Ads API connection in Mavix
 // yet, so this page shows what the module will do, what is needed, and the
@@ -16,7 +18,7 @@ import { readiness } from "@/lib/instagram-model";
 // API Overview page in the Cloud Console. New Basic/Standard applications need
 // brand verification. A manager account is no longer required.
 
-type Step = { title: string; text: string; state: "done" | "todo" | "later"; action?: { label: string; href: string; external?: boolean } };
+type Step = { title: string; text: string; state: "done" | "todo" | "later"; action?: { label: string; href: string; external?: boolean }; connect?: boolean };
 
 const PLANNED: { icon: typeof BarChart3; title: string; text: string }[] = [
   { icon: BarChart3, title: "Campagne-overzicht", text: "Uitgaven, klikken, CTR, CPC en conversies per campagne, met de vorige periode ernaast." },
@@ -36,6 +38,7 @@ export default function AdsPage() {
   const { data, ready } = useWorkspace();
   const brand = ready ? readiness(data.profile).score : 0;
   const website = !!data.profile.website?.trim();
+  const [linked, setLinked] = useState(false);
   // Your part: what you can already prepare. The connection itself follows
   // once Mavix's Google Ads API access is approved.
   const steps: Step[] = [
@@ -47,12 +50,11 @@ export default function AdsPage() {
     },
     { title: "Website ingevuld in Brand Hub", text: "Nodig voor advertenties die naar je site linken.", state: website ? "done" : "todo", action: { label: "Website toevoegen", href: "/brand-hub" } },
     {
-      title: "Een Google Ads-account met betaalgegevens",
-      text: "Heb je er nog geen? Maak het zelf aan bij Google. Mavix maakt geen accounts aan en kan dit niet voor je controleren tot de koppeling er is.",
-      state: "todo",
-      action: { label: "Naar Google Ads", href: "https://ads.google.com", external: true },
+      title: "Koppel je Google Ads-account",
+      text: "Heb je al een Google Ads-account (bijvoorbeeld voor je zaak)? Log in met Google en kies het account. Mavix leest alleen mee en wijzigt niets. Nog geen account? Maak het eerst aan bij Google Ads.",
+      state: linked ? "done" : "todo",
+      connect: true,
     },
-    { title: "Google Ads koppelen aan Mavix", text: "Je logt in met Google en kiest welk account Mavix mag lezen. Kan zodra Mavix toegang tot de Google Ads API heeft.", state: "later" },
   ];
   const ownSteps = steps.filter((s) => s.state !== "later");
   const done = ownSteps.filter((s) => s.state === "done").length;
@@ -64,8 +66,7 @@ export default function AdsPage() {
           <BrandIcon brand="google_ads" size={28} />
         </span>
         <div className="ads-hero-text">
-          <p className="ads-eyebrow">Marketing</p>
-          <h1>Google Ads</h1>
+                    <h1>Google Ads</h1>
           <p>Zie straks je campagnes, uitgaven en resultaten naast je andere marketing, met voorstellen van Mavix die jij goedkeurt.</p>
         </div>
         <span className="ads-badge">
@@ -121,9 +122,12 @@ export default function AdsPage() {
               <div className="ads-step-text">
                 <strong>{s.title}</strong>
                 <span>{s.text}</span>
+                {s.connect && <GoogleAdsConnect onChange={setLinked} />}
               </div>
               <span className="ads-step-state">{s.state === "done" ? "Klaar" : s.state === "later" ? "Volgt" : "Te doen"}</span>
-              {s.action && s.state === "todo" ? (
+              {s.connect ? (
+                <span className="ads-step-action" aria-hidden="true" />
+              ) : s.action && s.state === "todo" ? (
                 s.action.external ? (
                   <a className="button secondary ads-step-action" href={s.action.href} target="_blank" rel="noopener noreferrer">
                     {s.action.label} <ExternalLink size={13} aria-hidden="true" />

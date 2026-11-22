@@ -153,6 +153,7 @@ function Workspace() {
   return (
     <div className="instagram-workspace email-workspace">
       <PageHeading
+        logos={["gmail"]}
         title="E-mail"
         description="Maak, plan en automatiseer je e-mailcampagnes."
         action={

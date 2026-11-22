@@ -142,6 +142,7 @@ function Workspace() {
   return (
     <div className="rv-workspace">
       <PageHeading
+        logos={["google_reviews"]}
         title="Reviews"
         description="Lees en beantwoord je Google-reviews vanuit één plek. Wat je plaatst, staat direct op Google."
         action={

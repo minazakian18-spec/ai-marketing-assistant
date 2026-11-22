@@ -1,4 +1,5 @@
 import {
+  siFacebook,
   siGmail,
   siGoogle,
   siGoogleads,
@@ -19,6 +20,7 @@ import type React from "react";
 // monogram in its brand colour instead.
 export type Brand =
   | "instagram"
+  | "facebook"
   | "gmail"
   | "google_calendar"
   | "google_business"
@@ -31,6 +33,7 @@ export type Brand =
 
 const ICONS: Partial<Record<Brand, SimpleIcon>> = {
   instagram: siInstagram,
+  facebook: siFacebook,
   gmail: siGmail,
   google_calendar: siGooglecalendar,
   google_business: siGoogle,
@@ -43,6 +46,7 @@ const ICONS: Partial<Record<Brand, SimpleIcon>> = {
 
 export const BRAND_LABEL: Record<Brand, string> = {
   instagram: "Instagram",
+  facebook: "Facebook",
   gmail: "Gmail",
   google_calendar: "Google Agenda",
   google_business: "Google Bedrijfsprofiel",

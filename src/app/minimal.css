@@ -176,3 +176,32 @@
 /* Account pages: the same dark title and quiet eyebrow as everywhere else. */
 .app-shell :is(.account-content, .acc-main, .account-main) h1 { color: var(--min-ink); }
 .app-shell .page-heading .eyebrow { color: var(--min-muted); font-weight: 600; letter-spacing: 0.08em; }
+
+/* Google Ads: connect inside step 3 (components/ads/google-ads-connect.tsx). */
+.ads-connect { display: grid; gap: 8px; margin-top: 10px; justify-items: start; }
+.ads-connect-note { margin: 0; font-size: 12.5px; color: var(--min-muted, #5f5d72); }
+.ads-connect-error { margin: 0; font-size: 12.5px; color: #b91c1c; }
+.ads-connect-done { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; }
+.ads-connect-done > svg { color: #15803d; }
+.ads-connect-pick { display: grid; gap: 8px; font-size: 13.5px; }
+.ads-connect-pick p { margin: 0; }
+.ads-connect-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.ads-connect-row select { min-width: 200px; padding: 8px 10px; border: 1px solid var(--min-line-strong, #d9dae4); border-radius: 10px; background: #fff; font: inherit; }
+
+/* Channel logo tile left of the page title (same as Google Ads). */
+.app-shell .page-heading.has-logo { display: flex; align-items: flex-start; gap: 16px; }
+.app-shell .page-heading.has-logo .page-heading-text { flex: 1; min-width: 0; }
+.app-shell .page-heading.has-logo > :last-child:not(.page-heading-text):not(.page-logo) { align-self: center; }
+.page-logo { display: grid; place-items: center; flex: none; width: 52px; height: 52px; border: 1px solid var(--min-line, #e6e7ee); border-radius: 14px; background: #fff; }
+.page-logo.is-pair { grid-auto-flow: column; gap: 4px; width: 68px; }
+@media (max-width: 640px) {
+  .app-shell .page-heading.has-logo { flex-wrap: wrap; }
+  .page-logo { width: 44px; height: 44px; }
+}
+
+/* Publish: Instagram, Facebook or both (components/instagram/publish.tsx). */
+.ig-where { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+.ig-where > span { font-size: 12.5px; font-weight: 600; color: var(--min-muted, #5f5d72); margin-right: 2px; }
+.ig-where button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 1px solid var(--min-line-strong, #d9dae4); border-radius: 999px; background: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+.ig-where button[aria-checked="true"] { border-color: var(--min-accent, #6d28d9); background: var(--min-accent-soft, #f3effd); color: var(--min-accent, #6d28d9); font-weight: 600; }
+.ig-where button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.25); }

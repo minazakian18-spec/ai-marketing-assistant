@@ -1,4 +1,5 @@
 "use client";
+import { BrandIcon } from "@/components/brand-icon";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ExternalLink, Send } from "lucide-react";
@@ -126,6 +127,15 @@ export function PublishStatus({ post }: { post: Post }) {
         )}
       </span>
     );
+  if (post.facebook?.postId)
+    return (
+      <span className="ig-pub is-live">
+        Gepubliceerd op Facebook
+        <a href={post.facebook.permalink} target="_blank" rel="noreferrer">
+          Bekijk <ExternalLink size={12} aria-hidden="true" />
+        </a>
+      </span>
+    );
   if (post.status === "published") return <span className="ig-pub is-sim">Gepubliceerd (simulatie, niet op Instagram)</span>;
   return null;
 }
@@ -134,6 +144,9 @@ export function PublishButton({ post, capability }: { post: Post; capability: Ca
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [where, setWhere] = useState<"instagram" | "facebook" | "both">(post.platforms?.length === 2 ? "both" : post.platforms?.[0] === "facebook" ? "facebook" : "instagram");
+  const platforms: ("instagram" | "facebook")[] = where === "both" ? ["instagram", "facebook"] : [where];
+  const whereLabel = where === "both" ? "Instagram en Facebook" : where === "facebook" ? "Facebook" : "Instagram";
   if (post.status !== "approved" && post.status !== "scheduled") return null;
   const problems = publishProblems(post);
   const blocked = !capability?.ready || problems.length > 0;
@@ -143,7 +156,7 @@ export function PublishButton({ post, capability }: { post: Post; capability: Ca
     setOpen(false);
     setBusy(true);
     setError("");
-    const r = await fetch("/api/social/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId: post.id, confirm: true }) });
+    const r = await fetch("/api/social/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId: post.id, confirm: true, platforms }) });
     const d = await r.json().catch(() => ({}));
     setBusy(false);
     if (!r.ok) return setError(d.error || "Publiceren is niet gelukt. Er is niets gepubliceerd.");
@@ -152,6 +165,21 @@ export function PublishButton({ post, capability }: { post: Post; capability: Ca
 
   return (
     <div className="ig-publish">
+      <div className="ig-where" role="radiogroup" aria-label="Waar plaatsen?">
+        <span>Plaatsen op</span>
+        {([
+          ["instagram", "Instagram", ["instagram"]],
+          ["facebook", "Facebook", ["facebook"]],
+          ["both", "Allebei", ["instagram", "facebook"]],
+        ] as const).map(([id, label, brands]) => (
+          <button key={id} type="button" role="radio" aria-checked={where === id} disabled={busy} onClick={() => setWhere(id)}>
+            {brands.map((b) => (
+              <BrandIcon key={b} brand={b} size={15} />
+            ))}
+            {label}
+          </button>
+        ))}
+      </div>
       <button type="button" className="button primary" disabled={blocked || busy} onClick={() => setOpen(true)} aria-describedby={blocked ? "pub-" + post.id : undefined}>
         <Send size={14} aria-hidden="true" />
         {busy ? "Publiceren…" : "Nu publiceren"}
@@ -166,8 +194,8 @@ export function PublishButton({ post, capability }: { post: Post; capability: Ca
           {error}
         </small>
       )}
-      <ConfirmDialog open={open} onClose={() => setOpen(false)} title="Nu publiceren op Instagram?" confirmLabel="Publiceren" onConfirm={() => void publish()}>
-        {`Deze post wordt direct op ${capability?.account || "je Instagram-account"} geplaatst, met ${(post.media || []).length === 1 ? "1 foto" : (post.media || []).length + " foto's"}. Verwijderen of aanpassen doe je daarna in Instagram zelf.`}
+      <ConfirmDialog open={open} onClose={() => setOpen(false)} title={"Nu publiceren op " + whereLabel + "?"} confirmLabel="Publiceren" onConfirm={() => void publish()}>
+        {`Deze post wordt direct op ${where === "instagram" ? capability?.account || "je Instagram-account" : where === "facebook" ? "je Facebook-pagina" : (capability?.account || "Instagram") + " en je Facebook-pagina"} geplaatst, met ${(post.media || []).length === 1 ? "1 foto" : (post.media || []).length + " foto's"}. Verwijderen of aanpassen doe je daarna in ${whereLabel} zelf.`}
       </ConfirmDialog>
     </div>
   );
