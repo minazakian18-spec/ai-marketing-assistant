@@ -17,6 +17,7 @@ export function WorkspaceNav({
 }) {
   const tabs: [WorkspaceView, string][] = [
     ["overview", "Overzicht"],
+    ["inbox", channel === "Social" ? "Berichten" : "Inbox"],
     ["assist", "Maken"],
     ["auto", "Automatisering"],
   ];

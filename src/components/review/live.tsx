@@ -294,14 +294,15 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
 
   if (tab === "overview") {
     // Negative reviews first: they need a personal answer soonest.
-    const waiting = replyQueue(reviews).slice(0, 3);
+    // Every review that still needs an answer, not just the first few.
+    const waiting = replyQueue(reviews);
     return (
       <>
         {summary}
         {errorBox}
         <section className="rvl-section">
           <div className="rvl-section-head">
-            <h2>Wacht op antwoord</h2>
+            <h2>Wacht op antwoord{waiting.length ? ` (${waiting.length})` : ""}</h2>
             <Link className="text-link" href="/reviews?tab=inbox">
               Alle reviews <ArrowUpRight size={14} />
             </Link>

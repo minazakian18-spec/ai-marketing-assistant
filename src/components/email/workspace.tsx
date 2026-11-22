@@ -21,6 +21,7 @@ import {
   Plus,
 } from "lucide-react";
 import { PageHeading } from "@/components/ui";
+import { InboxView } from "@/components/inbox/inbox-view";
 import { useWorkspace } from "@/components/workspace-provider";
 import {
   defaultEmail,
@@ -173,7 +174,9 @@ function Workspace() {
         {message}
       </p>
       <div className="workspace-tab-enter" key={tab}>
-        {tab === "overview" ? (
+        {tab === "inbox" ? (
+          <InboxView fixed="gmail" />
+        ) : tab === "overview" ? (
           <>
             <ChannelOverview
               channel="Email"

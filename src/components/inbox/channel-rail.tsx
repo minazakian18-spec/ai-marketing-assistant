@@ -52,6 +52,7 @@ export function ChannelRail({
   onChannel,
   onStatus,
   onSort,
+  showChannels = true,
 }: {
   channels: ChannelState[] | null;
   unreadByChannel: Partial<Record<Channel, number>>;
@@ -61,10 +62,13 @@ export function ChannelRail({
   onChannel: (c: Channel) => void;
   onStatus: (s: StatusFilter) => void;
   onSort: (s: SortOrder) => void;
+  /** Hidden when the Inbox is embedded in one channel (Social or E-mail). */
+  showChannels?: boolean;
 }) {
   const state = (c: Channel) => channels?.find((x) => x.channel === c)?.state;
   return (
     <nav className="ib-rail" aria-label="Kanalen en mappen">
+      {showChannels && (
       <div className="ib-rail-group">
         <h3 className="ib-rail-heading">Kanalen</h3>
         <ul className="ib-rail-list">
@@ -94,6 +98,7 @@ export function ChannelRail({
           })}
         </ul>
       </div>
+      )}
       <div className="ib-rail-group ib-rail-folders">
         <h3 className="ib-rail-heading">Mappen</h3>
         <ul className="ib-rail-list">

@@ -15,6 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Sparkles, PenLine, Orbit, CheckCheck, CalendarDays, Plug, Plus } from "lucide-react";
 import { InstagramLogo as Instagram } from "@/components/brand-logos";
 import { PageHeading } from "@/components/ui";
+import { InboxView } from "@/components/inbox/inbox-view";
 import { useWorkspace } from "@/components/workspace-provider";
 import {
   defaultInstagram,
@@ -207,7 +208,9 @@ function Workspace() {
         {message}
       </p>
       <div className="workspace-tab-enter" key={tab}>
-        {tab === "overview" ? (
+        {tab === "inbox" ? (
+          <InboxView fixed="instagram" />
+        ) : tab === "overview" ? (
           <InstagramOverview posts={data.posts} settings={settings} />
         ) : tab === "assist" ? (
           <>
