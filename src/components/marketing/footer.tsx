@@ -33,6 +33,7 @@ const columns = [
     links: [
       ["/privacy", "Privacybeleid"],
       ["/voorwaarden", "Algemene voorwaarden"],
+      ["/verwerkersovereenkomst", "Verwerkersovereenkomst"],
       ["/cookies", "Cookiebeleid"],
       ["/gegevens-verwijderen", "Gegevens verwijderen"],
     ],

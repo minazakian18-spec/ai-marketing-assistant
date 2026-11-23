@@ -21,7 +21,7 @@ const sections: LegalSection[] = [
       <>
         <p>Mavix is AI-marketingsoftware voor ondernemers. Voor de gegevens van je eigen account (zoals je naam en e-mailadres) is Mavix de verwerkingsverantwoordelijke.</p>
         <p>
-          Voor gegevens die jij als ondernemer in Mavix verwerkt over jouw klanten (bijvoorbeeld contacten, reviews en berichten in de Inbox) ben jij de verwerkingsverantwoordelijke en verwerkt Mavix die gegevens in jouw opdracht, als verwerker.
+          Voor gegevens die jij als ondernemer in Mavix verwerkt over jouw klanten (bijvoorbeeld contacten, reviews en berichten in de Inbox) ben jij de verwerkingsverantwoordelijke en verwerkt Mavix die gegevens in jouw opdracht, als verwerker. De afspraken daarover staan in de <Link href="/verwerkersovereenkomst">verwerkersovereenkomst</Link>.
         </p>
         <Controller />
       </>
@@ -194,7 +194,7 @@ const sections: LegalSection[] = [
             <strong>Resend</strong>: e-mails over je account en, als je ze verstuurt, je e-mailcampagnes.
           </li>
           <li>
-            <strong>Twilio</strong>: sms-meldingen, als je die inschakelt.
+            <strong>Twilio</strong>: meldingen via WhatsApp of sms, als je die inschakelt.
           </li>
           <li>
             <strong>Stripe</strong>: betalingen, zodra betaalde abonnementen actief zijn.

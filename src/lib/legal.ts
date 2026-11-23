@@ -19,6 +19,7 @@ export const LEGAL = {
 export const LEGAL_PAGES = [
   { href: "/privacy", label: "Privacybeleid" },
   { href: "/voorwaarden", label: "Algemene voorwaarden" },
+  { href: "/verwerkersovereenkomst", label: "Verwerkersovereenkomst" },
   { href: "/cookies", label: "Cookiebeleid" },
   { href: "/gegevens-verwijderen", label: "Gegevens verwijderen" },
 ] as const;

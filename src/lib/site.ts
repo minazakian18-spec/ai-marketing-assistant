@@ -29,6 +29,7 @@ export const PUBLIC_PAGES: { path: string; priority: number; changeFrequency: "w
   { path: "/demo", priority: 0.7, changeFrequency: "monthly" },
   { path: "/privacy", priority: 0.3, changeFrequency: "monthly" },
   { path: "/voorwaarden", priority: 0.3, changeFrequency: "monthly" },
+  { path: "/verwerkersovereenkomst", priority: 0.3, changeFrequency: "monthly" },
   { path: "/en/privacy", priority: 0.3, changeFrequency: "monthly" },
   { path: "/en/terms", priority: 0.3, changeFrequency: "monthly" },
   { path: "/cookies", priority: 0.2, changeFrequency: "monthly" },
