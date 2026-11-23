@@ -282,3 +282,10 @@
 .cs-where-auto { display: grid; place-items: center; background: var(--min-accent-soft, #f3effd); color: var(--min-accent, #6d28d9); }
 .cs-where-list button[aria-checked="true"] { border-color: var(--min-accent, #6d28d9); box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.12); }
 .cs-where-list button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.3); }
+
+/* Brand Hub > Verdieping: content inside the card padding, buttons not on the edge. */
+.app-shell .panel.brand-section { padding-bottom: 20px; }
+.app-shell .panel.brand-section > :not(.section-heading) { margin-left: 23px; margin-right: 23px; }
+.app-shell .panel.brand-section .section-heading > svg { color: var(--min-muted, #5f5d72); }
+.app-shell .panel.brand-section .ig-settings-footer { padding: 0; border: 0; justify-content: space-between; }
+.app-shell .panel.brand-section .ig-two-fields { max-width: 520px; }
