@@ -53,13 +53,7 @@ export function SendPanel({ campaign }: { campaign: EmailCampaign }) {
     void load();
   }
 
-  if (demo)
-    return (
-      <p className="cs-publish-note">
-        <Send size={14} aria-hidden="true" />
-        <span>In de testmodus verstuurt Mavix geen e-mails. Met een echt account kun je een testmail naar jezelf sturen en, als het verzenddomein is ingericht, je campagne versturen.</span>
-      </p>
-    );
+  if (demo) return null;
 
   const cap = pre?.capability;
   const stats = pre?.stats?.stats;

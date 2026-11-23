@@ -420,14 +420,7 @@ export function EmailCreate({
           )}
         </div>
 
-        {saved ? (
-          <SendPanel campaign={saved} />
-        ) : (
-          <p className="cs-publish-note">
-            <Send size={14} aria-hidden="true" />
-            <span>Sla je e-mail op en keur hem goed. Daarna kun je een testmail naar jezelf sturen en versturen naar ontvangers met toestemming. Ingeplande e-mails staan in je <Link href="/calendar">kalender</Link>.</span>
-          </p>
-        )}
+        {saved && <SendPanel campaign={saved} />}
         {!saved && !generating ? (
           <div className="cs-start">
             <section className="cs-step" aria-labelledby="em-step-1">

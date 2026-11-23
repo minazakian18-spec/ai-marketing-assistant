@@ -31,6 +31,22 @@ async function withRetry(send: () => Promise<Response>) {
   }
   return r;
 }
+const CACHE = "mavix.reviews.";
+function cached<T>(key: string): T | null {
+  try {
+    const raw = window.sessionStorage.getItem(CACHE + key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+function remember(key: string, value: unknown) {
+  try {
+    window.sessionStorage.setItem(CACHE + key, JSON.stringify(value));
+  } catch {
+    /* storage full or blocked: no cache */
+  }
+}
 async function get<T>(url: string): Promise<T> {
   const r = await withRetry(() => fetch(url, { cache: "no-store" }));
   const d = await r.json().catch(() => ({}));
@@ -168,9 +184,10 @@ function Gate({ status, onConnected }: { status: Status; onConnected: () => void
 
 // Real Google reviews of the selected location (Google is the source of truth).
 export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
-  const [status, setStatus] = useState<Status | null>(null);
+  // The last list (this browser tab) shows instantly; fresh data replaces it.
+  const [status, setStatus] = useState<Status | null>(() => cached<Status>("status"));
   const [statusError, setStatusError] = useState("");
-  const [data, setData] = useState<Data | null>(null);
+  const [data, setData] = useState<Data | null>(() => cached<Data>("data"));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<ReviewFilter>("all");
@@ -201,14 +218,19 @@ export function LiveReviews({ tab }: { tab: "overview" | "inbox" }) {
     }
   }, []);
 
+  // Status and the first page load at the same time (not one after the other).
   const refresh = useCallback(() => {
+    void load();
     get<Status>("/api/integrations/google_business/status")
       .then((s) => {
         setStatus(s);
-        if (s.connected) void load();
+        remember("status", s);
       })
       .catch((e) => setStatusError((e as Error).message));
   }, [load]);
+  useEffect(() => {
+    if (data) remember("data", data);
+  }, [data]);
   useEffect(() => refresh(), [refresh]);
 
   const reviews = useMemo(() => data?.reviews || [], [data]);

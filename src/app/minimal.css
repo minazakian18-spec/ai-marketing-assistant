@@ -234,3 +234,7 @@
 /* Brand Hub: one line of context under each step title. */
 .bh-panel-intro { margin: 2px 0 0; font-size: 13.5px; color: var(--min-muted, #5f5d72); }
 .bh-stepper { overflow-x: auto; scrollbar-width: none; }
+
+/* Google-account row: actions stay at the top right, not in the middle of a tall card. */
+.int-row.int-google { align-items: start; }
+.int-row.int-google > .int-state, .int-row.int-google > .int-actions { margin-top: 2px; }

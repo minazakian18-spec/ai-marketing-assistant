@@ -435,8 +435,8 @@ const reviewPath = (id: string) => {
 };
 
 /** Raw v4 page (used by the research module). */
-export async function rawReviewsPage(workspaceId: string, pageToken = "", pageSize = 50) {
-  const s = await selected(workspaceId);
+export async function rawReviewsPage(workspaceId: string, pageToken = "", pageSize = 50, known?: Awaited<ReturnType<typeof selected>>) {
+  const s = known || (await selected(workspaceId));
   return businessRequest(
     workspaceId,
     s.base + "/reviews?" + new URLSearchParams({ pageSize: String(Math.min(50, Math.max(1, pageSize))), orderBy: "updateTime desc", ...(pageToken ? { pageToken } : {}) }),
@@ -448,7 +448,7 @@ export async function rawReviewsPage(workspaceId: string, pageToken = "", pageSi
 export async function listGoogleReviews(workspaceId: string, input: { pageToken?: string; pageSize?: number }) {
   const s = await selected(workspaceId);
   if (input.pageToken && !/^[\w.~=+/-]{1,2000}$/.test(input.pageToken)) throw new HttpError(400, "Ongeldige pagina.");
-  const raw = await rawReviewsPage(workspaceId, input.pageToken, input.pageSize);
+  const raw = await rawReviewsPage(workspaceId, input.pageToken, input.pageSize, s);
   return normalizeReviewsPage(raw, s.location, !input.pageToken);
 }
 
