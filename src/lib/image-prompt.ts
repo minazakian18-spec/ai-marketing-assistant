@@ -34,7 +34,7 @@ export function brandStyleOf(profile: { name?: string; industry?: string; audien
   };
 }
 
-export function buildImagePrompt(o: { brief: string; mode: ImageMode; format: ImageFormat; brand?: BrandStyle; slide?: SlideContext; references?: number; referenceKind?: ReferenceKind }): string {
+export function buildImagePrompt(o: { brief: string; mode: ImageMode; format: ImageFormat; brand?: BrandStyle; slide?: SlideContext; references?: number; referenceKind?: ReferenceKind; location?: string }): string {
   const b = o.brand || {};
   const lines: string[] = [];
   if (o.slide) {
@@ -42,7 +42,16 @@ export function buildImagePrompt(o: { brief: string; mode: ImageMode; format: Im
     lines.push(`This slide shows: ${clip(o.slide.slideBrief, 600)}.`);
     if (o.slide.styleReference) lines.push("The last input image is an earlier slide of this carousel: match its lighting, colour grade, photographic style and mood exactly so the slides belong together, but show this slide's own subject.");
   }
-  if (o.mode === "inspire" && o.referenceKind === "brand") {
+  if (o.location) {
+    // Shot on location: the first input image is the real place of this business.
+    lines.push(`Create a professional marketing photograph for this business's Instagram, shot on location at "${clip(o.location, 80)}" of their own venue: ${clip(o.brief, 800)}.`);
+    lines.push(
+      "The FIRST input image is a real photo of this exact location. Keep the venue exactly as it is: same architecture, walls, floor, furniture, materials, colours, windows, lighting fixtures and signage style. Do not invent another venue, do not change the interior design and do not add a different style of furniture. Place the subject of the brief naturally in this real scene, at a sensible spot, in correct scale and perspective, as if a professional photographer shot it there.",
+    );
+    if ((o.references || 0) > 0) lines.push("The other input images show this business's real products: show the products exactly as they look there (same recipe, shape, toppings, plating, packaging).");
+    lines.push("Make it creative and appealing like a top agency would: a strong hero subject, beautiful light that fits the venue, a refined colour grade, shallow depth of field where it helps, realistic textures and reflections. No people's faces, no copied text or watermarks.");
+    lines.push(o.format === "portrait" ? "Vertical 4:5 composition, important content inside the frame." : "Square composition with a clear focal point.");
+  } else if (o.mode === "inspire" && o.referenceKind === "brand") {
     // Branded content: the references ARE this business. The result must show
     // its real products and place, never a generic look-alike.
     lines.push(`Create a NEW professional marketing photograph for this business's Instagram: ${clip(o.brief, 800)}.`);

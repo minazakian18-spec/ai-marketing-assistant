@@ -215,10 +215,10 @@ export async function deleteFiles(workspaceId: string, ids: string[]) {
  * hash is part of the name, and an existing file with that name and size is
  * reused instead of uploading a copy. Returns the library file id.
  */
-export async function storeImage(ctx: { workspaceId: string; userId: string | null }, bytes: Buffer, o: { kind: "ai" | "image"; mime: string }) {
+export async function storeImage(ctx: { workspaceId: string; userId: string | null }, bytes: Buffer, o: { kind: "ai" | "image"; mime: string; name?: string }) {
   if (!["image/jpeg", "image/png", "image/webp"].includes(o.mime)) throw new HttpError(415, "Dit afbeeldingstype wordt niet ondersteund.");
   const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
-  const name = (o.kind === "ai" ? "AI-afbeelding " : "Foto ") + hash;
+  const name = (o.name ? o.name.slice(0, 150) + " " : o.kind === "ai" ? "AI-afbeelding " : "Foto ") + hash;
   const { data: existing, error: findError } = await db().from("library_files").select("id").eq("workspace_id", ctx.workspaceId).eq("name", name).eq("size_bytes", bytes.length).limit(1);
   setupCheck(findError, "library_files");
   if (existing?.[0]) return existing[0].id as string;

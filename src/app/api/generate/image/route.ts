@@ -30,6 +30,8 @@ const input = z.object({
   useBrand: z.boolean().default(true),
   /** "brand": the references are the business's own photos (products and place must match). */
   referenceKind: z.enum(["brand", "inspiration"]).default("inspiration"),
+  /** Brand Hub location photo used as the real scene (src/lib/locations.ts), not counted as inspiration. */
+  location: z.object({ photo: z.string().max(12_000_000), label: z.string().trim().min(1).max(80) }).optional(),
   slide: z
     .object({
       visualStyle: z.string().trim().max(600),
@@ -74,11 +76,13 @@ export async function POST(request: Request) {
       if (!wp.plan.entitlements.includes("carousels")) throw new HttpError(402, `AI-carrousels zitten niet in je ${wp.plan.name}-abonnement. Maak complete Instagram-carrousels met Mavix Growth.`);
       if (body.slide.total > wp.plan.carouselSlides) throw new HttpError(402, `Je ${wp.plan.name}-abonnement staat carrousels tot ${wp.plan.carouselSlides} slides toe.`);
     }
+    const scene = body.mode === "generate" && body.location ? await loadImageInput(auth.workspaceId, body.location.photo, "De locatiefoto") : null;
     const references = body.mode === "generate" ? await Promise.all(body.references.map((r, i) => loadImageInput(auth.workspaceId, r, `Inspiratiebeeld ${i + 1}`))) : [];
     // Carousel consistency: the first slide as extra style reference (system-added).
     if (body.mode === "generate" && body.slide?.styleReference) references.push(await loadImageInput(auth.workspaceId, body.slide.styleReference, "De eerste slide"));
 
     const profile = body.useBrand ? await storedProfile(auth.workspaceId) : null;
+    if (scene) references.unshift(scene);
     const mode = body.mode === "edit" ? "edit" : references.length ? "inspire" : "generate";
     const prompt = buildImagePrompt({
       brief: body.brief,
@@ -87,6 +91,7 @@ export async function POST(request: Request) {
       brand: brandStyleOf(profile as Parameters<typeof brandStyleOf>[0]),
       references: body.references.length,
       referenceKind: body.referenceKind,
+      location: scene ? body.location!.label : undefined,
       slide: body.slide ? { visualStyle: body.slide.visualStyle, slideBrief: body.slide.slideBrief, index: body.slide.index, total: body.slide.total, styleReference: !!body.slide.styleReference } : undefined,
     });
     const plan = imagePlan(body.format);
@@ -96,7 +101,7 @@ export async function POST(request: Request) {
     // Paid result: store it in the Bibliotheek. If storage is not available,
     // the image is still returned (as data) rather than lost.
     try {
-      const id = await storeImage({ workspaceId: auth.workspaceId, userId: auth.user.id }, jpeg, { kind: "ai", mime: "image/jpeg" });
+      const id = await storeImage({ workspaceId: auth.workspaceId, userId: auth.user.id }, jpeg, { kind: "ai", mime: "image/jpeg", name: scene ? "AI-beeld – " + body.location!.label : undefined });
       return NextResponse.json({ image: mediaRef(id), fileId: id, stored: true }, { headers: { "Cache-Control": "private, no-store" } });
     } catch (e) {
       console.error(JSON.stringify({ event: "ai_image_store_failed", code: (e as HttpError).status || "error" }));

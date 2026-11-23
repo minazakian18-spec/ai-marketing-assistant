@@ -272,3 +272,13 @@
 .bh-analyze-head small { font-size: 12.5px; color: var(--min-muted, #5f5d72); }
 .bh-analyze.is-compact { padding: 12px 14px; border: 1px dashed var(--min-line-strong, #d9dae4); border-radius: 12px; background: #fbfaff; }
 .bh-overview-analyze { padding: 16px 18px; }
+
+/* Social: where the AI photo is made (Brand Hub location photos). */
+.cs-where { display: grid; gap: 8px; margin: 4px 0; }
+.cs-where-label { font-size: 13px; font-weight: 600; color: var(--min-ink, #2a0f5c); }
+.cs-where-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.cs-where-list button { flex: none; display: grid; justify-items: center; gap: 6px; width: 112px; padding: 6px; border: 1px solid var(--min-line, #e6e7ee); border-radius: 12px; background: #fff; font: inherit; font-size: 12px; line-height: 1.25; text-align: center; color: var(--min-ink, #2a0f5c); cursor: pointer; }
+.cs-where-list button img, .cs-where-auto { width: 100%; height: 64px; border-radius: 8px; object-fit: cover; }
+.cs-where-auto { display: grid; place-items: center; background: var(--min-accent-soft, #f3effd); color: var(--min-accent, #6d28d9); }
+.cs-where-list button[aria-checked="true"] { border-color: var(--min-accent, #6d28d9); box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.12); }
+.cs-where-list button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.3); }

@@ -90,7 +90,7 @@ export async function generateCampaignDraft(goal: string, channels: ("instagram"
 
 /** A real AI image (OpenAI Images API, server-side). In test mode there is no AI: a clear error, no placeholder. */
 export type SlideRequest = { visualStyle: string; slideBrief: string; index: number; total: number; styleReference?: string };
-export async function generateImage(o: { mode: "generate" | "edit"; brief: string; format: "square" | "portrait"; photo?: string; references?: string[]; referenceKind?: "brand" | "inspiration"; slide?: SlideRequest; useBrand?: boolean }): Promise<string> {
+export async function generateImage(o: { mode: "generate" | "edit"; brief: string; format: "square" | "portrait"; photo?: string; references?: string[]; referenceKind?: "brand" | "inspiration"; slide?: SlideRequest; useBrand?: boolean; location?: { photo: string; label: string } }): Promise<string> {
   if (isBrowserDemo()) throw new Error("In de testmodus maakt Mavix geen AI-afbeeldingen. Met een echt account genereert Mavix hier een nieuwe afbeelding.");
   const { image } = await postJson<{ image: string }>("/api/generate/image", o);
   return image;

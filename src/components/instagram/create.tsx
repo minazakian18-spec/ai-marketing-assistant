@@ -1,4 +1,5 @@
 "use client";
+import { LOCATION_SHOTS, shotById, suggestLocation } from "@/lib/locations";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
@@ -144,6 +145,11 @@ export function CreateStudio({
   const [editBrief, setEditBrief] = useState("");
   // What happens with the own photo: used as it is, or adjusted with AI in the house style.
   const [ownMode, setOwnMode] = useState<"as-is" | "ai">("as-is");
+  // Where the AI image is made: one of the Brand Hub location photos, or "auto"
+  // (Mavix picks the best spot for the brief, or none).
+  const [where, setWhere] = useState<string>("auto");
+  const locations = profile.locations || {};
+  const locationIds = LOCATION_SHOTS.filter((x) => locations[x.id]).map((x) => x.id);
   const [status, setStatus] = useState<SaveStatus>(editPost ? "saved" : "idle");
   const [history, setHistory] = useState<{ caption: string; hashtags: string }[]>([]);
   const [alternatives, setAlternatives] = useState<string[]>([]);
@@ -310,7 +316,9 @@ export function CreateStudio({
   // photos as references (products, interior, packaging must match).
   function aiImage(brief: string) {
     if (!brandPhotos.length) return Promise.reject(new Error("Voeg eerst een paar foto's van je zaak of producten toe. Mavix maakt alleen beelden van jóuw bedrijf."));
-    return generateImage({ mode: "generate", brief, format: "square", useBrand: true, references: brandPhotos, referenceKind: "brand" });
+    const shot = where === "auto" ? suggestLocation(brief, locationIds) : where;
+    const scene = shot && locations[shot] ? { photo: locations[shot], label: shotById(shot)?.label || "de zaak" } : undefined;
+    return generateImage({ mode: "generate", brief, format: "square", useBrand: true, references: brandPhotos, referenceKind: "brand", location: scene });
   }
 
   function showImageOutcome(r: Awaited<ReturnType<typeof regenerateImage>>, again = false) {
@@ -652,6 +660,33 @@ export function CreateStudio({
     </form>
   );
 
+  const locationPicker = !post && !hasOwn ? (
+    <div className="cs-where">
+      <span className="cs-where-label">Waar wordt de foto gemaakt?</span>
+      {locationIds.length ? (
+        <div className="cs-where-list" role="radiogroup" aria-label="Locatie van de foto">
+          <button type="button" role="radio" aria-checked={where === "auto"} disabled={!!busy} onClick={() => setWhere("auto")}>
+            <span className="cs-where-auto" aria-hidden="true">
+              <Wand2 size={14} />
+            </span>
+            Mavix kiest
+          </button>
+          {locationIds.map((id) => (
+            <button key={id} type="button" role="radio" aria-checked={where === id} disabled={!!busy} onClick={() => setWhere(id)}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={locations[id]} alt="" />
+              {shotById(id)?.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="cs-hint">
+          Voeg foto&apos;s van je zaak toe in <Link href="/brand-hub">Brand Hub, stap Locatie</Link>. Dan kies je hier op welke plek (terras, bar, gevel) de foto wordt gemaakt.
+        </p>
+      )}
+    </div>
+  ) : null;
+
   // What Mavix will do with the brief, said plainly before the first click.
   const imagePlanNote = hasOwn ? (
     <p className="cs-plan-note">
@@ -788,6 +823,7 @@ export function CreateStudio({
                 <h3 id="cs-step-3">Wat wil je delen?</h3>
               </header>
               {brief}
+              {locationPicker}
               {imagePlanNote}
               {/* Refinements: optional, folded away so the start stays simple. */}
               <details className="cs-more">
