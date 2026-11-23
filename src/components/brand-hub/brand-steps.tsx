@@ -301,7 +301,7 @@ function StepProducts({
       <WebsiteAnalyze profile={profile} compact onApply={(patch, usps) => { setProfile(patch); if (usps) setStrategy({ usps }); }} />
       <Field
         label="Wat verkoop of bied je aan?"
-        hint="Eén product of dienst per regel, met de belangrijkste eerst. Prijzen en details voeg je later toe onder Verdieping."
+        hint="Eén product of dienst per regel, met de belangrijkste eerst. Prijzen en details voeg je later toe in het overzicht onder Doelgroepen en producten in detail."
       >
         <textarea
           rows={5}

@@ -64,7 +64,7 @@ const WHY: Record<number, { title: string; text: string; points: string[] }> = {
     text: "Hoe beter Mavix je klant kent, hoe beter de woorden, voorbeelden en het moment van je content aansluiten.",
     points: [
       "Beschrijf één typische klant: wie, waar en wanneer",
-      "Meerdere doelgroepen? Die voeg je later toe onder Verdieping",
+      "Meerdere doelgroepen? Die voeg je later toe in het overzicht onder Doelgroepen en producten in detail",
     ],
   },
   4: {
@@ -885,7 +885,7 @@ function Overview({
       </div>
       <section className="bh-deep">
         <h2>
-          <ImageIcon size={16} aria-hidden="true" /> Verdieping
+          <ImageIcon size={16} aria-hidden="true" /> Doelgroepen en producten in detail
         </h2>
         <p className="bh-hint">
           Doelgroepsegmenten en productkaarten geven Mavix nog meer houvast,
