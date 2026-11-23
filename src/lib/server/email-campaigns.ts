@@ -1,4 +1,5 @@
 import "server-only";
+import { notify } from "./notify";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { adminClient, appUrl } from "./supabase";
 import { HttpError } from "./access";
@@ -202,6 +203,7 @@ export async function sendCampaign(o: { workspaceId: string; userId: string | nu
       return { data: { ...data, email: { ...email, campaigns: (email.campaigns || []).map((x) => (x.id === campaignId ? { ...x, status: "sent" as const, reason: "", updatedAt: at, delivery: { runId: String(run.id), sentAt: at, recipients: list.recipients.length } } : x)) } }, result: null };
     }).catch((e) => console.error(JSON.stringify({ event: "email_campaign_record_failed", code: (e as HttpError).status || "error" })));
   console.info(JSON.stringify({ event: "email_campaign_done", status, sent, failed }));
+  await notify({ workspaceId: o.workspaceId, event: "email_campaign_completed", title: "E-mailcampagne verstuurd", body: `Verstuurd naar ${sent} van ${list.recipients.length} ontvangers.`, link: "/email", entity: { type: "email_campaign", id: campaignId } });
   return { status, sent, recipients: list.recipients.length, repeated: false };
 }
 

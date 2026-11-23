@@ -43,7 +43,7 @@ import {
   type StatusUpdate,
   type Upload,
 } from "../inbox/core";
-import { wantsNotification } from "../security";
+import { notify } from "./notify";
 
 // Mavix Inbox storage and provider orchestration. Message content is never
 // written to server logs; only event names and status codes are.
@@ -221,35 +221,14 @@ async function notifyNewConversation(
   channel: Channel,
   name: string,
 ) {
-  const event = "new_conversation";
-  const { data: prefs } = await db()
-    .from("notification_preferences")
-    .select("user_id,event_type,channel,enabled")
-    .eq("workspace_id", workspaceId)
-    .eq("event_type", event)
-    .eq("channel", "IN_APP")
-    .eq("enabled", true);
-  const users = [
-    ...new Set(
-      (prefs || [])
-        .filter((p) => wantsNotification([p], event, "IN_APP"))
-        .map((p) => p.user_id),
-    ),
-  ];
-  if (!users.length) return;
-  await db()
-    .from("notifications")
-    .insert(
-      users.map((recipient_id) => ({
-        workspace_id: workspaceId,
-        recipient_id,
-        event_type: event,
-        title: "Nieuw gesprek via " + capabilities[channel].label,
-        body: "Van " + name.slice(0, 120),
-        related_entity_type: "inbox_conversation",
-        related_entity_id: conversationId,
-      })),
-    );
+  await notify({
+    workspaceId,
+    event: "new_conversation",
+    title: "Nieuw gesprek via " + capabilities[channel].label,
+    body: "Van " + name.slice(0, 120),
+    link: "/inbox",
+    entity: { type: "inbox_conversation", id: conversationId },
+  });
 }
 
 const searchText = (

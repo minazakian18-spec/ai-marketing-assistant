@@ -1,4 +1,5 @@
 import "server-only";
+import { notify } from "./notify";
 import { adminClient } from "./supabase";
 import { encrypt, decrypt } from "./crypto";
 import { emailProvider } from "./notifications";
@@ -110,6 +111,7 @@ export async function checkGoogleConnection(row: Row): Promise<CheckOutcome> {
     const { data } = await update({ status: "reconnect_required", metadata: meta({ at: now, ok: false, reason: "invalid_grant" }) });
     log("google_check", { provider: row.provider, outcome: "reconnect" });
     if (data?.length) await notifyReconnect(row).catch(() => null);
+    if (data?.length) await notify({ workspaceId: row.workspace_id, event: "integration_disconnected", title: "Koppel " + LABEL[row.provider] + " opnieuw", body: "Google accepteert de opgeslagen toegang niet meer. Koppel opnieuw in Integraties.", link: "/account/integraties" });
     return "reconnect";
   }
   await update({ metadata: meta({ at: now, ok: false, reason: "temporary" }) });

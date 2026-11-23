@@ -39,7 +39,7 @@ const GROUPS: { title: string; description: string; events: [string, string][] }
     ],
   },
 ];
-const CHANNEL_LABEL: Record<string, string> = { IN_APP: "In Mavix", EMAIL: "E-mail", SMS: "Sms" };
+const CHANNEL_LABEL: Record<string, string> = { IN_APP: "In Mavix", EMAIL: "E-mail", WHATSAPP: "WhatsApp", SMS: "Sms" };
 
 export default function NotificationsPage() {
   const [preferences, setPreferences] = useState<Preference[]>([]);

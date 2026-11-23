@@ -1,4 +1,5 @@
 import "server-only";
+import { notify } from "./notify";
 import { randomUUID } from "node:crypto";
 import { adminClient } from "./supabase";
 import { HttpError } from "./access";
@@ -270,6 +271,7 @@ export async function publishPost(o: { workspaceId: string; userId: string | nul
       result: null,
     })).catch((e) => console.error(JSON.stringify({ event: "instagram_publish_record_failed", code: (e as HttpError).status || "error" })));
     console.info(JSON.stringify({ event: "instagram_published", trigger: o.trigger }));
+    await notify({ workspaceId: o.workspaceId, event: "content_published", title: "Post geplaatst", body: (fbError || "Je post staat online.") + " " + (post.title || post.prompt || "").slice(0, 120), link: "/social", entity: { type: "post", id: postId } });
     return { status: "published", mediaId: r.mediaId, permalink: r.permalink, repeated: false };
   } catch (e) {
     const message = e instanceof HttpError ? e.message : "Publiceren is niet gelukt. Er is niets gepubliceerd.";
@@ -278,6 +280,7 @@ export async function publishPost(o: { workspaceId: string; userId: string | nul
       data: { ...data, posts: ((data.posts || []) as Post[]).map((p) => (p.id === postId ? { ...p, failureReason: message } : p)) },
       result: null,
     })).catch(() => {});
+    await notify({ workspaceId: o.workspaceId, event: "content_failed", title: "Publiceren mislukt", body: message, link: "/social", entity: { type: "post", id: postId } });
     throw e instanceof HttpError ? e : new HttpError(502, message);
   }
 }
