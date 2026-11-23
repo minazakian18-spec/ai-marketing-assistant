@@ -92,9 +92,6 @@ const sections: LegalSection[] = [
             <strong>Resend</strong> (versturen van e-mails en nieuwsbrieven).
           </li>
           <li>
-            <strong>Twilio</strong> (meldingen via WhatsApp of sms, alleen als je dat aanzet).
-          </li>
-          <li>
             <strong>Google en Meta</strong>, alleen voor de koppelingen die jij zelf maakt.
           </li>
         </ul>

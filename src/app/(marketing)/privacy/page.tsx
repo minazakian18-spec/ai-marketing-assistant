@@ -194,9 +194,6 @@ const sections: LegalSection[] = [
             <strong>Resend</strong>: e-mails over je account en, als je ze verstuurt, je e-mailcampagnes.
           </li>
           <li>
-            <strong>Twilio</strong>: meldingen via WhatsApp of sms, als je die inschakelt.
-          </li>
-          <li>
             <strong>Stripe</strong>: betalingen, zodra betaalde abonnementen actief zijn.
           </li>
           <li>
