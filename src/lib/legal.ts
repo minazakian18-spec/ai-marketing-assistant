@@ -3,7 +3,7 @@
 // that the detail follows, instead of showing an invented value.
 export const LEGAL = {
   /** Legal name of the company that operates Mavix. */
-  entity: "Liceau (eenmanszaak)" as string | null,
+  entity: "Webbo Solutions (eenmanszaak), handelend onder de naam Mavix" as string | null,
   /** KvK (Chamber of Commerce) number. */
   kvk: "91819423" as string | null,
   /** Registered business address. */

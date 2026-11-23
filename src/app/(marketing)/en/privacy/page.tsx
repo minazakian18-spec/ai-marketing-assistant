@@ -25,7 +25,7 @@ const sections: LegalSection[] = [
     title: "Who we are",
     body: (
       <>
-        <p>Mavix is AI marketing software for local businesses, operated by Liceau (sole proprietorship) in the Netherlands. For the data of your own account, Mavix is the controller. For data you process in Mavix about your customers (contacts, reviews, messages), you are the controller and Mavix processes it on your behalf.</p>
+        <p>Mavix is AI marketing software for local businesses, operated by Webbo Solutions (sole proprietorship) in the Netherlands. For the data of your own account, Mavix is the controller. For data you process in Mavix about your customers (contacts, reviews, messages), you are the controller and Mavix processes it on your behalf.</p>
         <Controller lang="en" />
       </>
     ),
