@@ -13,7 +13,7 @@ const query = z.object({
 export async function GET(request: Request) {
   try {
     const auth = await workspace();
-    await limited("reviews-list:" + auth.workspaceId, 60);
+    await limited("reviews-list:" + auth.workspaceId, 300);
     const input = query.parse(Object.fromEntries(new URL(request.url).searchParams));
     return NextResponse.json(await listGoogleReviews(auth.workspaceId, input), { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) {

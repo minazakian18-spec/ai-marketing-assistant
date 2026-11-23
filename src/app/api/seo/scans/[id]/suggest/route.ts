@@ -16,7 +16,7 @@ export async function POST(request: Request, { params }: Context) {
   try {
     sameOrigin(request);
     const auth = await workspace();
-    await limited("seo-ai:" + auth.user.id, 10);
+    await limited("seo-ai:" + auth.user.id, 30);
     await limited("seo-ai-ws:" + auth.workspaceId, 40);
     const body = input.parse(await request.json());
     const scan = await getScan(auth.workspaceId, (await params).id);

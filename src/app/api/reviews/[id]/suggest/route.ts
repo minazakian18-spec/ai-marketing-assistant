@@ -13,8 +13,8 @@ export async function POST(request: Request, { params }: Context) {
   try {
     sameOrigin(request);
     const auth = await workspace();
-    await limited("reviews-ai:" + auth.user.id, 10);
-    await limited("reviews-ai-ws:" + auth.workspaceId, 40);
+    await limited("reviews-ai:" + auth.user.id, 40);
+    await limited("reviews-ai-ws:" + auth.workspaceId, 150);
     const { id } = await params;
     const review = await getGoogleReview(auth.workspaceId, id);
     const { data } = await adminClient().from("business_profiles").select("data").eq("workspace_id", auth.workspaceId).maybeSingle();

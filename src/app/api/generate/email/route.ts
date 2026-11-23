@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   try {
     sameOrigin(request);
     const auth = await workspace(["OWNER", "ADMIN"]);
-    await limited("ai:" + auth.user.id, 10);
+    await limited("ai:" + auth.user.id, 30);
     await limited("ai-ws:" + auth.workspaceId, 60);
     let body: EmailRequest;
     try {

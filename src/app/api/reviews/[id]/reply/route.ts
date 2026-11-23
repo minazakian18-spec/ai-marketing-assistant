@@ -13,7 +13,7 @@ export async function PUT(request: Request, { params }: Context) {
   try {
     sameOrigin(request);
     const auth = await workspace();
-    await limited("reviews-reply:" + auth.workspaceId, 30);
+    await limited("reviews-reply:" + auth.workspaceId, 120);
     const { comment } = input.parse(await request.json());
     const { id } = await params;
     const reply = await putReviewReply(auth.workspaceId, id, comment);
@@ -29,7 +29,7 @@ export async function DELETE(request: Request, { params }: Context) {
   try {
     sameOrigin(request);
     const auth = await workspace();
-    await limited("reviews-reply:" + auth.workspaceId, 30);
+    await limited("reviews-reply:" + auth.workspaceId, 120);
     const { id } = await params;
     await deleteReviewReply(auth.workspaceId, id);
     await audit(auth.workspaceId, auth.user.id, "review_reply_deleted");

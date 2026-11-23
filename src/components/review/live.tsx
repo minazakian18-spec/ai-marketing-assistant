@@ -21,14 +21,24 @@ type Data = { reviews: GoogleReview[]; next: string | null; average: number | nu
 const MAX_PAGES = 20;
 type Check = { state: string; message?: string; locations?: BusinessLocation[]; location?: { name: string; address: string } };
 
+// A short pause and one retry when Mavix or Google says "too many requests",
+// so a busy moment never shows up as an error.
+async function withRetry(send: () => Promise<Response>) {
+  let r = await send();
+  for (let i = 0; i < 2 && r.status === 429; i++) {
+    await new Promise((ok) => setTimeout(ok, 2500 * (i + 1)));
+    r = await send();
+  }
+  return r;
+}
 async function get<T>(url: string): Promise<T> {
-  const r = await fetch(url, { cache: "no-store" });
+  const r = await withRetry(() => fetch(url, { cache: "no-store" }));
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error || "Er ging iets mis. Probeer het opnieuw.");
   return d as T;
 }
 async function post<T>(url: string, body: unknown = {}): Promise<T> {
-  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const r = await withRetry(() => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error || "Er ging iets mis. Probeer het opnieuw.");
   return d as T;

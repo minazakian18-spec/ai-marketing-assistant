@@ -22,7 +22,7 @@ export async function POST(request: Request, { params }: Context) {
   try {
     sameOrigin(request);
     const auth = await workspace();
-    await limited("inbox-ai:" + auth.user.id, 10);
+    await limited("inbox-ai:" + auth.user.id, 30);
     await limited("inbox-ai-ws:" + auth.workspaceId, 40);
     const { id } = await params;
     const body = input.parse(await request.json());

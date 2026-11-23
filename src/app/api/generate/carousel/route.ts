@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const auth = await workspace(["OWNER", "ADMIN"]);
     // Same closed test as single AI images: a carousel always needs AI images.
     assertImageAccess(auth.workspaceId);
-    await limited("ai:" + auth.user.id, 10);
+    await limited("ai:" + auth.user.id, 30);
     await limited("ai-ws:" + auth.workspaceId, 60);
     const body = input.parse(await request.json());
     if (!aiConfigured()) throw new HttpError(503, "AI is nog niet geconfigureerd. Er is geen carrousel gemaakt.");

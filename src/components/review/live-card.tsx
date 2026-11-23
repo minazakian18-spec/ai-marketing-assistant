@@ -16,7 +16,12 @@ const initials = (name: string) =>
 const longDate = (iso: string) => (iso ? new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" }) : "");
 
 async function call<T>(url: string, init: RequestInit): Promise<T> {
-  const r = await fetch(url, { ...init, headers: { "Content-Type": "application/json" } });
+  // Too many requests: nothing was sent yet, so wait briefly and try again.
+  let r = await fetch(url, { ...init, headers: { "Content-Type": "application/json" } });
+  for (let i = 0; i < 2 && r.status === 429; i++) {
+    await new Promise((ok) => setTimeout(ok, 2500 * (i + 1)));
+    r = await fetch(url, { ...init, headers: { "Content-Type": "application/json" } });
+  }
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.error || "Er ging iets mis. Probeer het opnieuw.");
   return d as T;

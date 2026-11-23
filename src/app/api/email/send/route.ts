@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const auth = await workspace(["OWNER", "ADMIN"]);
     const { campaignId, mode } = input.parse(await request.json());
     if (mode === "test") {
-      await limited("email-test:" + auth.user.id, 5);
+      await limited("email-test:" + auth.user.id, 15);
       return NextResponse.json(await sendTest({ workspaceId: auth.workspaceId, userId: auth.user.id, email: auth.user.email || "" }, campaignId), { headers });
     }
     await limited("email-send:" + auth.workspaceId, 5);
