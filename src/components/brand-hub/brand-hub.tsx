@@ -1,17 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Building2,
-  Check,
-  ImageIcon,
-  LayoutGrid,
-  Megaphone,
-  Palette,
-  Pencil,
-  Target,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Check, ImageIcon, LayoutGrid, Megaphone, Palette, Pencil, Target, Package, Users } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { PageHeading } from "@/components/ui";
 import { SegmentsManager } from "@/components/brand/segments-manager";
@@ -42,24 +31,41 @@ import {
 import { BrandPreview, type PreviewText } from "./brand-preview";
 import { StepGoals, StepIdentity, StepVisual, StepVoice } from "./brand-steps";
 
-// Brand Hub: a guided four-step setup (identity, audience & voice, visuals,
-// goals) with a summary, and an overview once the brand is set up. Existing
+// Brand Hub: a guided six-step setup (company, products & services, audience,
+// tone of voice, house style, goals) with a summary, and an overview once the brand is set up. Existing
 // profiles are reused as they are; nobody has to start over.
 // Drafts are kept in this browser while typing and saved to the workspace on
 // every "Opslaan en verder".
 
 const DRAFT_KEY = "mavix.brandhub.draft.v1";
-const ICONS = [Building2, Megaphone, Palette, Target];
+const ICONS = [Building2, Package, Users, Megaphone, Palette, Target];
+const LAST = STEPS.length;
 const WHY: Record<number, { title: string; text: string; points: string[] }> = {
   1: {
     title: "Zo leert Mavix je bedrijf kennen",
-    text: "Met je naam, branche en omschrijving begrijpt Mavix wat je doet. Je unieke kenmerken maken content onderscheidend in plaats van algemeen.",
+    text: "Met je naam, branche en omschrijving begrijpt Mavix wat je doet. Mavix noemt alleen wat jij hier invult en verzint geen feiten.",
     points: [
       "Wordt gebruikt in posts, e-mails, antwoorden op berichten en reviews",
-      "Mavix noemt alleen wat jij hier invult; er worden geen feiten verzonnen",
+      "Haal je gegevens van je website op om tijd te besparen",
     ],
   },
   2: {
+    title: "Je aanbod, helder op een rij",
+    text: "Mavix gebruikt je producten en diensten in posts, e-mails en antwoorden. Wat je uniek maakt, zorgt dat je content niet klinkt als die van de concurrent.",
+    points: [
+      "Zet je belangrijkste product of dienst bovenaan",
+      "Mavix noemt geen prijzen of acties die jij niet invult",
+    ],
+  },
+  3: {
+    title: "Schrijven voor de juiste klant",
+    text: "Hoe beter Mavix je klant kent, hoe beter de woorden, voorbeelden en het moment van je content aansluiten.",
+    points: [
+      "Beschrijf één typische klant: wie, waar en wanneer",
+      "Meerdere doelgroepen? Die voeg je later toe onder Verdieping",
+    ],
+  },
+  4: {
     title: "Je merkstem in elke tekst",
     text: "Toon, aanspreekvorm en persoonlijkheid bepalen hoe Mavix schrijft. Woorden die je wilt vermijden, gebruikt Mavix nooit.",
     points: [
@@ -67,7 +73,7 @@ const WHY: Record<number, { title: string; text: string; points: string[] }> = {
       "Een kanaal met eigen instellingen (zoals reviewtoon) gaat voor",
     ],
   },
-  3: {
+  5: {
     title: "Herkenbaar in beeld",
     text: "Logo, kleuren en stijl zorgen dat visuele content bij je huisstijl past. Bedrijfsfoto's zijn nodig voor automatische Instagram-posts.",
     points: [
@@ -75,7 +81,7 @@ const WHY: Record<number, { title: string; text: string; points: string[] }> = {
       "Alleen PNG, JPG en WebP",
     ],
   },
-  4: {
+  6: {
     title: "Content met een doel",
     text: "Je hoofddoel en kanalen bepalen waar Mavix de nadruk op legt. De call-to-action wordt standaard gebruikt als je per post niets anders kiest.",
     points: [
@@ -123,7 +129,7 @@ function firstOpenStep(p: Profile) {
   const c = completion(p);
   for (const st of STEPS)
     if (Object.keys(stepErrors(st.id, p)).length) return st.id;
-  return c.perStep.find((x) => x.filled < x.total)?.step || 5;
+  return c.perStep.find((x) => x.filled < x.total)?.step || LAST + 1;
 }
 
 export function BrandHub() {
@@ -170,7 +176,7 @@ export function BrandHub() {
           saved.step &&
           Number.isInteger(saved.step) &&
           saved.step >= 1 &&
-          saved.step <= 5
+          saved.step <= LAST + 1
         )
           restoredStep = saved.step;
       }
@@ -188,7 +194,7 @@ export function BrandHub() {
       setMode("overview");
     else {
       setMode("wizard");
-      setStep(restoredStep || Math.min(firstOpenStep(start), 4));
+      setStep(restoredStep || Math.min(firstOpenStep(start), LAST));
     }
   }, [ready, data.profile, draftKey]);
 
@@ -308,7 +314,7 @@ export function BrandHub() {
     const profile = { ...draft, strategy: { ...strategy, completedSteps } };
     setDraft(profile);
     if (
-      await persist(profile, step < 4 ? "Stap opgeslagen" : "Doelen opgeslagen")
+      await persist(profile, step < LAST ? "Stap opgeslagen" : "Doelen opgeslagen")
     )
       go(step + 1);
   }
@@ -326,7 +332,7 @@ export function BrandHub() {
       ...draft,
       strategy: {
         ...strategy,
-        completedSteps: [1, 2, 3, 4],
+        completedSteps: STEPS.map((x) => x.id),
         finishedAt: strategy.finishedAt || new Date().toISOString(),
       },
     };
@@ -387,7 +393,6 @@ export function BrandHub() {
   return (
     <div className="bh">
       <PageHeading
-        eyebrow="Merk"
         title="Brand Hub"
         description="Het geheugen van je merk. Mavix gebruikt dit in al je posts, e-mails en antwoorden."
       />
@@ -437,7 +442,7 @@ export function BrandHub() {
             aria-pressed={mode === "wizard"}
             onClick={() => {
               setMode("wizard");
-              setStep(Math.min(firstOpenStep(draft), 4));
+              setStep(Math.min(firstOpenStep(draft), LAST));
             }}
           >
             <Pencil size={14} aria-hidden="true" /> Stap voor stap
@@ -450,7 +455,7 @@ export function BrandHub() {
           <nav className="bh-stepper" aria-label="Stappen">
             <div className="bh-stepper-track" aria-hidden="true">
               <span
-                style={{ width: `${((Math.min(step, 5) - 1) / 4) * 100}%` }}
+                style={{ width: `${((Math.min(step, LAST + 1) - 1) / LAST) * 100}%` }}
               />
             </div>
             {[
@@ -458,11 +463,11 @@ export function BrandHub() {
                 id: s.id as number,
                 short: s.short as string,
               })),
-              { id: 5, short: "Samenvatting" },
+              { id: LAST + 1, short: "Samenvatting" },
             ].map((s) => {
-              const Icon = s.id <= 4 ? ICONS[s.id - 1] : Check;
+              const Icon = s.id <= LAST ? ICONS[s.id - 1] : Check;
               const done =
-                s.id <= 4 &&
+                s.id <= LAST &&
                 strategy.completedSteps.includes(s.id) &&
                 !Object.keys(stepErrors(s.id, draft)).length;
               return (
@@ -485,7 +490,7 @@ export function BrandHub() {
                     )}
                   </span>
                   <span className="bh-step-label">
-                    <small>{s.id <= 4 ? `Stap ${s.id}` : "Klaar"}</small>
+                    <small>{s.id <= LAST ? `Stap ${s.id}` : "Klaar"}</small>
                     {s.short}
                   </span>
                 </button>
@@ -499,7 +504,7 @@ export function BrandHub() {
               key={step}
               aria-labelledby="bh-step-title"
             >
-              {step <= 4 ? (
+              {step <= LAST ? (
                 <>
                   <header className="bh-panel-head">
                     <span className="bh-panel-icon" aria-hidden="true">
@@ -510,15 +515,19 @@ export function BrandHub() {
                     </span>
                     <div>
                       <small>
-                        Stap {step} van 4 · {progress.perStep[step - 1].filled}{" "}
+                        Stap {step} van {LAST} · {progress.perStep[step - 1].filled}{" "}
                         van {progress.perStep[step - 1].total} ingevuld
                       </small>
                       <h2 id="bh-step-title">{STEPS[step - 1].title}</h2>
+                      <p className="bh-panel-intro">{STEPS[step - 1].intro}</p>
                     </div>
                   </header>
-                  {step === 1 && <StepIdentity {...stepProps} />}
-                  {step === 2 && (
+                  {step === 1 && <StepIdentity {...stepProps} part="company" />}
+                  {step === 2 && <StepIdentity {...stepProps} part="products" />}
+                  {step === 3 && <StepVoice {...stepProps} part="audience" />}
+                  {step === 4 && (
                     <StepVoice
+                      part="voice"
                       {...stepProps}
                       ai={same(previewProfile, draft) ? ai : null}
                       onPreview={() => void preview()}
@@ -526,8 +535,8 @@ export function BrandHub() {
                       previewError={previewError}
                     />
                   )}
-                  {step === 3 && <StepVisual {...stepProps} />}
-                  {step === 4 && <StepGoals {...stepProps} />}
+                  {step === 5 && <StepVisual {...stepProps} />}
+                  {step === 6 && <StepGoals {...stepProps} />}
                   <footer className="bh-actions">
                     <button
                       type="button"
@@ -548,7 +557,7 @@ export function BrandHub() {
                     >
                       {busy
                         ? "Opslaan…"
-                        : step < 4
+                        : step < LAST
                           ? "Opslaan en verder"
                           : "Naar samenvatting"}{" "}
                       <ArrowRight size={15} aria-hidden="true" />
@@ -565,7 +574,7 @@ export function BrandHub() {
               )}
             </section>
             <aside className="bh-aside">
-              {step <= 4 ? (
+              {step <= LAST ? (
                 <>
                   <div className="bh-why">
                     <h3>{WHY[step].title}</h3>
@@ -576,17 +585,17 @@ export function BrandHub() {
                       ))}
                     </ul>
                   </div>
-                  {(step === 3 || step === 4) && (
+                  {(step === 4 || step === 5) && (
                     <BrandPreview
                       profile={draft}
                       ai={same(previewProfile, draft) ? ai : null}
                     />
                   )}
-                  {step === 1 && progress.perStep[0].missing.length > 0 && (
+                  {progress.perStep[step - 1].missing.length > 0 && (
                     <div className="bh-why">
                       <h3>Nog in te vullen</h3>
                       <ul>
-                        {progress.perStep[0].missing.map((m) => (
+                        {progress.perStep[step - 1].missing.map((m) => (
                           <li key={m}>{m}</li>
                         ))}
                       </ul>
@@ -620,6 +629,8 @@ function rows(p: Profile): Record<number, [string, string][]> {
       ["Branche", p.industry],
       ["Omschrijving", p.description],
       ["Website", p.website],
+    ],
+    2: [
       [
         "Producten of diensten",
         p.products ||
@@ -630,12 +641,14 @@ function rows(p: Profile): Record<number, [string, string][]> {
       ],
       ["Wat je uniek maakt", s.usps],
     ],
-    2: [
+    3: [
       [
         "Doelgroep",
         p.audience || (p.segments || []).map((x) => x.name).join(", "),
       ],
       ["Interesses", s.audienceInterests],
+    ],
+    4: [
       ["Taal", languageLabel(s.language)],
       [
         "Toon",
@@ -644,7 +657,7 @@ function rows(p: Profile): Record<number, [string, string][]> {
       ["Persoonlijkheid", s.personality.join(", ")],
       ["Vermijden", v.avoidWords],
     ],
-    3: [
+    5: [
       ["Logo", p.logo ? "Geüpload" : ""],
       ["Kleuren", v.colors.filter((c) => HEX.test(c)).join(", ")],
       ["Ontwerpstijl", s.designStyles.join(", ")],
@@ -660,7 +673,7 @@ function rows(p: Profile): Record<number, [string, string][]> {
         s.referenceImages.length ? `${s.referenceImages.length} beelden` : "",
       ],
     ],
-    4: [
+    6: [
       ["Hoofddoel", objectiveLabel(s.objective)],
       ["Kanalen", s.channels.filter((c) => CHANNELS.includes(c)).join(", ")],
       ["Call-to-action", s.ctas.join(", ")],
@@ -726,7 +739,7 @@ function Summary({
         <button
           type="button"
           className="button secondary"
-          onClick={() => onEdit(4)}
+          onClick={() => onEdit(LAST)}
           disabled={busy}
         >
           <ArrowLeft size={15} aria-hidden="true" /> Vorige

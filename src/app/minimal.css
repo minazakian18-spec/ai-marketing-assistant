@@ -230,3 +230,7 @@
 
 /* Inbox rail: a channel that is not available yet. */
 .ib-rail-item.is-soon { opacity: 0.6; cursor: default; }
+
+/* Brand Hub: one line of context under each step title. */
+.bh-panel-intro { margin: 2px 0 0; font-size: 13.5px; color: var(--min-muted, #5f5d72); }
+.bh-stepper { overflow-x: auto; scrollbar-width: none; }

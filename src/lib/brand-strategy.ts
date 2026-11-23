@@ -87,11 +87,15 @@ export const HEX = /^#[0-9a-f]{6}$/i;
 // ---------------------------------------------------------------- Steps
 
 export const STEPS = [
-  { id: 1, title: "Bedrijfsidentiteit", short: "Identiteit" },
-  { id: 2, title: "Doelgroep en merkstem", short: "Stem" },
-  { id: 3, title: "Visuele identiteit", short: "Visueel" },
-  { id: 4, title: "Marketingdoelen", short: "Doelen" },
+  { id: 1, title: "Over je bedrijf", short: "Bedrijf", intro: "Wie je bent en wat je doet, in je eigen woorden." },
+  { id: 2, title: "Producten en diensten", short: "Aanbod", intro: "Wat je verkoopt en waarom klanten voor jou kiezen." },
+  { id: 3, title: "Je doelgroep", short: "Doelgroep", intro: "Voor wie je werkt en waar die klanten om geven." },
+  { id: 4, title: "Tone of voice", short: "Toon", intro: "Hoe Mavix namens jou klinkt in posts, e-mails en antwoorden." },
+  { id: 5, title: "Huisstijl", short: "Huisstijl", intro: "Logo, kleuren, lettertypes en de sfeer van je beelden." },
+  { id: 6, title: "Marketingdoelen", short: "Doelen", intro: "Wat je met je marketing wilt bereiken." },
 ] as const;
+/** The summary comes after the last step. */
+export const SUMMARY_STEP = STEPS.length + 1;
 
 type Field = { step: number; label: string; done: (p: Profile, s: BrandStrategy, v: BrandVoice) => boolean };
 export const FIELDS: Field[] = [
@@ -99,21 +103,21 @@ export const FIELDS: Field[] = [
   { step: 1, label: "Branche", done: (p) => !!p.industry.trim() },
   { step: 1, label: "Omschrijving", done: (p) => p.description.trim().length >= 20 },
   { step: 1, label: "Website", done: (p) => !!p.website.trim() },
-  { step: 1, label: "Producten of diensten", done: (p) => !!p.products?.trim() || !!p.productList?.some((x) => x.active) },
-  { step: 1, label: "Wat je uniek maakt", done: (_p, s) => !!s.usps.trim() },
-  { step: 2, label: "Doelgroep", done: (p) => !!p.audience.trim() || !!p.segments?.length },
-  { step: 2, label: "Interesses van klanten", done: (_p, s) => !!s.audienceInterests.trim() },
-  { step: 2, label: "Toon", done: (_p, s) => !!s.tonePreset },
-  { step: 2, label: "Merkpersoonlijkheid", done: (_p, s) => s.personality.length > 0 },
-  { step: 2, label: "Woorden om te vermijden", done: (_p, _s, v) => !!v.avoidWords.trim() },
-  { step: 3, label: "Logo", done: (p) => !!p.logo },
-  { step: 3, label: "Merkkleuren", done: (_p, _s, v) => v.colors.some((c) => HEX.test(c)) },
-  { step: 3, label: "Ontwerpstijl", done: (_p, s) => s.designStyles.length > 0 },
-  { step: 3, label: "Lettertype", done: (_p, s) => !!s.typography.heading },
-  { step: 4, label: "Hoofddoel", done: (_p, s) => !!s.objective },
-  { step: 4, label: "Kanalen", done: (_p, s) => s.channels.length > 0 },
-  { step: 4, label: "Call-to-action", done: (_p, s) => s.ctas.length > 0 },
-  { step: 4, label: "Marketingvoorkeuren", done: (p, s) => !!p.contentPreferences?.trim() || !!s.businessGoals.trim() },
+  { step: 2, label: "Producten of diensten", done: (p) => !!p.products?.trim() || !!p.productList?.some((x) => x.active) },
+  { step: 2, label: "Wat je uniek maakt", done: (_p, s) => !!s.usps.trim() },
+  { step: 3, label: "Doelgroep", done: (p) => !!p.audience.trim() || !!p.segments?.length },
+  { step: 3, label: "Interesses van klanten", done: (_p, s) => !!s.audienceInterests.trim() },
+  { step: 4, label: "Toon", done: (_p, s) => !!s.tonePreset },
+  { step: 4, label: "Merkpersoonlijkheid", done: (_p, s) => s.personality.length > 0 },
+  { step: 4, label: "Woorden om te vermijden", done: (_p, _s, v) => !!v.avoidWords.trim() },
+  { step: 5, label: "Logo", done: (p) => !!p.logo },
+  { step: 5, label: "Merkkleuren", done: (_p, _s, v) => v.colors.some((c) => HEX.test(c)) },
+  { step: 5, label: "Ontwerpstijl", done: (_p, s) => s.designStyles.length > 0 },
+  { step: 5, label: "Lettertype", done: (_p, s) => !!s.typography.heading },
+  { step: 6, label: "Hoofddoel", done: (_p, s) => !!s.objective },
+  { step: 6, label: "Kanalen", done: (_p, s) => s.channels.length > 0 },
+  { step: 6, label: "Call-to-action", done: (_p, s) => s.ctas.length > 0 },
+  { step: 6, label: "Marketingvoorkeuren", done: (p, s) => !!p.contentPreferences?.trim() || !!s.businessGoals.trim() },
 ];
 
 export function completion(p: Profile) {
@@ -138,14 +142,16 @@ export function stepErrors(step: number, p: Profile): Record<string, string> {
     if (p.description.trim().length < 20) e.description = "Beschrijf je bedrijf in minimaal 20 tekens.";
     if (p.website.trim() && !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(p.website.trim())) e.website = "Gebruik een volledig webadres, bijvoorbeeld https://jouwbedrijf.nl.";
   }
-  if (step === 2) {
-    if (!p.audience.trim() && !p.segments?.length) e.audience = "Beschrijf in een paar woorden voor wie je werkt.";
-    if (!s.tonePreset && !p.voice.trim()) e.tonePreset = "Kies een toon die bij je merk past.";
-  }
   if (step === 3) {
-    if (v.colors.some((c) => c && !HEX.test(c))) e.colors = "Gebruik een kleurcode als #6D28D9.";
+    if (!p.audience.trim() && !p.segments?.length) e.audience = "Beschrijf in een paar woorden voor wie je werkt.";
   }
   if (step === 4) {
+    if (!s.tonePreset && !p.voice.trim()) e.tonePreset = "Kies een toon die bij je merk past.";
+  }
+  if (step === 5) {
+    if (v.colors.some((c) => c && !HEX.test(c))) e.colors = "Gebruik een kleurcode als #6D28D9.";
+  }
+  if (step === 6) {
     if (!s.objective) e.objective = "Kies je belangrijkste marketingdoel.";
   }
   return e;
@@ -179,8 +185,8 @@ export function strategyValid(v: unknown): boolean {
     str(s.businessGoals, 2000) &&
     strArr(s.ctas, 6, 60) &&
     Array.isArray(s.completedSteps) &&
-    s.completedSteps.length <= 4 &&
-    s.completedSteps.every((x) => Number.isInteger(x) && (x as number) >= 1 && (x as number) <= 4) &&
+    s.completedSteps.length <= STEPS.length &&
+    s.completedSteps.every((x) => Number.isInteger(x) && (x as number) >= 1 && (x as number) <= STEPS.length) &&
     (s.finishedAt === undefined || str(s.finishedAt, 40))
   );
 }

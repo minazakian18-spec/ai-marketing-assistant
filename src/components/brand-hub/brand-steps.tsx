@@ -230,8 +230,10 @@ export function StepIdentity({
   errors,
   setProfile,
   setStrategy,
-}: StepProps) {
+  part = "company",
+}: StepProps & { part?: "company" | "products" }) {
   const s = strategyOf(profile);
+  if (part === "products") return <StepProducts profile={profile} setProfile={setProfile} setStrategy={setStrategy} s={s} />;
   return (
     <div className="bh-fields">
       <div className="bh-two">
@@ -281,13 +283,26 @@ export function StepIdentity({
         />
       </Field>
       <WebsiteImport profile={profile} onApply={(patch) => setProfile(patch)} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Step 2: products and services
+
+function StepProducts({
+  profile,
+  setProfile,
+  setStrategy,
+  s,
+}: Pick<StepProps, "profile" | "setProfile" | "setStrategy"> & { s: ReturnType<typeof strategyOf> }) {
+  return (
+    <div className="bh-fields">
       <Field
-        label="Belangrijkste producten of diensten"
-        optional
-        hint="Eén per regel. Uitgebreide productkaarten beheer je onder 'Verdieping' in het overzicht."
+        label="Wat verkoop of bied je aan?"
+        hint="Eén product of dienst per regel, met de belangrijkste eerst. Prijzen en details voeg je later toe onder Verdieping."
       >
         <textarea
-          rows={3}
+          rows={5}
           maxLength={3000}
           value={profile.products || ""}
           onChange={(e) => setProfile({ products: e.target.value })}
@@ -321,7 +336,7 @@ export function StepIdentity({
   );
 }
 
-// ---------------------------------------------------------------- Step 2
+// ---------------------------------------------------------------- Steps 3 and 4: audience, tone of voice
 
 export function StepVoice({
   profile,
@@ -333,44 +348,42 @@ export function StepVoice({
   onPreview,
   previewBusy,
   previewError,
+  part = "voice",
 }: StepProps & {
-  ai: PreviewText;
-  onPreview: () => void;
-  previewBusy: boolean;
-  previewError: string;
+  ai?: PreviewText;
+  onPreview?: () => void;
+  previewBusy?: boolean;
+  previewError?: string;
+  part?: "audience" | "voice";
 }) {
   const s = strategyOf(profile);
   const v = voiceOf(profile);
-  return (
-    <div className="bh-fields">
-      <Field
-        label="Wie is je klant?"
-        error={errors.audience}
-        hint="Beschrijf je doelgroep alsof je één klant voor je ziet."
-      >
-        <textarea
-          rows={3}
-          maxLength={1000}
-          value={profile.audience}
-          onChange={(e) => setProfile({ audience: e.target.value })}
-          placeholder="Bijvoorbeeld: Gezinnen en stellen uit Gouda en omgeving die graag ontspannen uit eten gaan."
-        />
-      </Field>
-      <Improve
-        field="audience"
-        text={profile.audience}
-        profile={profile}
-        onAccept={(v2) => setProfile({ audience: v2 })}
-      />
-      <div className="bh-two">
-        <Field label="Waar zijn je klanten in geïnteresseerd?" optional>
+  if (part === "audience")
+    return (
+      <div className="bh-fields">
+        <Field label="Wie is je klant?" error={errors.audience} hint="Beschrijf je doelgroep alsof je één klant voor je ziet: wie, waar, en wanneer ze bij je komen.">
+          <textarea
+            rows={4}
+            maxLength={1000}
+            value={profile.audience}
+            onChange={(e) => setProfile({ audience: e.target.value })}
+            placeholder="Bijvoorbeeld: gezinnen en stellen uit Amstelveen en omgeving die in het weekend ontspannen willen eten of laten bezorgen."
+          />
+        </Field>
+        <Improve field="audience" text={profile.audience} profile={profile} onAccept={(v2) => setProfile({ audience: v2 })} />
+        <Field label="Waar zijn je klanten in geïnteresseerd?" optional hint="Een paar onderwerpen, gescheiden door komma's.">
           <input
             value={s.audienceInterests}
             maxLength={1000}
             onChange={(e) => setStrategy({ audienceInterests: e.target.value })}
-            placeholder="Lekker eten, gezelligheid, lokale producten"
+            placeholder="Lekker eten, gezelligheid, aanbiedingen, lokale producten"
           />
         </Field>
+      </div>
+    );
+  return (
+    <div className="bh-fields">
+      <div className="bh-two">
         <Field label="Taal van je content">
           <select
             value={s.language}
