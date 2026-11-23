@@ -1,4 +1,6 @@
 import "server-only";
+import { LOCATION_SHOTS } from "@/lib/locations";
+import { isMediaRef } from "@/lib/media-ref";
 import { z } from "zod";
 import { DATA_IMAGE, strategyValid } from "../brand-strategy";
 
@@ -66,8 +68,16 @@ export function brandAssetsValid(
     previous.logo,
     ...(Array.isArray(previous.media) ? previous.media : []),
   ];
+  // Library photos are referenced by their own path (stored in this workspace).
+  const libraryRef = (v: unknown) => typeof v === "string" && isMediaRef(v);
   const image = (v: unknown) =>
-    v === "" || oldImages.includes(v) || rasterImageValid(v, 1_000_000);
+    v === "" || oldImages.includes(v) || libraryRef(v) || rasterImageValid(v, 1_000_000);
+  if (profile.locations !== undefined) {
+    const l = profile.locations as Record<string, unknown> | null;
+    if (!l || typeof l !== "object" || Array.isArray(l)) return false;
+    const entries = Object.entries(l);
+    if (entries.length > LOCATION_SHOTS.length || !entries.every(([k, v]) => LOCATION_SHOTS.some((s) => s.id === k) && libraryRef(v))) return false;
+  }
   if (profile.logo !== undefined && !image(profile.logo)) return false;
   if (
     profile.media !== undefined &&

@@ -25,6 +25,8 @@ export type Profile = {
   offers?: string;
   logo?: string;
   media?: string[];
+  /** Location photos per perspective (src/lib/locations.ts): shot id -> library media ref. */
+  locations?: Record<string, string>;
   contentPreferences?: string;
   segments?: AudienceSegment[];
   productList?: Product[];

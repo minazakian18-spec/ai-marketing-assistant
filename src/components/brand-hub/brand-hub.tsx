@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Building2, Check, ImageIcon, LayoutGrid, Megaphone, Palette, Pencil, Target, Package, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Check, ImageIcon, LayoutGrid, Megaphone, Palette, Pencil, Target, Package, Users, Camera } from "lucide-react";
 import { useWorkspace } from "@/components/workspace-provider";
 import { PageHeading } from "@/components/ui";
 import { SegmentsManager } from "@/components/brand/segments-manager";
@@ -30,6 +30,8 @@ import {
 } from "@/lib/brand-strategy";
 import { BrandPreview, type PreviewText } from "./brand-preview";
 import { StepGoals, StepIdentity, StepVisual, StepVoice } from "./brand-steps";
+import { LocationShots } from "./location-shots";
+import { WebsiteAnalyze } from "./website-analyze";
 
 // Brand Hub: a guided six-step setup (company, products & services, audience,
 // tone of voice, house style, goals) with a summary, and an overview once the brand is set up. Existing
@@ -38,7 +40,7 @@ import { StepGoals, StepIdentity, StepVisual, StepVoice } from "./brand-steps";
 // every "Opslaan en verder".
 
 const DRAFT_KEY = "mavix.brandhub.draft.v1";
-const ICONS = [Building2, Package, Users, Megaphone, Palette, Target];
+const ICONS = [Building2, Package, Users, Megaphone, Palette, Camera, Target];
 const LAST = STEPS.length;
 const WHY: Record<number, { title: string; text: string; points: string[] }> = {
   1: {
@@ -82,6 +84,15 @@ const WHY: Record<number, { title: string; text: string; points: string[] }> = {
     ],
   },
   6: {
+    title: "Zo weet Mavix hoe je zaak eruitziet",
+    text: "Met foto's vanuit verschillende hoeken maakt Mavix AI-beelden op jouw echte locatie, in plaats van een willekeurig restaurant.",
+    points: [
+      "Bij Social kies je op welke plek de foto wordt gemaakt",
+      "De foto's staan ook in je Bibliotheek, album Locatiefoto's",
+      "Begin met de 5 belangrijkste; de rest kan later",
+    ],
+  },
+  7: {
     title: "Content met een doel",
     text: "Je hoofddoel en kanalen bepalen waar Mavix de nadruk op legt. De call-to-action wordt standaard gebruikt als je per post niets anders kiest.",
     points: [
@@ -536,7 +547,8 @@ export function BrandHub() {
                     />
                   )}
                   {step === 5 && <StepVisual {...stepProps} />}
-                  {step === 6 && <StepGoals {...stepProps} />}
+                  {step === 6 && <LocationShots profile={draft} setProfile={stepProps.setProfile} />}
+                  {step === 7 && <StepGoals {...stepProps} />}
                   <footer className="bh-actions">
                     <button
                       type="button"
@@ -612,7 +624,15 @@ export function BrandHub() {
           </div>
         </>
       ) : (
-        <Overview profile={draft} onEdit={(s) => (setMode("wizard"), go(s))} />
+        <Overview
+          profile={draft}
+          onEdit={(s) => (setMode("wizard"), go(s))}
+          onAnalyzed={(patch, usps) => {
+            const next = { ...draft, ...patch, ...(usps ? { strategy: { ...strategyOf(draft), usps } } : {}) };
+            setDraft(next);
+            void persist(next, "Gegevens van je website overgenomen");
+          }}
+        />
       )}
     </div>
   );
@@ -673,7 +693,8 @@ function rows(p: Profile): Record<number, [string, string][]> {
         s.referenceImages.length ? `${s.referenceImages.length} beelden` : "",
       ],
     ],
-    6: [
+    6: [["Locatiefoto's", Object.keys(p.locations || {}).length ? `${Object.keys(p.locations || {}).length} van 20` : ""]],
+    7: [
       ["Hoofddoel", objectiveLabel(s.objective)],
       ["Kanalen", s.channels.filter((c) => CHANNELS.includes(c)).join(", ")],
       ["Call-to-action", s.ctas.join(", ")],
@@ -762,15 +783,20 @@ function Summary({
 function Overview({
   profile,
   onEdit,
+  onAnalyzed,
 }: {
   profile: Profile;
   onEdit: (s: number) => void;
+  onAnalyzed: (patch: Partial<Profile>, usps?: string) => void;
 }) {
   const r = rows(profile);
   const c = completion(profile);
   return (
     <>
       <div className="bh-overview">
+        <section className="ui-card bh-overview-analyze">
+          <WebsiteAnalyze profile={profile} onApply={onAnalyzed} />
+        </section>
         <section className="ui-card bh-overview-hero">
           <div>
             <h2>{profile.name || "Je merk"}</h2>

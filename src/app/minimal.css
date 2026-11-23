@@ -242,3 +242,33 @@
 /* E-mail: chosen audiences and a direct way to edit contacts. */
 .cs-goals button[aria-pressed="true"] { border-color: var(--ds-accent, #6d28d9); background: var(--ds-accent-soft, #f3effd); }
 .em-audience-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--min-muted, #5f5d72); }
+
+/* Brand Hub: location photos (components/brand-hub/location-shots.tsx). */
+.loc-progress { display: grid; gap: 6px; font-size: 13.5px; color: var(--min-muted, #5f5d72); }
+.loc-progress strong { color: var(--min-ink, #2a0f5c); }
+.loc-bar { height: 6px; border-radius: 999px; background: #ecebf3; overflow: hidden; }
+.loc-bar span { display: block; height: 100%; background: var(--min-accent, #6d28d9); border-radius: inherit; transition: width 0.3s ease; }
+.loc-intro, .loc-note { margin: 0; font-size: 13px; color: var(--min-muted, #5f5d72); }
+.loc-area h4 { margin: 6px 0 8px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--min-muted, #5f5d72); }
+.loc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.loc-card { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--min-line, #e6e7ee); border-radius: 12px; background: #fff; }
+.loc-card.is-done { border-color: rgba(21, 128, 61, 0.35); }
+.loc-thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 8px; background: #f4f5f9; overflow: hidden; display: grid; place-items: center; }
+.loc-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.loc-n { font-size: 22px; font-weight: 700; color: #c9c7d6; }
+.loc-remove { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; }
+.loc-text { display: grid; gap: 2px; }
+.loc-text strong { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--min-ink, #2a0f5c); }
+.loc-text strong svg { color: #15803d; }
+.loc-text small { font-size: 12px; line-height: 1.4; color: var(--min-muted, #5f5d72); }
+.loc-add { justify-content: center; cursor: pointer; }
+.loc-add.is-disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Brand Hub: website analysis. */
+.bh-analyze { display: grid; gap: 10px; }
+.bh-analyze-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.bh-analyze-head > div { display: grid; gap: 2px; }
+.bh-analyze-head strong { font-size: 14px; color: var(--min-ink, #2a0f5c); }
+.bh-analyze-head small { font-size: 12.5px; color: var(--min-muted, #5f5d72); }
+.bh-analyze.is-compact { padding: 12px 14px; border: 1px dashed var(--min-line-strong, #d9dae4); border-radius: 12px; background: #fbfaff; }
+.bh-overview-analyze { padding: 16px 18px; }

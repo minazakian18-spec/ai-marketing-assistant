@@ -46,7 +46,7 @@ test("completion and validation support optional fields and actionable errors", 
   p.website = "javascript:alert(1)";
   assert.ok(stepErrors(1, p).website);
   const c = completion(p);
-  assert.equal(c.perStep.length, 6);
+  assert.equal(c.perStep.length, 7);
   assert.ok(c.percent >= 0 && c.percent <= 100);
 });
 

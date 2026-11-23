@@ -92,7 +92,8 @@ export const STEPS = [
   { id: 3, title: "Je doelgroep", short: "Doelgroep", intro: "Voor wie je werkt en waar die klanten om geven." },
   { id: 4, title: "Tone of voice", short: "Toon", intro: "Hoe Mavix namens jou klinkt in posts, e-mails en antwoorden." },
   { id: 5, title: "Huisstijl", short: "Huisstijl", intro: "Logo, kleuren, lettertypes en de sfeer van je beelden." },
-  { id: 6, title: "Marketingdoelen", short: "Doelen", intro: "Wat je met je marketing wilt bereiken." },
+  { id: 6, title: "Foto's van je zaak", short: "Locatie", intro: "20 foto's vanuit verschillende hoeken, zodat Mavix weet hoe je zaak eruitziet." },
+  { id: 7, title: "Marketingdoelen", short: "Doelen", intro: "Wat je met je marketing wilt bereiken." },
 ] as const;
 /** The summary comes after the last step. */
 export const SUMMARY_STEP = STEPS.length + 1;
@@ -114,10 +115,11 @@ export const FIELDS: Field[] = [
   { step: 5, label: "Merkkleuren", done: (_p, _s, v) => v.colors.some((c) => HEX.test(c)) },
   { step: 5, label: "Ontwerpstijl", done: (_p, s) => s.designStyles.length > 0 },
   { step: 5, label: "Lettertype", done: (_p, s) => !!s.typography.heading },
-  { step: 6, label: "Hoofddoel", done: (_p, s) => !!s.objective },
-  { step: 6, label: "Kanalen", done: (_p, s) => s.channels.length > 0 },
-  { step: 6, label: "Call-to-action", done: (_p, s) => s.ctas.length > 0 },
-  { step: 6, label: "Marketingvoorkeuren", done: (p, s) => !!p.contentPreferences?.trim() || !!s.businessGoals.trim() },
+  { step: 6, label: "Locatiefoto's (minstens 5)", done: (p) => Object.keys(p.locations || {}).length >= 5 },
+  { step: 7, label: "Hoofddoel", done: (_p, s) => !!s.objective },
+  { step: 7, label: "Kanalen", done: (_p, s) => s.channels.length > 0 },
+  { step: 7, label: "Call-to-action", done: (_p, s) => s.ctas.length > 0 },
+  { step: 7, label: "Marketingvoorkeuren", done: (p, s) => !!p.contentPreferences?.trim() || !!s.businessGoals.trim() },
 ];
 
 export function completion(p: Profile) {
@@ -151,7 +153,7 @@ export function stepErrors(step: number, p: Profile): Record<string, string> {
   if (step === 5) {
     if (v.colors.some((c) => c && !HEX.test(c))) e.colors = "Gebruik een kleurcode als #6D28D9.";
   }
-  if (step === 6) {
+  if (step === 7) {
     if (!s.objective) e.objective = "Kies je belangrijkste marketingdoel.";
   }
   return e;

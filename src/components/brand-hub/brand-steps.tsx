@@ -1,4 +1,5 @@
 "use client";
+import { WebsiteAnalyze } from "./website-analyze";
 import {
   cloneElement,
   isValidElement,
@@ -297,6 +298,7 @@ function StepProducts({
 }: Pick<StepProps, "profile" | "setProfile" | "setStrategy"> & { s: ReturnType<typeof strategyOf> }) {
   return (
     <div className="bh-fields">
+      <WebsiteAnalyze profile={profile} compact onApply={(patch, usps) => { setProfile(patch); if (usps) setStrategy({ usps }); }} />
       <Field
         label="Wat verkoop of bied je aan?"
         hint="Eén product of dienst per regel, met de belangrijkste eerst. Prijzen en details voeg je later toe onder Verdieping."
