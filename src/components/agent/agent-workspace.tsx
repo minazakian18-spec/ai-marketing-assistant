@@ -463,10 +463,20 @@ export function AgentWorkspace() {
           {drawer ? <X size={16} /> : <PanelLeftClose size={16} />}
         </IconButton>
       </div>
-      <button type="button" className="ag-new" onClick={() => void openConversation(null)}>
-        <SquarePen size={15} aria-hidden="true" />
-        Nieuw gesprek
-      </button>
+      <div className="ag-actions">
+        <button type="button" className="ag-new" onClick={() => void openConversation(null)}>
+          <SquarePen size={15} aria-hidden="true" />
+          Nieuw gesprek
+        </button>
+        <button
+          type="button"
+          className="ag-new ag-new-project"
+          onClick={() => (demo ? setNotice("In de testmodus kun je geen projecten aanmaken. Met een echt account bundel je hier gesprekken per campagne of onderwerp.") : setNewFolder(""))}
+        >
+          <FolderPlus size={15} aria-hidden="true" />
+          Nieuw project
+        </button>
+      </div>
       <label className="ag-search">
         <Search size={14} aria-hidden="true" />
         <span className="sr-only">Zoek in gesprekken</span>
@@ -579,8 +589,7 @@ export function AgentWorkspace() {
                 </ul>
               </section>
             )}
-            {archivedView ? section("Archief", conversations) : section("Afgelopen 7 dagen", groups.recent)}
-            {!archivedView && section("Ouder", groups.older)}
+            {archivedView ? section("Archief", conversations) : section("Gesprekken", [...groups.recent, ...groups.older])}
             {!conversations.length && !demo && <p className="ag-muted ag-small">{archivedView ? "Het archief is leeg." : "Je gesprekken verschijnen hier."}</p>}
             {more && (
               <button type="button" className="ag-more" onClick={() => void loadList({ append: true, archived: archivedView })}>
@@ -667,7 +676,7 @@ export function AgentWorkspace() {
                 <h2>Waar werken we vandaag aan?</h2>
                 <p>Mavix is je marketingassistent. Hij kent je Brand Hub en werkruimte, schrijft teksten en plannen, en wijst je de weg in Mavix. Hij publiceert of verstuurt nooit zelf iets.</p>
                 <ul className="ag-suggestions" aria-label="Voorbeelden">
-                  {AGENT_SUGGESTIONS.map((s) => (
+                  {AGENT_SUGGESTIONS.slice(0, 6).map((s) => (
                     <li key={s.prompt}>
                       <button type="button" disabled={sending} onClick={() => void send(s.prompt)}>
                         {s.prompt}

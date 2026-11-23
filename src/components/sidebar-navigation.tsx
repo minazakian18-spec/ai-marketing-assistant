@@ -62,7 +62,7 @@ export function SidebarNavigation({ onNavigate }: { onNavigate: () => void }) {
               item={item}
               path={path}
               onNavigate={onNavigate}
-              badge={item.href === "/social" ? unread : 0}
+              badge={item.href === "/inbox" ? unread : 0}
             />
           ))}
         </section>

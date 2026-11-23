@@ -43,10 +43,10 @@ type Outgoing = { conversationId: string; payload: SendPayload; message: Message
  * Customer conversations. Embedded per channel: Social > Berichten shows
  * Instagram, E-mail > Inbox shows e-mail (`fixed`). There is no mixed view.
  */
-export function InboxView({ fixed }: { fixed: Channel }) {
+export function InboxView({ fixed }: { fixed?: Channel }) {
   const [demo, setDemo] = useState(false);
   const [ready, setReady] = useState(false);
-  const [channel, setChannel] = useState<Channel | "">(fixed);
+  const [channel, setChannel] = useState<Channel | "">(fixed || "");
   const [status, setStatus] = useState<StatusFilter>("open");
   const [sort, setSort] = useState<SortOrder>("newest");
   const [unreadByChannel, setUnreadByChannel] = useState<Partial<Record<Channel, number>>>({});
@@ -506,12 +506,12 @@ export function InboxView({ fixed }: { fixed: Channel }) {
   );
   return (
     <div className="ib" data-view={view} data-details={detailsOpen ? "open" : "closed"} data-open={shown ? "yes" : "no"}>
-      <header className="ib-head ib-head-embedded">
+      <header className={"ib-head" + (fixed ? " ib-head-embedded" : "")}>
         <div>
-          <h2>{fixed === "gmail" ? "Binnengekomen e-mails" : "Instagram-berichten"}</h2>
-          <p>{fixed === "gmail" ? "Lees en beantwoord e-mails van klanten." : "Lees en beantwoord DM's van je klanten."}</p>
+          {fixed ? <h2>{fixed === "gmail" ? "Binnengekomen e-mails" : "Instagram-berichten"}</h2> : <h1>Inbox</h1>}
+          <p>{fixed === "gmail" ? "Lees en beantwoord e-mails van klanten." : fixed ? "Lees en beantwoord DM's van je klanten." : "Instagram, Facebook en e-mail van je klanten op één plek."}</p>
         </div>
-        {!demo && fixed === "gmail" && gmailConnected && (
+        {!demo && fixed !== "instagram" && gmailConnected && (
           <button type="button" className="button primary ib-new-mail" onClick={() => setComposing(true)}>
             <PenLine size={15} aria-hidden="true" />
             Nieuwe e-mail
@@ -545,7 +545,7 @@ export function InboxView({ fixed }: { fixed: Channel }) {
       <div className="ib-layout ui-card">
         <ChannelRail
           channels={channels}
-          showChannels={false}
+          showChannels={!fixed}
           unreadByChannel={demo ? demoUnread : unreadByChannel}
           channel={channel}
           status={status}

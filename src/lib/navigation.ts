@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import {
+  Inbox,
   LayoutDashboard,
   PenLine,
   CalendarDays,
@@ -33,6 +34,7 @@ export const navigationGroups: NavGroup[] = [
     label: "Dagelijks werk",
     items: [
       { href: "/agent", label: "Mavix Agent", icon: Mavi },
+      { href: "/inbox", label: "Inbox", icon: Inbox },
       { href: "/studio", label: "Content Studio", icon: PenLine },
       { href: "/calendar", label: "Kalender", icon: CalendarDays },
     ],
