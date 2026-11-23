@@ -14,9 +14,15 @@ const SEGMENT_GROUP: Record<string, string> = { "Nieuwe klanten": "Nieuw", "VIP 
  * that group. Returns the list plus how many contacts were left out because
  * Mavix has no recorded consent for them (for example imported contacts).
  */
+/** Several audiences are stored as "Nieuwe klanten + VIP klanten". */
+export const splitAudience = (segment: string) => segment.split(" + ").map((x) => x.trim()).filter(Boolean);
+
 export function campaignRecipients(segment: string, consented: Consented[], contacts: AudienceContact[]) {
-  const group = SEGMENT_GROUP[segment];
-  const inGroup = group ? new Set(contacts.filter((c) => c.group === group || c.group === segment).map((c) => norm(c.email))) : null;
+  const parts = splitAudience(segment);
+  // "Alle contacten" (or no specific group) means everyone with consent.
+  const everyone = !parts.length || parts.some((p) => !SEGMENT_GROUP[p]);
+  const matches = (c: AudienceContact) => parts.some((p) => c.group === SEGMENT_GROUP[p] || c.group === p);
+  const inGroup = everyone ? null : new Set(contacts.filter(matches).map((c) => norm(c.email)));
   const seen = new Set<string>();
   const recipients = consented.filter((s) => {
     const e = norm(s.email);
@@ -25,7 +31,7 @@ export function campaignRecipients(segment: string, consented: Consented[], cont
     return true;
   });
   const consentedSet = new Set(consented.map((s) => norm(s.email)));
-  const targeted = contacts.filter((c) => c.email && (!group || c.group === group || c.group === segment) && c.status === "Ingeschreven");
+  const targeted = contacts.filter((c) => c.email && (everyone || matches(c)) && c.status === "Ingeschreven");
   return { recipients, withoutConsent: targeted.filter((c) => !consentedSet.has(norm(c.email))).length };
 }
 

@@ -459,11 +459,23 @@ export function EmailCreate({
                 </span>
                 <h3 id="em-step-2">Voor wie?</h3>
               </header>
-              <div className="cs-goals" role="radiogroup" aria-labelledby="em-step-2">
+              <div className="cs-goals" role="group" aria-labelledby="em-step-2">
                 {segments.map((seg) => {
                   const n = recipients(seg).length;
+                  const chosen = audience.split(" + ").includes(seg);
                   return (
-                    <button key={seg} type="button" role="radio" aria-checked={audience === seg} onClick={() => setAudience(seg)}>
+                    <button
+                      key={seg}
+                      type="button"
+                      aria-pressed={chosen}
+                      aria-checked={chosen}
+                      onClick={() => {
+                        // Several audiences at once; "Alle contacten" stands on its own.
+                        const now = audience.split(" + ").filter(Boolean);
+                        const next = seg === "Alle contacten" ? ["Alle contacten"] : chosen ? now.filter((x) => x !== seg) : [...now.filter((x) => x !== "Alle contacten"), seg];
+                        setAudience(next.length ? next.join(" + ") : "Alle contacten");
+                      }}
+                    >
                       <strong>{seg}</strong>
                       <small>
                         {n} {n === 1 ? "contact" : "contacten"} met toestemming
@@ -472,9 +484,14 @@ export function EmailCreate({
                   );
                 })}
               </div>
-              <p className="cs-hint">
-                Ontvangers komen uit <Link href="/contacten">Contacten</Link>. Alleen wie toestemming gaf, krijgt de e-mail.
-              </p>
+              <div className="em-audience-bar">
+                <span>
+                  {recipients(audience).length} {recipients(audience).length === 1 ? "ontvanger" : "ontvangers"} met toestemming · je kunt meerdere groepen kiezen
+                </span>
+                <Link className="button secondary" href="/contacten">
+                  Contacten bewerken
+                </Link>
+              </div>
             </section>
 
             <section className="cs-step cs-step-brief" aria-labelledby="em-step-3">

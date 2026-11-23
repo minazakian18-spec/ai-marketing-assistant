@@ -128,7 +128,13 @@ export function segmentForGroup(group?: string): Segment {
   return "Alle contacten";
 }
 
-export function recipients(segment: string) {
+export function recipients(audience: string): typeof liveContacts {
+  const parts = audience.split(" + ").map((x) => x.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    const seen = new Set<string>();
+    return parts.flatMap((p) => recipients(p)).filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
+  }
+  const segment = parts[0] || "Alle contacten";
   return liveContacts.filter(
     (c) =>
       c.status === "Ingeschreven" &&

@@ -238,3 +238,7 @@
 /* Google-account row: actions stay at the top right, not in the middle of a tall card. */
 .int-row.int-google { align-items: start; }
 .int-row.int-google > .int-state, .int-row.int-google > .int-actions { margin-top: 2px; }
+
+/* E-mail: chosen audiences and a direct way to edit contacts. */
+.cs-goals button[aria-pressed="true"] { border-color: var(--ds-accent, #6d28d9); background: var(--ds-accent-soft, #f3effd); }
+.em-audience-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--min-muted, #5f5d72); }
