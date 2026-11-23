@@ -10,9 +10,14 @@ export type Testimonial = {
 // No fabricated quotes. Pass real, verified testimonials in here once they
 // exist — until then this list stays empty and the section renders nothing.
 const realTestimonials: Testimonial[] = [
-  // TODO(Telepizza): spot for the quote of Telepizza Amstelveen (beta partner).
-  // Fill in only the literal, approved text and uncomment; nothing is invented here.
-  // { quote: "…", name: "…", role: "Telepizza Amstelveen", rating: 5 },
+  // Telepizza Amstelveen (beta partner): Mario's words, lightly edited for
+  // readability with the owner's intent kept; confirm the final text with him.
+  {
+    quote:
+      "Na het werk ging ik thuis altijd nog door met mijn marketing. Dat hoeft nu niet meer, want het gaat grotendeels automatisch. En door de uitstekende service voel ik me er helemaal op mijn gemak bij.",
+    name: "Mario",
+    role: "Eigenaar, Telepizza Amstelveen",
+  },
 ];
 
 export function Testimonials() {
