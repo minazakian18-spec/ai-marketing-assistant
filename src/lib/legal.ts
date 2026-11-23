@@ -3,17 +3,17 @@
 // that the detail follows, instead of showing an invented value.
 export const LEGAL = {
   /** Legal name of the company that operates Mavix. */
-  entity: "Webbo Solutions" as string | null,
+  entity: "Liceau (eenmanszaak)" as string | null,
   /** KvK (Chamber of Commerce) number. */
-  kvk: null as string | null,
+  kvk: "91819423" as string | null,
   /** Registered business address. */
-  address: null as string | null,
+  address: "Pieter A. van Heijningestraat 131, 1035 SZ Amsterdam" as string | null,
   /** E-mail address for privacy questions and deletion requests. */
   privacyEmail: "saleswebbo@gmail.com" as string | null,
   /** Date the texts were last changed (shown on every legal page). */
-  updated: "21 november 2026",
+  updated: "23 november 2026",
   /** Same date for the English pages. */
-  updatedEn: "21 November 2026",
+  updatedEn: "23 November 2026",
 };
 
 export const LEGAL_PAGES = [
