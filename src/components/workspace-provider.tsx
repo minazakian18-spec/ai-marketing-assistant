@@ -200,9 +200,12 @@ export function WorkspaceProvider({
     >
       {demo && (
         <div className="demo-banner" role="status">
-          Testmodus — voorbeeldgegevens, lokaal opgeslagen. AI-content is
-          gesimuleerd. Koppelingen, facturatie en accountbeheer vereisen een
-          echt account.{" "}
+          <span className="demo-short">Testmodus — voorbeeldgegevens.</span>
+          <span className="demo-long">
+            Testmodus — voorbeeldgegevens, lokaal opgeslagen. AI-content is
+            gesimuleerd. Koppelingen, facturatie en accountbeheer vereisen een
+            echt account.
+          </span>{" "}
           <button type="button" onClick={stopDemo}>
             Testmodus verlaten
           </button>

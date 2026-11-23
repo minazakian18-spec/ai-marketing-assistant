@@ -295,3 +295,10 @@
   .main-shell .page-heading, .dash > *, .ui-empty, .todo-all-done, .dash-quick li, .todo { animation-duration: 200ms; }
   .dash > :nth-child(n), .dash-quick li, .todo { animation-delay: 0ms; }
 }
+
+/* Demo banner: one short line on phones. */
+.demo-banner .demo-short { display: none; }
+@media (max-width: 640px) {
+  .demo-banner .demo-short { display: inline; }
+  .demo-banner .demo-long { display: none; }
+}
