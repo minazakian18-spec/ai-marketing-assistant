@@ -5,7 +5,7 @@ import { defaultChannel, CHANNEL_ORDER } from "../src/lib/inbox/channel-default.
 const ch = (states) => Object.entries(states).map(([channel, state]) => ({ channel, state }));
 
 test("channel-first Inbox: always one channel, never an aggregate view", () => {
-  assert.deepEqual(CHANNEL_ORDER, ["instagram", "gmail"]);
+  assert.deepEqual(CHANNEL_ORDER, ["instagram", "messenger", "gmail"]);
   for (const c of [[], ch({ gmail: "reconnect" }), ch({ instagram: "connected" })]) assert.ok(CHANNEL_ORDER.includes(defaultChannel(c, {}, null)));
 });
 

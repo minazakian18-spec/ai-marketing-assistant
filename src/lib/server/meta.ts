@@ -263,6 +263,24 @@ export async function sendMetaText(workspaceId:string,provider:MetaProvider,reci
 
 
 // Best-effort customer profile for a new conversation (name/username).
+/** Page id of the Facebook Page behind the Instagram connection (Facebook Login only). */
+export function facebookPageId(c:{metadata?:unknown},creds?:{page_id?:string}){const m=(c.metadata||{}) as {authMode?:string;pageId?:string};if(m.authMode!=='facebook')return '';const id=String(m.pageId||creds?.page_id||'');return /^\d{1,30}$/.test(id)?id:'';}
+
+/** Replies to a customer on the Facebook Page (Messenger). Needs pages_messaging. */
+export async function sendFacebookText(workspaceId:string,recipient:string,text:string):Promise<string>{
+ const {creds,c}=await metaConnection(workspaceId,'instagram');
+ const pageId=facebookPageId(c,creds);
+ if(!pageId)throw new HttpError(409,'Facebook is niet gekoppeld. Koppel Instagram via Facebook om Facebook-berichten te beantwoorden.');
+ try{const d=await metaJson(graph('/'+pageId+'/messages'),{method:'POST',headers:{Authorization:'Bearer '+creds.access_token,'Content-Type':'application/json'},body:JSON.stringify({recipient:{id:recipient},messaging_type:'RESPONSE',message:{text}})},'instagram');return String(d.message_id);}
+ catch(e){await flag(c.id,e);throw e;}
+}
+
+/** Name of a Facebook customer (Page-scoped id). */
+export async function facebookProfile(workspaceId:string,id:string){
+ try{if(!/^\d{1,40}$/.test(id))return {};const {creds}=await metaConnection(workspaceId,'instagram');const d=await metaJson(graph('/'+id+'?fields=first_name,last_name,name'),{headers:{Authorization:'Bearer '+creds.access_token}},'instagram');return {name:typeof d.name==='string'?d.name.slice(0,200):[d.first_name,d.last_name].filter(Boolean).join(' ').slice(0,200)||undefined};}
+ catch{return {};}
+}
+
 export async function metaProfile(workspaceId:string,provider:'instagram',id:string){
  try{
   if(!/^\d{1,40}$/.test(id))return {};

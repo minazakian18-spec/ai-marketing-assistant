@@ -85,12 +85,12 @@ test("unread counts per channel and in total; channel states for the rail", asyn
   const f = setup(t);
   // (memoryDb has no PostgREST `or`, used by the all-channels list with Gmail; the counts do not use it.)
   const { body } = await f.list("channel=instagram");
-  assert.deepEqual(body.unreadByChannel, { gmail: 1, instagram: 1 });
+  assert.deepEqual(body.unreadByChannel, { gmail: 1, instagram: 1, messenger: 0 });
   assert.equal(body.unread, 2);
   const states = Object.fromEntries(body.channels.map((c) => [c.channel, c.state]));
-  assert.deepEqual(states, { gmail: "connected", instagram: "connected" });
+  assert.deepEqual(states, { gmail: "connected", instagram: "connected", messenger: "not_connected" });
   const other = await f.list("channel=instagram", "u2");
-  assert.deepEqual(other.body.unreadByChannel, { gmail: 0, instagram: 1 });
+  assert.deepEqual(other.body.unreadByChannel, { gmail: 0, instagram: 1, messenger: 0 });
 });
 
 test("all channels without Gmail linked: no Gmail conversations; newest or oldest first", async (t) => {

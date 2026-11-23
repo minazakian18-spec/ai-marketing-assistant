@@ -148,7 +148,7 @@ type MetaMessaging = {
 // professional account id the connection is stored under.
 export function parseMetaMessaging(
   payload: unknown,
-  channel: "instagram",
+  channel: "instagram" | "messenger",
 ) {
   const messages: NormalizedMessage[] = [];
   const statuses: StatusUpdate[] = [];
@@ -157,7 +157,7 @@ export function parseMetaMessaging(
     entry?: { id?: string; time?: number; messaging?: MetaMessaging[] }[];
   };
   if (
-    body?.object !== channel ||
+    body?.object !== (channel === "messenger" ? "page" : channel) ||
     !Array.isArray(body.entry)
   )
     return { messages, statuses };

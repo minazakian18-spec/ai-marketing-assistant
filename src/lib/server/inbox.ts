@@ -11,6 +11,9 @@ import {
   metaConnection,
   metaProfile,
   sendMetaText,
+  sendFacebookText,
+  facebookProfile,
+  facebookPageId,
   type MetaProvider,
 } from "./meta";
 import {
@@ -161,12 +164,20 @@ export async function channelStates(
 ): Promise<ChannelState[]> {
   const { data, error } = await db()
     .from("integration_connections")
-    .select("provider,status,scopes,display_name,provider_account_id")
+    .select("provider,status,scopes,display_name,provider_account_id,metadata")
     .eq("workspace_id", workspaceId)
     .in("provider", ["gmail", "instagram"]);
   if (error) throw error;
-  return (["gmail", "instagram"] as Channel[]).map(
+  return (["gmail", "instagram", "messenger"] as Channel[]).map(
     (channel) => {
+      if (channel === "messenger") {
+        const ig = data?.find((d) => d.provider === "instagram");
+        if (!ig || ig.status === "disconnected" || !facebookPageId(ig)) return { channel, state: "not_connected", account: "" };
+        const page = String((ig.metadata as { pageName?: string })?.pageName || "");
+        if (ig.status === "reconnect_required") return { channel, state: "reconnect", account: page };
+        if (ig.status !== "connected" && ig.status !== "permission_missing") return { channel, state: "error", account: page };
+        return { channel, state: "connected", account: page };
+      }
       const c = data?.find((d) => d.provider === channel);
       if (!c || c.status === "disconnected")
         return { channel, state: "not_connected", account: "" };
@@ -346,6 +357,12 @@ export async function ingest(
       } as Record<string, string>;
       patch.external_contact = merged;
     }
+  } else if (created && m.channel === "messenger" && m.direction === "inbound") {
+    const profile = await facebookProfile(workspaceId, m.threadId);
+    if (profile.name) {
+      merged = { ...merged, name: profile.name } as Record<string, string>;
+      patch.external_contact = merged;
+    }
   } else if (!row.external_contact?.name && contact.name)
     patch.external_contact = merged;
   if (!row.contact_id) {
@@ -425,7 +442,22 @@ export async function applyStatus(workspaceId: string, u: StatusUpdate) {
 
 // ---------------------------------------------------------------- Webhooks
 
-async function workspacesFor(provider: MetaProvider, accountId: string) {
+async function workspacesFor(provider: MetaProvider | "messenger", accountId: string) {
+  if (provider === "messenger") {
+    if (!/^\d{1,30}$/.test(accountId)) return [];
+    const { data: pages } = await db()
+      .from("integration_connections")
+      .select("workspace_id")
+      .eq("provider", "instagram")
+      .eq("metadata->>pageId", accountId)
+      .in("status", ["connected", "permission_missing"]);
+    const ids = (pages || []).map((d) => d.workspace_id as string);
+    if (ids.length > 1) {
+      log("inbox_webhook_ambiguous_account", { provider, workspaces: ids.length });
+      return [];
+    }
+    return ids;
+  }
   const { data } = await db()
     .from("integration_connections")
     .select("workspace_id")
@@ -459,10 +491,12 @@ async function firstDelivery(
 // Process a verified Meta webhook body (Instagram).
 export async function processMetaWebhook(payload: unknown) {
   const object = (payload as { object?: string })?.object;
-  const provider: MetaProvider | null =
+  const provider: MetaProvider | "messenger" | null =
     object === "instagram"
       ? "instagram"
-      : null;
+      : object === "page"
+        ? "messenger"
+        : null;
   if (!provider) return;
   const { messages, statuses } = parseMetaMessaging(payload, provider);
   const cache = new Map<string, string[]>();
@@ -1073,7 +1107,7 @@ export async function listConversations(
 // Gmail counts only the mailbox that is linked right now.
 export async function unreadByChannel(workspaceId: string): Promise<Record<Channel, number>> {
   const gmailAccount = await visibleGmailAccount(workspaceId);
-  const channels: Channel[] = ["gmail", "instagram"];
+  const channels: Channel[] = ["gmail", "instagram", "messenger"];
   const counts = await Promise.all(
     channels.map(async (channel) => {
       if (channel === "gmail" && !gmailAccount) return 0;
@@ -1319,6 +1353,8 @@ export async function sendReply(
         attachments,
       );
       providerId = String(sent.id);
+    } else if (row.provider === "messenger") {
+      providerId = await sendFacebookText(ctx.workspaceId, row.provider_thread_id, body);
     } else {
       providerId = await sendMetaText(
         ctx.workspaceId,

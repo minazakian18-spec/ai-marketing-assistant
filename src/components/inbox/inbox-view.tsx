@@ -33,6 +33,7 @@ const uuid = () => crypto.randomUUID();
 const CONNECT_TEXT: Record<Channel, string> = {
   instagram: "Koppel je professionele Instagram-account om Direct-berichten hier te ontvangen en te beantwoorden.",
   gmail: "E-mail lezen komt later beschikbaar.",
+  messenger: "Koppel Instagram via Facebook om ook berichten van je Facebook-pagina hier te ontvangen en te beantwoorden.",
 };
 const byNewest = (a: ConversationView, b: ConversationView) => b.lastMessageAt.localeCompare(a.lastMessageAt) || b.id.localeCompare(a.id);
 const byOldest = (a: ConversationView, b: ConversationView) => -byNewest(a, b);

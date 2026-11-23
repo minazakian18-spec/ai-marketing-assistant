@@ -15,6 +15,7 @@ export type SortOrder = "newest" | "oldest";
 export { CHANNEL_ORDER };
 export const CHANNEL_NAME: Record<Channel, string> = {
   instagram: "Instagram Direct",
+  messenger: "Facebook",
   gmail: "Gmail",
 };
 const FOLDERS: [StatusFilter, string, typeof Inbox][] = [
@@ -96,17 +97,6 @@ export function ChannelRail({
               </li>
             );
           })}
-          <li>
-            <span className="ib-rail-item is-soon" aria-disabled="true" title="Facebook-berichten komen binnenkort">
-              <span className="ib-rail-icon">
-                <BrandIcon brand="facebook" size={18} />
-              </span>
-              <span className="ib-rail-label">
-                Facebook
-                <small>Binnenkort</small>
-              </span>
-            </span>
-          </li>
         </ul>
       </div>
       )}

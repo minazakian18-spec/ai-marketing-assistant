@@ -21,6 +21,7 @@ import type React from "react";
 export type Brand =
   | "instagram"
   | "facebook"
+  | "messenger"
   | "gmail"
   | "google_calendar"
   | "google_business"
@@ -34,6 +35,7 @@ export type Brand =
 const ICONS: Partial<Record<Brand, SimpleIcon>> = {
   instagram: siInstagram,
   facebook: siFacebook,
+  messenger: siFacebook,
   gmail: siGmail,
   google_calendar: siGooglecalendar,
   google_business: siGoogle,
@@ -47,6 +49,7 @@ const ICONS: Partial<Record<Brand, SimpleIcon>> = {
 export const BRAND_LABEL: Record<Brand, string> = {
   instagram: "Instagram",
   facebook: "Facebook",
+  messenger: "Facebook",
   gmail: "Gmail",
   google_calendar: "Google Agenda",
   google_business: "Google Bedrijfsprofiel",
