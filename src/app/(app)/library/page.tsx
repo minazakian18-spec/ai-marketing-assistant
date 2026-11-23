@@ -266,7 +266,7 @@ export default function LibraryPage() {
   return (
     <div className="lb">
       <PageHeading
-        eyebrow="Merk"
+       
         title="Bibliotheek"
         description="Al je afbeeldingen, video's, logo's en creaties op één plek."
         action={

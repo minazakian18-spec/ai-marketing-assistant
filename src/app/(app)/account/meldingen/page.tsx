@@ -83,7 +83,7 @@ export default function NotificationsPage() {
   const unread = notices.filter((n) => !n.read_at).length;
   return (
     <>
-      <PageHeading eyebrow="Persoonlijk" title="Meldingen" description="Kies waarover je bericht wilt krijgen en waar." />
+      <PageHeading title="Meldingen" description="Kies waarover je bericht wilt krijgen en waar." />
       <section className="panel account-panel">
         <div className="section-heading">
           <div>

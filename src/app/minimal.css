@@ -289,3 +289,9 @@
 .app-shell .panel.brand-section .section-heading > svg { color: var(--min-muted, #5f5d72); }
 .app-shell .panel.brand-section .ig-settings-footer { padding: 0; border: 0; justify-content: space-between; }
 .app-shell .panel.brand-section .ig-two-fields { max-width: 520px; }
+
+/* Faster, calmer entrance: pages feel ready right away (was 420 ms + stagger). */
+@media (prefers-reduced-motion: no-preference) {
+  .main-shell .page-heading, .dash > *, .ui-empty, .todo-all-done, .dash-quick li, .todo { animation-duration: 200ms; }
+  .dash > :nth-child(n), .dash-quick li, .todo { animation-delay: 0ms; }
+}

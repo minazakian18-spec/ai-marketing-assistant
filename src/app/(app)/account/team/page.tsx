@@ -43,7 +43,7 @@ export default function TeamPage() {
   }
   return (
     <>
-      <PageHeading eyebrow="Werkruimte" title="Team" description="Wissel van werkruimte of nodig een collega uit." />
+      <PageHeading title="Team" description="Wissel van werkruimte of nodig een collega uit." />
       {invite && (
         <section className="panel account-panel">
           <div className="section-heading">

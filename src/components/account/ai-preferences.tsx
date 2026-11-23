@@ -47,7 +47,7 @@ export function AiPreferences() {
   return (
     <>
       <PageHeading
-        eyebrow="Werkruimte"
+       
         title="AI-voorkeuren"
         description="Geef Mavix een vaste basis. Per bericht of kanaal kun je hiervan afwijken."
       />

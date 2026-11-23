@@ -46,7 +46,7 @@ export function AccountForm() {
   return (
     <>
       <PageHeading
-        eyebrow="Persoonlijk"
+       
         title="Account en profiel"
         description="Je naam, foto en contactgegevens in Mavix."
       />

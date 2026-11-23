@@ -230,7 +230,7 @@ export default function IntegrationsPage() {
 
   return (
     <div className="int">
-      <PageHeading eyebrow="Account" title="Integraties" description="Koppel je kanalen en tools. Je geeft per dienst zelf toestemming." />
+      <PageHeading title="Integraties" description="Koppel je kanalen en tools. Je geeft per dienst zelf toestemming." />
       {notice && (
         <p role={noticeError ? "alert" : "status"} className={noticeError ? "int-notice int-error" : "int-notice"}>
           {notice}

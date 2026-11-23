@@ -33,7 +33,7 @@ export default function PrivacyPage() {
   }
   return (
     <>
-      <PageHeading eyebrow="Persoonlijk" title="Beveiliging en privacy" description="Je wachtwoord, sessies, gekoppelde diensten en je gegevens." />
+      <PageHeading title="Beveiliging en privacy" description="Je wachtwoord, sessies, gekoppelde diensten en je gegevens." />
       <section className="panel account-panel">
         <div className="section-heading">
           <div>

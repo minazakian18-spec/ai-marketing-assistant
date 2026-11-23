@@ -53,7 +53,7 @@ export default function BillingPage() {
   const returned = params.get("betaling");
   return (
     <>
-      <PageHeading eyebrow="Werkruimte" title="Abonnement en facturatie" description={state === "beta" ? "Mavix is in besloten beta. Je betaalt nu niets." : "Je abonnement, facturen en betaalmethode."} />
+      <PageHeading title="Abonnement en facturatie" description={state === "beta" ? "Mavix is in besloten beta. Je betaalt nu niets." : "Je abonnement, facturen en betaalmethode."} />
       {returned === "bezig" && <p className="int-notice" role="status">Bedankt. Zodra Stripe de betaling bevestigt, zie je je abonnement hier. Dat kan een paar minuten duren.</p>}
       {returned === "geannuleerd" && <p className="int-notice" role="status">Je hebt het afrekenen afgebroken. Er is niets in rekening gebracht.</p>}
       <section className="panel account-panel">
