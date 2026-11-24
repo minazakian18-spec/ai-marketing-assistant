@@ -137,16 +137,31 @@ const sum = (list: Totals[]): Totals => list.reduce((a, b) => ({ cost: a.cost + 
 
 export type AdsReport = Awaited<ReturnType<typeof adsReport>>;
 
-/** Last 30 days (until yesterday) next to the 30 days before, weekly trend, campaigns and search terms. */
-async function adsReport(workspaceId: string, customerId: string) {
-  const now = `segments.date BETWEEN '${day(30)}' AND '${day(1)}'`;
-  const before = `segments.date BETWEEN '${day(60)}' AND '${day(31)}'`;
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
+
+/** A chosen period (default: last 30 days until yesterday), max 3 years, never in the future. */
+export function adsRange(from?: string | null, to?: string | null) {
+  let end = to && ISO.test(to) ? to : day(1);
+  if (end > day(0)) end = day(0);
+  let start = from && ISO.test(from) ? from : addDays(end, -29);
+  if (start > end) start = end;
+  if (start < addDays(end, -1095)) start = addDays(end, -1095);
+  const days = Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1;
+  return { from: start, to: end, days, previousFrom: addDays(start, -days), previousTo: addDays(start, -1) };
+}
+
+/** The chosen period next to the same number of days before it, a trend (per day, week or month), campaigns and search terms. */
+async function adsReport(workspaceId: string, customerId: string, range = adsRange()) {
+  const now = `segments.date BETWEEN '${range.from}' AND '${range.to}'`;
+  const before = `segments.date BETWEEN '${range.previousFrom}' AND '${range.previousTo}'`;
+  const unit = range.days <= 31 ? "date" : range.days <= 180 ? "week" : "month";
   const m = "metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions, metrics.conversions_value";
   const [info, cur, prev, weeks, campaigns, terms] = await Promise.all([
     gaql(workspaceId, customerId, "SELECT customer.descriptive_name, customer.currency_code, customer.time_zone FROM customer LIMIT 1"),
     gaql(workspaceId, customerId, `SELECT ${m} FROM customer WHERE ${now}`),
     gaql(workspaceId, customerId, `SELECT ${m} FROM customer WHERE ${before}`),
-    gaql(workspaceId, customerId, `SELECT segments.week, ${m} FROM customer WHERE segments.date BETWEEN '${day(84)}' AND '${day(1)}'`),
+    gaql(workspaceId, customerId, `SELECT segments.${unit}, ${m} FROM customer WHERE ${now}`),
     gaql(workspaceId, customerId, `SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign_budget.amount_micros, ${m} FROM campaign WHERE ${now} AND campaign.status != 'REMOVED' ORDER BY metrics.cost_micros DESC LIMIT 50`),
     // Search terms only exist for search campaigns; an account without them just returns none.
     gaql(workspaceId, customerId, `SELECT search_term_view.search_term, ${m} FROM search_term_view WHERE ${now} ORDER BY metrics.clicks DESC LIMIT 25`).catch(() => []),
@@ -154,12 +169,13 @@ async function adsReport(workspaceId: string, customerId: string) {
   const c = info[0]?.customer || {};
   const byWeek = new Map<string, Totals[]>();
   for (const r of weeks) {
-    const w = String(r.segments?.week || "");
+    const w = String(r.segments?.[unit] || "");
     if (w) byWeek.set(w, [...(byWeek.get(w) || []), totalsOf(r.metrics)]);
   }
   return {
     account: { id: customerId, name: String(c.descriptiveName || ""), currency: String(c.currencyCode || "EUR"), timeZone: String(c.timeZone || "") },
-    period: { from: day(30), to: day(1), previousFrom: day(60), previousTo: day(31) },
+    period: { from: range.from, to: range.to, days: range.days, previousFrom: range.previousFrom, previousTo: range.previousTo },
+    unit,
     current: sum(cur.map((r) => totalsOf(r.metrics))),
     previous: sum(prev.map((r) => totalsOf(r.metrics))),
     weeks: [...byWeek.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([week, list]) => ({ week, ...sum(list) })),
@@ -194,7 +210,8 @@ export async function handleGoogleAds(request: Request, action: string) {
     if (action === "report" && method === "GET") {
       const st = await googleAdsStatus(auth.workspaceId);
       if (st.status !== "connected" || !st.customerId) throw new HttpError(409, "Google Ads is nog niet gekoppeld.");
-      return NextResponse.json(await adsReport(auth.workspaceId, st.customerId), { headers });
+      const q = new URL(request.url).searchParams;
+      return NextResponse.json(await adsReport(auth.workspaceId, st.customerId, adsRange(q.get("from"), q.get("to"))), { headers });
     }
 
     if (action === "connect" && method === "POST") {
@@ -281,7 +298,8 @@ export async function handleGoogleAds(request: Request, action: string) {
     if (action === "advice" && method === "POST") {
       const st = await googleAdsStatus(auth.workspaceId);
       if (st.status !== "connected" || !st.customerId) throw new HttpError(409, "Google Ads is nog niet gekoppeld.");
-      const report = await adsReport(auth.workspaceId, st.customerId);
+      const body = (await request.json().catch(() => ({}))) as { from?: string; to?: string };
+      const report = await adsReport(auth.workspaceId, st.customerId, adsRange(body.from, body.to));
       const profile = await storedProfile(auth.workspaceId);
       const advice = await metered(auth, "content_campaign", () => adsAdvice(report, profile, new Date().toISOString().slice(0, 10)), request.headers.get("idempotency-key"));
       return NextResponse.json({ advice, period: report.period }, { headers });
