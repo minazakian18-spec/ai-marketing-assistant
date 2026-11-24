@@ -18,6 +18,7 @@ import "../design-system.css";
 import "../channel-themes.css";
 import "../motion.css";
 import "../minimal.css";
+import "../theme.css";
 // The logged-in workspace is private: never indexed.
 export const metadata: Metadata = {
   title: { default: "Mavix", template: "%s | Mavix" },
@@ -39,8 +40,12 @@ export default async function AppGroupLayout({
     } = await db.auth.getUser();
     if (!user) redirect("/login?session=expired");
   }
+  const saved = (await cookies()).get("mavix-theme")?.value;
+  const theme = saved === "donker" || saved === "paars" ? saved : "licht";
   return (
     <WorkspaceProvider demo={demo}>
+      {/* Theme flag: theme.css styles the whole page from it, also before hydration. */}
+      <span hidden id="mavix-theme" data-theme-flag={theme} />
       <AppShell>{children}</AppShell>
     </WorkspaceProvider>
   );

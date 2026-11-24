@@ -1,4 +1,5 @@
 "use client";
+import { ThemePicker } from "./theme-picker";
 import { useState, type ChangeEvent } from "react";
 import { Save, Camera, Building2, ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -127,6 +128,17 @@ export function AccountForm() {
                 </label>
               ))}
             </div>
+          </div>
+        </section>
+        <section className="panel account-panel" aria-labelledby="theme-title">
+          <div className="section-heading">
+            <div>
+              <h2 id="theme-title">Weergave</h2>
+              <p>Kies hoe Mavix eruitziet. Je keuze wordt meteen toegepast en onthouden in deze browser.</p>
+            </div>
+          </div>
+          <div className="account-panel-body">
+            <ThemePicker />
           </div>
         </section>
         <Link href="/account/bedrijf" className="panel account-panel st-crosslink">

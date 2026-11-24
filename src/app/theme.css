@@ -1,0 +1,89 @@
+/* App themes (Account > Weergave): licht (default), donker and paars.
+   The app layout renders a hidden #mavix-theme flag from the mavix-theme
+   cookie; html:has() picks it up, so it only applies inside the app. */
+
+/* Donker: one smart inversion of the whole app, so every page (also ones with
+   hard-coded white surfaces) turns dark at once. Photos, video and logos are
+   inverted back so they keep their real colours. */
+html:has(#mavix-theme[data-theme-flag="donker"]) {
+  background: #111018;
+  filter: invert(0.93) hue-rotate(180deg);
+}
+html:has(#mavix-theme[data-theme-flag="donker"]) :is(img, video, canvas, picture, iframe, [style*="background-image"], .brand-icon, .keep-colors) {
+  filter: invert(1) hue-rotate(180deg);
+}
+html:has(#mavix-theme[data-theme-flag="donker"]) body::before {
+  display: none;
+}
+html:has(#mavix-theme[data-theme-flag="donker"]) .app-shell {
+  --min-shadow: none;
+}
+html:has(#mavix-theme[data-theme-flag="donker"]) .app-shell * {
+  box-shadow: none !important;
+}
+
+/* Paars: a deep purple frame (sidebar and top bar) around a soft lavender
+   canvas; cards stay white so text keeps its contrast. */
+html:has(#mavix-theme[data-theme-flag="paars"]) {
+  background: #efe9fd;
+}
+html:has(#mavix-theme[data-theme-flag="paars"]) body::before {
+  background:
+    radial-gradient(900px 500px at 10% -10%, rgba(124, 58, 237, 0.22), transparent 60%),
+    radial-gradient(800px 480px at 100% 0%, rgba(76, 29, 149, 0.16), transparent 60%),
+    linear-gradient(180deg, #f3eefe 0%, #ece4fd 100%);
+}
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell {
+  --min-canvas: transparent;
+  --min-line: #ddd2fa;
+  --min-accent-soft: #ede5fe;
+  background: transparent;
+}
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell .sidebar {
+  background: linear-gradient(180deg, #3b0f8c 0%, #2a0a66 100%);
+  border-right-color: transparent;
+  color: #f1ebff;
+}
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell .sidebar :is(a, button, span, p, strong, small, h2, h3, svg) {
+  color: #ece4ff;
+}
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell .sidebar :is(.nav-group-label, .nav-section-title, small) {
+  color: #c4b2f5;
+}
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell .sidebar .side-nav .nav-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell .sidebar .side-nav .nav-item[aria-current="page"],
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell .sidebar .side-nav .nav-item.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell .sidebar .side-nav .nav-item[aria-current="page"] *,
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell .sidebar .side-nav .nav-item.active * {
+  color: #fff;
+}
+html:has(#mavix-theme[data-theme-flag="paars"]) .app-shell .topbar {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px);
+  border-bottom-color: #ddd2fa;
+}
+
+/* The choice itself (components/account/theme-picker.tsx). */
+.theme-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.theme-option { display: grid; gap: 8px; padding: 10px; border: 1.5px solid var(--min-line, #e6e7ee); border-radius: 12px; background: #fff; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.theme-option[aria-checked="true"] { border-color: var(--min-accent, #6d28d9); box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.15); }
+.theme-option:focus-visible { outline: 2px solid var(--min-accent, #6d28d9); outline-offset: 2px; }
+.theme-preview { display: grid; grid-template-columns: 28% 1fr; height: 70px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0, 0, 0, 0.08); }
+.theme-preview i { display: block; }
+.theme-preview b { display: block; margin: 10px; border-radius: 5px; }
+.theme-preview.licht i { background: #fff; border-right: 1px solid #e6e7ee; }
+.theme-preview.licht span { background: #f4f5f9; }
+.theme-preview.licht b { background: #fff; height: 24px; border: 1px solid #e6e7ee; }
+.theme-preview.donker i { background: #1b1a24; border-right: 1px solid #2c2b38; }
+.theme-preview.donker span { background: #111018; }
+.theme-preview.donker b { background: #1f1e2a; height: 24px; border: 1px solid #2c2b38; }
+.theme-preview.paars i { background: linear-gradient(180deg, #3b0f8c, #2a0a66); }
+.theme-preview.paars span { background: linear-gradient(180deg, #f3eefe, #e6dbfd); }
+.theme-preview.paars b { background: #fff; height: 24px; border: 1px solid #ddd2fa; }
+.theme-option strong { font-size: 14px; }
+.theme-option small { font-size: 12px; color: var(--min-muted, #5f5d72); }
