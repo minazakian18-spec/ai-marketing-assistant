@@ -1,4 +1,5 @@
 "use client";
+import { AdsAnalysis, type AdsAdvice } from "./ads-analysis";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Copy, Loader2, MousePointerClick, Percent, RefreshCw, Sparkles, Target, Wallet, Check, TrendingUp } from "lucide-react";
 
@@ -14,15 +15,6 @@ type Report = {
   weeks: ({ week: string } & T)[];
   campaigns: ({ id: string; name: string; status: string; type: string; dailyBudget: number } & T)[];
   searchTerms: ({ term: string } & T)[];
-};
-type Advice = {
-  summary: string;
-  conclusions: { title: string; explanation: string; evidence: string; verdict: "goed" | "let op" | "probleem" }[];
-  insights: { title: string; detail: string }[];
-  actions: { title: string; why: string; impact: "hoog" | "middel" | "laag"; campaign: string }[];
-  ad_copy: { headlines: string[]; descriptions: string[] };
-  keywords: { add: string[]; negative: string[] };
-  missing_data: string[];
 };
 const BASE = "/api/integrations/google_ads/";
 const STATUS: Record<string, string> = { ENABLED: "Actief", PAUSED: "Gepauzeerd", REMOVED: "Verwijderd" };
@@ -51,7 +43,7 @@ export function AdsDashboard() {
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [advice, setAdvice] = useState<Advice | null>(null);
+  const [advice, setAdvice] = useState<AdsAdvice | null>(null);
   const [thinking, setThinking] = useState(false);
   const [adviceError, setAdviceError] = useState("");
   const [copied, setCopied] = useState("");
@@ -238,100 +230,7 @@ export function AdsDashboard() {
             {adviceError}
           </p>
         )}
-        {advice && (
-          <div className="ads-advice-body">
-            {advice.summary && <p className="ads-advice-summary">{advice.summary}</p>}
-            {advice.conclusions.length > 0 && (
-              <>
-                <h3>Conclusies</h3>
-                <ul className="ads-conclusions">
-                  {advice.conclusions.map((c) => (
-                    <li key={c.title} className={"is-" + c.verdict.replace(" ", "-")}>
-                      <span className="ads-verdict">{c.verdict === "goed" ? "Werkt goed" : c.verdict === "probleem" ? "Probleem" : "Let op"}</span>
-                      <strong>{c.title}</strong>
-                      <span>{c.explanation}</span>
-                      {c.evidence && <small>Onderbouwing: {c.evidence}</small>}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {advice.actions.length > 0 && (
-              <>
-                <h3>Wat je nu kunt doen</h3>
-                <ol className="ads-actions">
-                  {advice.actions.map((a) => (
-                    <li key={a.title}>
-                      <span className={"ads-impact is-" + a.impact}>{a.impact === "hoog" ? "Grote impact" : a.impact === "middel" ? "Middel" : "Klein"}</span>
-                      <strong>{a.title}</strong>
-                      {a.campaign && <small>Campagne: {a.campaign}</small>}
-                      <span>{a.why}</span>
-                    </li>
-                  ))}
-                </ol>
-              </>
-            )}
-            {advice.insights.length > 0 && (
-              <>
-                <h3>Wat opvalt</h3>
-                <ul className="ads-insights">
-                  {advice.insights.map((i) => (
-                    <li key={i.title}>
-                      <strong>{i.title}</strong> {i.detail}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {(advice.ad_copy.headlines.length > 0 || advice.ad_copy.descriptions.length > 0) && (
-              <>
-                <h3>Advertentieteksten om te testen</h3>
-                <ul className="ads-copy">
-                  {[...advice.ad_copy.headlines.map((h) => ["Kop", h]), ...advice.ad_copy.descriptions.map((d) => ["Beschrijving", d])].map(([kind, text]) => (
-                    <li key={kind + text}>
-                      <small>
-                        {kind} · {text.length} tekens
-                      </small>
-                      <span>{text}</span>
-                      <button type="button" className="ads-copy-btn" aria-label={"Kopieer: " + text} onClick={() => copy(text)}>
-                        {copied === text ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {(advice.keywords.add.length > 0 || advice.keywords.negative.length > 0) && (
-              <div className="ads-keywords">
-                {advice.keywords.add.length > 0 && (
-                  <div>
-                    <h3>Zoekwoorden om toe te voegen</h3>
-                    <p className="ads-chips">{advice.keywords.add.map((k) => <span key={k}>{k}</span>)}</p>
-                  </div>
-                )}
-                {advice.keywords.negative.length > 0 && (
-                  <div>
-                    <h3>Uitsluiten (negatieve zoekwoorden)</h3>
-                    <p className="ads-chips is-negative">{advice.keywords.negative.map((k) => <span key={k}>{k}</span>)}</p>
-                  </div>
-                )}
-              </div>
-            )}
-            {advice.missing_data.length > 0 && (
-              <div className="ads-missing">
-                <AlertTriangle size={15} aria-hidden="true" />
-                <div>
-                  <strong>Voor beter advies</strong>
-                  <ul>
-                    {advice.missing_data.map((m) => (
-                      <li key={m}>{m}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {advice && <AdsAnalysis advice={advice} currency={report.account.currency} />}
       </section>
 
       {report.campaigns.length > 0 && (

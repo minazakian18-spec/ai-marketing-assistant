@@ -3,7 +3,8 @@ import Link from "next/link";
 import { usePresence } from "@/components/use-presence";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogOut, UserRound } from "lucide-react";
+import { ChevronDown, LogOut, Sparkles, UserRound } from "lucide-react";
+import { ThemeSwatches } from "./theme-picker";
 import { useWorkspace } from "@/components/workspace-provider";
 import { accountLinks } from "./account-nav";
 
@@ -25,6 +26,15 @@ export function AccountMenu() {
   const trigger = useRef<HTMLButtonElement>(null);
   const path = usePathname();
   useEffect(() => setOpen(false), [path]);
+  // AI credits of this period (owners and admins; others simply see no bar).
+  const [credits, setCredits] = useState<{ total: number; used: number; remaining: number } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    void fetch("/api/ai-usage", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setCredits(d?.credits ?? null))
+      .catch(() => setCredits(null));
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     function outside(e: PointerEvent) {
@@ -79,6 +89,24 @@ export function AccountMenu() {
                 .join(" ") || "Mijn account"}
             </strong>
             {data.account.email && <span>{data.account.email}</span>}
+          </div>
+          {credits && (
+            <Link href="/account/ai" className="menu-credits" onClick={() => setOpen(false)}>
+              <span className="menu-credits-head">
+                <Sparkles size={15} aria-hidden="true" /> AI-tegoed
+                <strong>
+                  {credits.remaining} / {credits.total}
+                </strong>
+              </span>
+              <span className="menu-credits-bar" aria-hidden="true">
+                <i style={{ width: (credits.total ? Math.min(100, (credits.remaining / credits.total) * 100) : 0) + "%" }} />
+              </span>
+              <small>credits over deze periode</small>
+            </Link>
+          )}
+          <div className="menu-theme">
+            <span>Thema</span>
+            <ThemeSwatches />
           </div>
           <nav aria-label="Account">
             {accountLinks.map(([href, label, Icon]) => (

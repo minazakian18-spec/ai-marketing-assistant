@@ -147,7 +147,8 @@ test("conservative defaults: short output limits and modest quotas", () => {
   assert.equal(l.globalMonthlyMicroUsd, 8_000_000);
   // One campaign call replaces three separate generations (post, e-mail, copy).
   // Images are priced per image size/quality (fixed output tokens), not per answer length.
-  assert.ok(Object.entries(usage.OUTPUT_LIMIT).every(([f, n]) => n <= (f === "content_campaign" || f === "carousel_plan" ? 2600 : f.startsWith("image_") ? 8000 : 1800)));
+  // The Google Ads analysis is one full plan (conclusions and several proposals with budgets): 9000.
+  assert.ok(Object.entries(usage.OUTPUT_LIMIT).every(([f, n]) => n <= (f === "content_campaign" || f === "carousel_plan" ? 2600 : f === "ads_analysis" ? 9000 : f.startsWith("image_") ? 8000 : 1800)));
 });
 
 const agentRequest = (body, headers = {}) =>

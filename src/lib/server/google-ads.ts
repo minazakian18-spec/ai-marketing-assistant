@@ -301,7 +301,7 @@ export async function handleGoogleAds(request: Request, action: string) {
       const body = (await request.json().catch(() => ({}))) as { from?: string; to?: string };
       const report = await adsReport(auth.workspaceId, st.customerId, adsRange(body.from, body.to));
       const profile = await storedProfile(auth.workspaceId);
-      const advice = await metered(auth, "content_campaign", () => adsAdvice(report, profile, new Date().toISOString().slice(0, 10)), request.headers.get("idempotency-key"));
+      const advice = await metered(auth, "ads_analysis", () => adsAdvice(report, profile, new Date().toISOString().slice(0, 10)), request.headers.get("idempotency-key"));
       return NextResponse.json({ advice, period: report.period }, { headers });
     }
 

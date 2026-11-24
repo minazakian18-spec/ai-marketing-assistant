@@ -41,7 +41,8 @@ export type AiFeature =
   | "image_generate"
   | "image_inspire"
   | "image_edit"
-  | "carousel_plan";
+  | "carousel_plan"
+  | "ads_analysis";
 
 // Output cap per feature (tokens); short drafts never need the model maximum.
 // Output cap per feature (tokens, including reasoning tokens). Deliberately
@@ -73,6 +74,9 @@ export const OUTPUT_LIMIT: Record<AiFeature, number> = {
   image_edit: 8000,
   // Carousel plan: up to 10 slides with text and image brief, plus caption.
   carousel_plan: 2600,
+  // Google Ads analysis: summary, conclusions and a step-by-step plan with
+  // several proposals (idea, goal, steps, budget, measurement) in one answer.
+  ads_analysis: 9000,
 };
 // Image model (OpenAI Images API). gpt-image-2.5-flare: text input 5 USD,
 // image input 8 USD, image output 30 USD per 1M tokens (OpenAI model page,
@@ -100,7 +104,7 @@ export const PRICES: Record<string, { input: number; output: number }> = {
 export const MAX_STEPS: Partial<Record<AiFeature, number>> = { agent: 4 };
 // Input cap per model call, in tokens. The agent carries tool results and a
 // compact history, so it gets more room; everything else keeps the default.
-export const INPUT_LIMIT: Partial<Record<AiFeature, number>> = { agent: 12_000, image_generate: 1_000, image_edit: 8_000, image_inspire: 14_000 };
+export const INPUT_LIMIT: Partial<Record<AiFeature, number>> = { agent: 12_000, ads_analysis: 12_000, image_generate: 1_000, image_edit: 8_000, image_inspire: 14_000 };
 // image_inspire: up to 5 reference images (each downscaled to max 1024 px)
 // plus the prompt; input tokens are reserved for all of them.
 export const stepsFor = (feature: AiFeature) => MAX_STEPS[feature] ?? 1;

@@ -64,6 +64,8 @@ export const FEATURE_ACTION: Record<string, AiAction> = {
   inbox_summary: "inbox_summary",
   seo_suggest: "seo_advice",
   content_campaign: "campaign",
+  // A Google Ads analysis with proposals counts as one AI campaign proposal.
+  ads_analysis: "campaign",
   research: "research",
   agent: "agent_task",
   brand_improve: "brand_improve",
