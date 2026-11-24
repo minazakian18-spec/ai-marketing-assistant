@@ -6,17 +6,12 @@ import { useWorkspace } from "@/components/workspace-provider";
 import { readiness } from "@/lib/instagram-model";
 import { useState } from "react";
 import { GoogleAdsConnect } from "@/components/ads/google-ads-connect";
+import { AdsDashboard } from "@/components/ads/ads-dashboard";
 
-// Google Ads: planned module. There is no Google Ads API connection in Mavix
-// yet, so this page shows what the module will do, what is needed, and the
-// layout of the future overview WITHOUT numbers. Mavix never creates or
-// changes campaigns without explicit approval.
-//
-// Access to the Google Ads API (since 9 September 2026): no developer token;
-// access belongs to the Google Cloud project of Mavix's OAuth client, at an
-// access level (Test, Explorer, Basic, Standard) requested on the Google Ads
-// API Overview page in the Cloud Console. New Basic/Standard applications need
-// brand verification. A manager account is no longer required.
+// Google Ads: connect an account, then real results (last 30 days vs the 30
+// before, weekly trend, campaigns, search terms) and AI proposals based on
+// those numbers and the Brand Hub (components/ads/ads-dashboard.tsx).
+// Read-only: Mavix never creates or changes campaigns.
 
 type Step = { title: string; text: string; state: "done" | "todo" | "later"; action?: { label: string; href: string; external?: boolean }; connect?: boolean };
 
@@ -67,47 +62,29 @@ export default function AdsPage() {
         </span>
         <div className="ads-hero-text">
                     <h1>Google Ads</h1>
-          <p>Zie straks je campagnes, uitgaven en resultaten naast je andere marketing, met voorstellen van Mavix die jij goedkeurt.</p>
+          <p>Je campagnes, uitgaven en resultaten naast je andere marketing, met voorstellen van Mavix die jij goedkeurt.</p>
         </div>
-        <span className="ads-badge">
-          <Clock size={13} aria-hidden="true" /> In ontwikkeling
-        </span>
       </header>
 
-      <section className="ads-card ads-connection" aria-labelledby="ads-connection">
-        <div className="ads-connection-head">
-          <span className="ads-dot" aria-hidden="true" />
-          <h2 id="ads-connection">Nog niet verbonden</h2>
-        </div>
-        <p className="ads-lead">De koppeling met Google Ads is in voorbereiding. Er worden geen cijfers getoond tot je Google Ads-account echt gekoppeld is.</p>
-        <div className="ads-split">
-          <div>
-            <h3>Wat Mavix regelt</h3>
-            <ul>
-              <li>Toegang tot de Google Ads API voor het Google Cloud-project van Mavix, op een toegangsniveau voor echte advertentieaccounts (Basic of Standard).</li>
-              <li>De merkverificatie die Google voor die toegang vraagt.</li>
-              <li>De goedkeuring van het Google-inlogscherm waarmee je straks koppelt.</li>
-            </ul>
-            <p className="ads-muted">Nog niet afgerond. Jij hoeft hiervoor niets te doen: geen developer token en geen managementaccount (MCC).</p>
+      {linked && <AdsDashboard />}
+
+      {!linked && (
+        <section className="ads-card ads-connection" aria-labelledby="ads-connection">
+          <div className="ads-connection-head">
+            <span className="ads-dot" aria-hidden="true" />
+            <h2 id="ads-connection">Nog niet verbonden</h2>
           </div>
-          <div>
-            <h3>Wat jij straks doet</h3>
-            <ul>
-              <li>Inloggen met je Google-account en toestemming geven.</li>
-              <li>Kiezen welk Google Ads-account Mavix mag lezen.</li>
-            </ul>
-            <p className="ads-muted">Je kunt de toegang altijd weer intrekken, in Mavix of in je Google-account.</p>
-          </div>
-        </div>
-      </section>
+          <p className="ads-lead">Koppel je Google Ads-account hieronder. Daarna zie je hier je echte cijfers en maakt Mavix voorstellen op basis van je resultaten en je Brand Hub. Mavix leest alleen mee; je kunt de toegang altijd intrekken.</p>
+        </section>
+      )}
 
       <section className="ads-card" aria-labelledby="ads-steps">
         <div className="ads-section-head">
           <div>
             <h2 id="ads-steps">
-              <ListChecks size={17} aria-hidden="true" /> Klaar voor de koppeling
+              <ListChecks size={17} aria-hidden="true" /> {linked ? "Koppeling" : "Klaar voor de koppeling"}
             </h2>
-            <p>Wat je nu al kunt voorbereiden.</p>
+            <p>{linked ? "Je account en wat Mavix gebruikt voor de voorstellen." : "Wat je nu al kunt voorbereiden."}</p>
           </div>
           <span className="ads-progress" aria-label={`${done} van ${ownSteps.length} stappen klaar`}>
             {done}/{ownSteps.length} klaar
@@ -145,10 +122,12 @@ export default function AdsPage() {
         </ol>
       </section>
 
+      {!linked && (
+      <>
       <section aria-labelledby="ads-plan">
         <div className="ads-section-head ads-section-head-plain">
           <div>
-            <h2 id="ads-plan">Wat de module gaat doen</h2>
+            <h2 id="ads-plan">Wat je krijgt</h2>
             <p>Zodra Google Ads gekoppeld is.</p>
           </div>
         </div>
@@ -168,7 +147,7 @@ export default function AdsPage() {
       <section className="ads-card ads-preview" aria-labelledby="ads-future">
         <div className="ads-section-head">
           <div>
-            <h2 id="ads-future">Zo ziet je overzicht er straks uit</h2>
+            <h2 id="ads-future">Zo ziet je overzicht eruit</h2>
             <p>Voorbeeld van de indeling. Dit zijn geen echte cijfers.</p>
           </div>
           <span className="ads-sample">Voorbeeldweergave</span>
@@ -214,6 +193,8 @@ export default function AdsPage() {
           </div>
         </div>
       </section>
+      </>
+      )}
     </div>
   );
 }

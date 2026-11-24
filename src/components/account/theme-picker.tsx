@@ -22,6 +22,7 @@ export function ThemePicker() {
     setTheme(t);
     const flag = document.getElementById("mavix-theme");
     if (flag) flag.dataset.themeFlag = t;
+    // eslint-disable-next-line react-hooks/immutability -- writing the browser cookie is the point here
     document.cookie = `mavix-theme=${t}; path=/; max-age=31536000; samesite=lax`;
   }
 
