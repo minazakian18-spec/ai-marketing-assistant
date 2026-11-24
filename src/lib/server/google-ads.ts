@@ -25,7 +25,7 @@ const redirectUri = () => appUrl() + "/api/integrations/google_ads/callback";
 const back = (query: string) => new NextResponse(null, { status: 303, headers: { ...headers, Location: appUrl() + "/ads?" + query } });
 const db = () => adminClient();
 const ctx = (ws: string) => ws + ":" + PROVIDER;
-const apiVersion = () => process.env.GOOGLE_ADS_API_VERSION || "v21";
+const apiVersion = () => process.env.GOOGLE_ADS_API_VERSION || "v26";
 
 async function exchange(body: Record<string, string>): Promise<Token> {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) throw new HttpError(503, "Google-koppeling vereist configuratie.");
@@ -76,6 +76,7 @@ async function accessibleAccounts(workspaceId: string) {
   const d = await r.json().catch(() => ({}));
   if (!r.ok) {
     const msg = JSON.stringify(d);
+    console.error(JSON.stringify({ event: "google_ads_accounts_failed", status: r.status, error: msg.slice(0, 300) }));
     if (/DEVELOPER_TOKEN|developer token|not approved|NOT_ALLOWLISTED|PERMISSION/i.test(msg)) throw new HttpError(503, "Mavix wacht nog op toegang tot de Google Ads API. Je koppeling is bewaard; je accounts verschijnen zodra Google de toegang goedkeurt.");
     throw new HttpError(r.status === 401 ? 409 : 502, r.status === 401 ? "Koppel Google Ads opnieuw." : "Je Google Ads-accounts konden niet worden geladen.");
   }
