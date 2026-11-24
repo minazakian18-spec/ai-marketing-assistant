@@ -3,6 +3,7 @@ import { handleBusinessIntegration } from "@/lib/server/google-business-oauth";
 import { handleSearchConsoleIntegration } from "@/lib/server/search-console-oauth";
 import { handleGoogleAccount } from "@/lib/server/google-account";
 import { handleGoogleAds } from "@/lib/server/google-ads";
+import { handleGoogleAnalytics } from "@/lib/server/google-analytics";
 import { oauthStateMatches } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -120,6 +121,7 @@ export async function POST(request: Request, { params }: Context) {
       return handleBusinessIntegration(request, route.action);
     if (route.provider === "google") return handleGoogleAccount(request, route.action);
     if (route.provider === "google_ads") return handleGoogleAds(request, route.action);
+    if (route.provider === "google_analytics") return handleGoogleAnalytics(request, route.action);
     if (route.provider === "google_search_console")
       return handleSearchConsoleIntegration(request, route.action);
     sameOrigin(request);
@@ -352,6 +354,7 @@ export async function GET(request: Request, { params }: Context) {
       return handleBusinessIntegration(request, route.action);
     if (route.provider === "google") return handleGoogleAccount(request, route.action);
     if (route.provider === "google_ads") return handleGoogleAds(request, route.action);
+    if (route.provider === "google_analytics") return handleGoogleAnalytics(request, route.action);
     if (route.provider === "google_search_console")
       return handleSearchConsoleIntegration(request, route.action);
     if (!PROVIDERS.includes(route.provider))

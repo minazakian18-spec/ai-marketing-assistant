@@ -2,6 +2,7 @@
 import { ResearchSection } from "@/components/research/research-section";
 import { MarketingResults } from "@/components/research/marketing-results";
 import { useWorkspace } from "@/components/workspace-provider";
+import { GoogleAnalytics } from "@/components/insights/google-analytics";
 import "../../research.css";
 import "../../insights.css";
 
@@ -19,6 +20,7 @@ export default function Insights() {
         <h1>Inzichten</h1>
         <p>Ontdek hoe je marketing presteert en waar je kunt groeien.</p>
       </header>
+      <GoogleAnalytics />
       <MarketingResults />
       <ResearchSection />
     </div>
