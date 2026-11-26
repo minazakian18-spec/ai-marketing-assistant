@@ -18,6 +18,7 @@ import "../design-system.css";
 import "../channel-themes.css";
 import "../motion.css";
 import "../minimal.css";
+import "../soft.css";
 import "../theme.css";
 // The logged-in workspace is private: never indexed.
 export const metadata: Metadata = {

@@ -1,0 +1,250 @@
+/* Soft layer (27-11-2026), loaded after minimal.css and before theme.css.
+   A calm control-panel look: a light grey canvas, borderless white cards
+   with large rounded corners, pill-shaped buttons, airy spacing, a quiet
+   sidebar and top bar. Mavix purple stays the accent; titles stay dark
+   purple (project rule). Status colours are untouched. */
+
+.app-shell {
+  --min-canvas: #f4f4f7;
+  --min-card: #ffffff;
+  --min-line: #ececf1;
+  --min-line-strong: #dedfe6;
+  --min-radius: 20px;
+  --min-shadow: 0 1px 2px rgba(24, 22, 40, 0.04), 0 1px 1px rgba(24, 22, 40, 0.02);
+  --soft-pill: #f1f1f5;
+  --soft-pill-hover: #e8e8ee;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* Canvas: one flat grey, content centred with room to breathe. */
+.app-shell .main-shell main,
+.app-shell main.page {
+  background: transparent;
+}
+.app-shell .content,
+.app-shell main > .page,
+.app-shell .main-content {
+  max-width: 1120px;
+}
+
+/* Top bar and sidebar melt into the canvas. */
+.app-shell .topbar {
+  background: rgba(244, 244, 247, 0.86);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 0;
+}
+.app-shell .sidebar {
+  background: #fbfbfd;
+  border-right: 1px solid var(--min-line);
+}
+.app-shell .sidebar .side-nav .nav-item {
+  border-radius: 10px;
+}
+.app-shell .sidebar .side-nav .nav-item:hover {
+  background: #f1f1f5;
+}
+
+/* Page titles: large and friendly. */
+.app-shell .page-heading h1,
+.app-shell :is(.ads-hero, .ins-head, .acc-main, .account-content) h1 {
+  font-size: clamp(26px, 2.6vw, 32px);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+.app-shell .page-heading {
+  margin-bottom: 24px;
+}
+
+/* Cards: borderless white, large radius, generous padding. */
+.app-shell :is(.panel, .card, .ui-card, .cs-studio, .int-row, .dash-card, .quick-action, .ig-card, .ads-card, .nl-card, .rvl-card, .ga) {
+  background: var(--min-card);
+  border: 1px solid transparent;
+  border-radius: var(--min-radius);
+  box-shadow: var(--min-shadow);
+}
+.app-shell :is(.ads-card, .ga) {
+  padding: 24px;
+}
+.app-shell :is(a.panel, a.card, .quick-action, a.ig-card):hover {
+  border-color: var(--min-line-strong);
+  box-shadow: 0 4px 16px rgba(24, 22, 40, 0.06);
+}
+/* Cards inside cards: flat grey tiles instead of a second white box. */
+.app-shell :is(.panel, .ads-card, .ga, .ui-card) :is(.ads-kpis-live > div, .ga-stat, .aa-grid section, .ads-chart, .kpi, .stat) {
+  background: #f7f7fa;
+  border-color: transparent;
+  border-radius: 14px;
+}
+.app-shell :is(.panel, .ads-card, .ga) :is(.aa-card, .aa-section, .ads-actions li, .ads-conclusions li, .ads-copy li) {
+  border-radius: 14px;
+}
+
+/* Section headings inside cards. */
+.app-shell :is(.panel, .ads-card, .ga) h2 {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+/* Buttons: pills. Primary stays Mavix purple; secondary is a soft grey pill. */
+.app-shell .button {
+  border-radius: 999px;
+  font-weight: 600;
+}
+.app-shell .button.primary {
+  padding-inline: 18px;
+}
+.app-shell .button.secondary {
+  background: var(--soft-pill);
+  border: 1px solid transparent;
+  color: var(--min-ink, #2a0f5c);
+}
+.app-shell .button.secondary:hover:not(:disabled) {
+  background: var(--soft-pill-hover);
+  border-color: transparent;
+}
+
+/* Form fields: soft, rounded, clear focus. */
+.app-shell :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea) {
+  border-radius: 12px;
+  border-color: var(--min-line-strong);
+}
+.app-shell :is(input, select, textarea):focus-visible {
+  border-color: var(--min-accent, #6d28d9);
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.14);
+  outline: none;
+}
+
+/* Chips, badges and tags: pills. */
+.app-shell :is(.chip, .badge, .pill, .ads-badge, .ads-progress, .ads-sample, .aa-tag, .ads-impact, .ads-verdict) {
+  border-radius: 999px;
+}
+
+/* Tables: airy rows, no heavy borders. */
+.app-shell table th,
+.app-shell table td {
+  border-color: var(--min-line);
+}
+.app-shell table thead th {
+  font-weight: 600;
+}
+
+/* Account dropdown: rounded floating card. */
+.app-shell .account-dropdown {
+  border-radius: 18px;
+  border: 1px solid var(--min-line);
+  box-shadow: 0 12px 32px rgba(24, 22, 40, 0.12);
+}
+
+/* ---------- Mavix Agent: a calm chat workspace ---------- */
+.app-shell .ag {
+  height: calc(100dvh - 120px);
+  border: 0;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: var(--min-shadow);
+}
+.app-shell .ag-side {
+  background: #fbfbfd;
+  border-right: 1px solid var(--min-line);
+  padding: 14px 12px;
+}
+.app-shell :is(.ag-new, .ag-list button, .ag-group-head button) {
+  border-radius: 10px;
+}
+.app-shell .ag-new {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  justify-content: flex-start;
+}
+.app-shell .ag-new:hover {
+  background: #f1f1f5;
+}
+.app-shell .ag-search {
+  border-radius: 999px;
+  background: #f1f1f5;
+  border-color: transparent;
+}
+.app-shell .ag-main {
+  background: #fff;
+}
+.app-shell .ag-main-head {
+  border-bottom: 0;
+}
+.app-shell .ag-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding-top: clamp(24px, 8vh, 90px);
+  text-align: center;
+}
+.app-shell .ag-empty-mark {
+  margin-bottom: 6px;
+}
+.app-shell .ag-empty h2 {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  color: var(--min-ink, #2a0f5c);
+}
+.app-shell .ag-empty > p {
+  margin: 0 0 14px;
+  max-width: 520px;
+  color: var(--min-muted, #5f5d72);
+}
+.app-shell .ag-suggestions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  width: 100%;
+  padding: 6px;
+  border-radius: 16px;
+  background: #f7f7fa;
+  list-style: none;
+}
+.app-shell .ag-suggestions li + li {
+  border-top: 1px solid #ececf1;
+}
+.app-shell .ag-suggestions button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  font-size: 14.5px;
+  color: var(--min-ink, #2a0f5c);
+}
+.app-shell .ag-suggestions button:hover:not(:disabled) {
+  background: #fff;
+}
+.app-shell .ag-suggestions button svg {
+  flex-shrink: 0;
+  color: var(--min-accent, #6d28d9);
+}
+.app-shell .ag-composer {
+  border-top: 0;
+  background: #fff;
+}
+.app-shell .ag-composer :is(.composer, .glow-host) {
+  border-radius: 18px;
+  box-shadow: 0 2px 10px rgba(24, 22, 40, 0.06);
+}
+.app-shell .ag-disclaimer {
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .app-shell .ag {
+    height: calc(100dvh - 110px);
+    border-radius: 16px;
+  }
+}

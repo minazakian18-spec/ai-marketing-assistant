@@ -22,6 +22,7 @@ import {
   ScrollText,
   Search,
   SquarePen,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -35,6 +36,7 @@ import { AGENT_SUGGESTIONS } from "@/lib/agent/capabilities";
 import { Markdown } from "./markdown";
 import { UpgradeNotice, usePlan } from "@/components/plan-gate";
 import { useAgent } from "./agent-provider";
+import { useWorkspace } from "@/components/workspace-provider";
 
 // Mavix Agent workspace: conversation sidebar (folders, pinned, recent,
 // older, archive, search) and the conversation itself. Everything is stored
@@ -82,6 +84,8 @@ const DAY = 86_400_000;
 const sortRecent = (list: Conversation[]) => [...list].sort((a, b) => (a.last_message_at < b.last_message_at ? 1 : -1));
 
 export function AgentWorkspace() {
+  const { data: workspaceData } = useWorkspace();
+  const firstName = (workspaceData.account.firstName || "").trim();
   const router = useRouter();
   const search = useSearchParams();
   const { takeHandoff, setActivity } = useAgent();
@@ -673,12 +677,14 @@ export function AgentWorkspace() {
                     {project.instructions ? " · Mavix volgt de instructies van dit project." : ""}
                   </p>
                 )}
-                <h2>Waar werken we vandaag aan?</h2>
-                <p>Mavix is je marketingassistent. Hij kent je Brand Hub en werkruimte, schrijft teksten en plannen, en wijst je de weg in Mavix. Hij publiceert of verstuurt nooit zelf iets.</p>
+                <MaviMascot size={72} state="idle" className="ag-empty-mark" />
+                <h2>{firstName ? `Blij je te zien, ${firstName}` : "Waar werken we vandaag aan?"}</h2>
+                <p>Je marketingassistent. Mavix kent je Brand Hub, schrijft teksten en plannen en wijst je de weg. Hij publiceert of verstuurt nooit zelf iets.</p>
                 <ul className="ag-suggestions" aria-label="Voorbeelden">
-                  {AGENT_SUGGESTIONS.slice(0, 6).map((s) => (
+                  {AGENT_SUGGESTIONS.slice(0, 4).map((s) => (
                     <li key={s.prompt}>
                       <button type="button" disabled={sending} onClick={() => void send(s.prompt)}>
+                        <Sparkles size={15} aria-hidden="true" />
                         {s.prompt}
                       </button>
                     </li>
