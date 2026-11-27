@@ -145,7 +145,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside
         id="main-sidebar"
         ref={drawer}
-        inert={(mobile && !open) || (!mobile && collapsed)}
+        inert={mobile && !open}
         className={`sidebar ${open ? "open" : ""}`}
       >
         <button

@@ -1,13 +1,17 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarPlus, ChartNoAxesCombined, MessageSquareReply } from "lucide-react";
+import { ArrowUpRight, ChartNoAxesCombined } from "lucide-react";
+import { BrandIcon } from "@/components/brand-icon";
 import { InstagramLogo as Instagram, GmailLogo as Mail } from "@/components/brand-logos";
+
+const GoogleCalendar = ({ size = 18 }: { size?: number }) => <BrandIcon brand="google_calendar" size={size} />;
+const GoogleReviews = ({ size = 18 }: { size?: number }) => <BrandIcon brand="google_reviews" size={size} />;
 
 // Tool shortcuts. `tone` picks a calm icon tint (see .qa-tone-* in polish.css).
 const ACTIONS = [
   { href: "/social?tab=assist", group: "Maken", label: "Instagram-post maken", detail: "Caption, hashtags en beeldconcept in één keer.", Icon: Instagram, tone: "rose" },
   { href: "/email?tab=assist", group: "Maken", label: "E-mailcampagne maken", detail: "Een nieuwsbrief of actie, klaar om in te plannen.", Icon: Mail, tone: "blue" },
-  { href: "/calendar", group: "Plannen", label: "Content plannen", detail: "Zet je week klaar in de kalender.", Icon: CalendarPlus, tone: "violet" },
-  { href: "/reviews?tab=inbox", group: "Opvolgen", label: "Reviews beantwoorden", detail: "Reageer snel en persoonlijk op klanten.", Icon: MessageSquareReply, tone: "amber" },
+  { href: "/calendar", group: "Plannen", label: "Content plannen", detail: "Zet je week klaar in de kalender.", Icon: GoogleCalendar, tone: "violet" },
+  { href: "/reviews?tab=inbox", group: "Opvolgen", label: "Reviews beantwoorden", detail: "Reageer snel en persoonlijk op klanten.", Icon: GoogleReviews, tone: "amber" },
   { href: "/inzichten", group: "Analyseren", label: "Resultaten bekijken", detail: "Zie wat werkt en waar winst zit.", Icon: ChartNoAxesCombined, tone: "green" },
 ] as const;
 

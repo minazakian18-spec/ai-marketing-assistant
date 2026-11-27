@@ -31,6 +31,7 @@ function Item({
       href={item.href}
       className={"nav-item" + (active ? " is-active" : "")}
       aria-current={active ? "page" : undefined}
+      title={item.label}
       onClick={onNavigate}
     >
       <Icon size={17} />

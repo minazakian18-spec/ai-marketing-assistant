@@ -248,3 +248,51 @@
     border-radius: 16px;
   }
 }
+
+/* Folded sidebar (Ctrl/Cmd+B): an icon rail that stays clickable, with the
+   label as tooltip. Phones keep the slide-in drawer. */
+@media (min-width: 651px) {
+  .app-shell.is-collapsed .sidebar {
+    transform: none;
+    width: 72px;
+    padding-inline: 10px;
+    overflow-x: hidden;
+  }
+  .app-shell.is-collapsed .main-shell {
+    margin-left: 72px;
+  }
+  .app-shell.is-collapsed .sidebar :is(.mavix-wordmark, .side-nav-label, .sidebar-user-text, .nav-item > span:not(.nav-badge)) {
+    display: none;
+  }
+  .app-shell.is-collapsed .sidebar > .brand {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .app-shell.is-collapsed .sidebar .nav-item {
+    position: relative;
+    justify-content: center;
+    padding-inline: 0;
+    width: 48px;
+    height: 42px;
+    margin-inline: auto;
+  }
+  .app-shell.is-collapsed .sidebar .nav-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 16px;
+  }
+  .app-shell.is-collapsed .sidebar .side-nav-group + .side-nav-group {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--min-line, #ececf1);
+  }
+  .app-shell.is-collapsed .sidebar .sidebar-user {
+    justify-content: center;
+    padding-inline: 0;
+  }
+}
