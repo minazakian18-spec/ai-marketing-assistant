@@ -1,5 +1,5 @@
 "use client";
-import { IntegrationHealth } from "@/components/account/integration-health";
+import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { PageHeading, IconButton } from "@/components/ui";
@@ -26,23 +26,16 @@ type Integration = {
   group: Group;
   provider?: string; // backend provider (aliases share one connection)
   planned?: boolean;
+  /** Connected on its own page (Google Ads, Analytics). */
+  href?: string;
 };
 
-// Sections in the order people need them; every integration appears once.
-const ALL_GROUPS: [Group, string, string][] = [
-  ["recommended", "Aanbevolen", "De belangrijkste kanalen voor je marketing. Begin hier."],
-  ["communication", "Communicatie", "Klantgesprekken komen samen in je Inbox."],
-  ["productivity", "Productiviteit en inzicht", "Planning en je zoekresultaten in Google."],
-  ["other", "Binnenkort", "Deze koppelingen zijn in voorbereiding en nog niet te gebruiken."],
-];
-
-// Only groups that still contain an integration (no empty headings or tabs).
-const GROUPS = (): [Group, string, string][] => ALL_GROUPS.filter(([g]) => INTEGRATIONS.some((i) => i.group === g));
-
+// One list, in the order people need them.
 const INTEGRATIONS: Integration[] = [
   { id: "instagram", brand: "instagram", name: "Instagram", description: "Instagram-berichten (DM's) in de Inbox. Vereist een professioneel account.", group: "recommended", provider: "instagram" },
   { id: "google", brand: "google_business", name: "Google-account", description: "Bedrijfsprofiel en reviews, Agenda, Search Console en e-mail versturen, met één koppeling.", group: "recommended", provider: "google" },
-  { id: "google_ads", brand: "google_ads", name: "Google Ads", description: "Campagneresultaten en zoektermen bekijken.", group: "other", planned: true },
+  { id: "google_ads", brand: "google_ads", name: "Google Ads", description: "Campagneresultaten, zoektermen en voorstellen van Mavix.", group: "recommended", href: "/ads" },
+  { id: "google_analytics", brand: "google_business", name: "Google Analytics", description: "Websitebezoekers en waar ze vandaan komen.", group: "productivity", href: "/inzichten" },
   { id: "meta_ads", brand: "meta_ads", name: "Meta Ads", description: "Resultaten van Facebook- en Instagram-advertenties.", group: "other", planned: true },
 ];
 const SCOPE_LABEL: Record<string, string> = {
@@ -116,7 +109,6 @@ export default function IntegrationsPage() {
   const [demo, setDemo] = useState(false);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [group, setGroup] = useState<Group | "all">("all");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [noticeError, setNoticeError] = useState(false);
@@ -223,7 +215,6 @@ export default function IntegrationsPage() {
     }
   }
 
-  const groups = GROUPS().filter(([g]) => group === "all" || g === group);
   const m = manage;
   const mc = m ? conn(m) : undefined;
   const ms = m ? stateOf(m, mc) : "disconnected";
@@ -245,76 +236,55 @@ export default function IntegrationsPage() {
           {error}
         </p>
       )}
-      <IntegrationHealth />
-
-      <div className="int-tabs" role="tablist" aria-label="Onderdeel">
-        <button type="button" role="tab" aria-selected={group === "all"} onClick={() => setGroup("all")}>
-          Alle integraties
-        </button>
-        {GROUPS().map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={group === id} onClick={() => setGroup(id)}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {groups.map(([g, label, text]) => (
-        <section key={g} className="int-group" aria-labelledby={"int-group-" + g}>
-          <header className="int-group-head">
-            <h2 id={"int-group-" + g}>{label}</h2>
-            <p>{text}</p>
-          </header>
-          <ul className="int-list ui-card">
-            {INTEGRATIONS.filter((i) => i.group === g).map((item) => {
-              if (item.id === "google") return <GoogleAccountCard key="google" onNotice={setNotice} />;    const c = conn(item);
-              const state = loaded ? stateOf(item, c) : item.planned ? "planned" : "disconnected";
-              const linked = !item.planned && state !== "disconnected";
-              return (
-                <li key={item.id} className="int-row">
-                  <span className="int-logo">
-                    <BrandIcon brand={item.brand} size={24} />
-                  </span>
-                  <div className="int-info">
-                    <strong>{item.name}</strong>
-                    <p>{item.description}</p>
-                    {linked && c?.display_name && <small>{c.display_name}</small>}
-                    {item.provider === "instagram" && state === "connected" && c?.metadata?.messaging === false && (
-                      <small className="int-limited">
-                        Berichten in de Inbox: nog niet ingeschakeld (
-                        {c.metadata.messagingMissing?.length
-                          ? "Meta-toestemming " + c.metadata.messagingMissing.join(", ") + " ontbreekt"
-                          : c.metadata.messagingIssue === "webhook_subscription_failed"
-                            ? "Meta weigerde berichtmeldingen voor de gekoppelde Facebook-pagina"
-                            : "extra Meta-toestemming nodig"}
-                        )
-                      </small>
-                    )}
-                  </div>
-                  <span className={"int-state is-" + state}>{STATE_TEXT[state]}</span>
-                  {item.planned ? (
-                    <button type="button" className="button secondary" disabled>
-                      Binnenkort
-                    </button>
-                  ) : linked ? (
-                    <button type="button" className="button secondary" onClick={() => open(item)} disabled={demo}>
-                      Beheren
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="button secondary"
-                      disabled={demo || busy}
-                      onClick={() => void call(item.provider!, "connect")}
-                    >
-                      Koppelen
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
+      <ul className="int-list int-one ui-card">
+        {INTEGRATIONS.map((item) => {
+          if (item.id === "google") return <GoogleAccountCard key="google" onNotice={setNotice} />;
+          const c = conn(item);
+          const state = item.href ? null : loaded ? stateOf(item, c) : item.planned ? "planned" : "disconnected";
+          const linked = !item.planned && !item.href && state !== "disconnected";
+          return (
+            <li key={item.id} className="int-row">
+              <span className="int-logo">
+                <BrandIcon brand={item.brand} size={24} />
+              </span>
+              <div className="int-info">
+                <strong>{item.name}</strong>
+                <p>{item.description}</p>
+                {linked && c?.display_name && <small>{c.display_name}</small>}
+                {item.provider === "instagram" && state === "connected" && c?.metadata?.messaging === false && (
+                  <small className="int-limited">
+                    Berichten in de Inbox: nog niet ingeschakeld (
+                    {c.metadata.messagingMissing?.length
+                      ? "Meta-toestemming " + c.metadata.messagingMissing.join(", ") + " ontbreekt"
+                      : c.metadata.messagingIssue === "webhook_subscription_failed"
+                        ? "Meta weigerde berichtmeldingen voor de gekoppelde Facebook-pagina"
+                        : "extra Meta-toestemming nodig"}
+                    )
+                  </small>
+                )}
+              </div>
+              {state && <span className={"int-state is-" + state}>{STATE_TEXT[state]}</span>}
+              {item.href ? (
+                <Link href={item.href} className="button secondary">
+                  Openen
+                </Link>
+              ) : item.planned ? (
+                <button type="button" className="button secondary" disabled>
+                  Binnenkort
+                </button>
+              ) : linked ? (
+                <button type="button" className="button secondary" onClick={() => open(item)} disabled={demo}>
+                  Beheren
+                </button>
+              ) : (
+                <button type="button" className="button secondary" disabled={demo || busy} onClick={() => void call(item.provider!, "connect")}>
+                  Koppelen
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
 
       {m && (
         <>
