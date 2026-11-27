@@ -163,7 +163,7 @@ function CopyEditor() {
       <div className="cs-studio">
         <div className="cs-toolbar">
           <div className="cs-toolbar-title">
-            <h2>{copy ? "Marketingtekst" : "Nieuwe marketingtekst"}</h2>
+            <h1>{copy ? "Marketingtekst" : "Nieuwe marketingtekst"}</h1>
             {copy?.status === "ready" && <span className="st2-status is-approved">Klaar</span>}
             <SaveIndicator status={shown} />
           </div>
