@@ -373,3 +373,12 @@
   .adm-invoices li { grid-template-columns: 1fr auto; }
   .adm-drawer { padding: 18px 16px; }
 }
+
+/* Agent welcome: the turning Mavix mark (components/agent/mavix-orb.tsx). */
+.mx-orb { position: relative; display: grid; place-items: center; perspective: 520px; cursor: grab; touch-action: none; user-select: none; margin-bottom: 8px; }
+.mx-orb:active { cursor: grabbing; }
+.mx-orb-body { position: relative; width: 78%; height: 78%; transform-style: preserve-3d; transform: rotateX(var(--rx, -12deg)) rotateY(var(--ry, 20deg)); }
+.mx-orb-body img { position: absolute; inset: 0; width: 100%; height: 100%; backface-visibility: hidden; filter: drop-shadow(0 6px 14px rgba(91, 58, 209, 0.35)) saturate(1.1); }
+.mx-orb-front { transform: translateZ(4px); }
+.mx-orb-back { transform: rotateY(180deg) translateZ(4px); filter: brightness(0.82) drop-shadow(0 6px 14px rgba(91, 58, 209, 0.3)); }
+.mx-orb-shadow { position: absolute; bottom: -2px; width: 56%; height: 10px; border-radius: 50%; background: radial-gradient(closest-side, rgba(60, 30, 140, 0.22), transparent); }

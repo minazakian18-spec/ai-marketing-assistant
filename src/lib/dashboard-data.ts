@@ -72,14 +72,14 @@ export function mockDashboard(now: Date): {
       "scheduled",
       dateAt(monday, i, i % 3 === 1 ? 12 : i % 3 === 2 ? 17 : 18),
       i % 3 === 2
-        ? "Instagram Reel"
+        ? "Instagram Story"
         : i % 3 === 1
           ? "E-mailcampagne"
           : "Instagram-post",
     ),
   );
   const reel = scheduled.find(
-    (entry) => entry.kind === "Instagram Reel" && new Date(entry.date) >= now,
+    (entry) => entry.kind === "Instagram Story" && new Date(entry.date) >= now,
   )!;
   return {
     attention: [

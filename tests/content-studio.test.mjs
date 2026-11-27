@@ -32,11 +32,9 @@ test("overview uses the same records as the calendar: posts, campaigns and copie
   assert.deepEqual(studioCounts(items), { draft: 1, approved: 1, scheduled: 1, published: 1, failed: 0 });
 });
 
-test("only implemented channels are selectable; Reel is clearly marked as coming", () => {
-  assert.deepEqual(CHANNELS.filter((c) => c.available).map((c) => c.id), ["instagram", "email", "copy"]);
-  const reel = CHANNELS.find((c) => c.id === "reel");
-  assert.equal(reel.available, false);
-  assert.match(reel.note, /Binnenkort/);
+test("only implemented channels are offered; no Reel option (Mavix makes no video)", () => {
+  assert.deepEqual(CHANNELS.map((c) => c.id), ["instagram", "email", "copy"]);
+  assert.ok(CHANNELS.every((c) => c.available));
 });
 
 test("Brand Hub gaps are suggestions, not a blocker", () => {

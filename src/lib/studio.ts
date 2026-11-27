@@ -37,7 +37,6 @@ export const CHANNELS: { id: StudioChannel; label: string; description: string; 
   { id: "instagram", label: "Instagram-post", description: "Caption, hashtags en een foto uit je Bibliotheek.", available: true },
   { id: "email", label: "E-mail of nieuwsbrief", description: "Onderwerp, voorbeeldtekst en de inhoud van je mail.", available: true },
   { id: "copy", label: "Marketingtekst", description: "Voor je website, een advertentie, flyer of productomschrijving.", available: true },
-  { id: "reel", label: "Instagram Reel", description: "Korte verticale video met caption.", available: false, note: "Binnenkort: Mavix maakt en plaatst nog geen video's." },
 ];
 
 export type StudioStatus = "draft" | "approved" | "scheduled" | "published" | "failed" | "other";

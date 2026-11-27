@@ -146,7 +146,6 @@ function NewCampaign() {
               </label>
             );
           })}
-          <span className="cp-soon">Reels en Stories: binnenkort</span>
         </fieldset>
         <div className="cp-actions">
           <button type="button" className="button primary" onClick={() => void generate()} disabled={!!busy || !channels.length}>

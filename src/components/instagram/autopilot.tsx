@@ -27,14 +27,12 @@ function Frequencies({
 }) {
   return (
     <div className="ig-frequency">
-      {(["posts", "stories", "reels"] as const).map((key) => (
+      {(["posts", "stories"] as const).map((key) => (
         <label key={key}>
           {prefix}
           {key === "posts"
             ? "Posts"
-            : key === "stories"
-              ? "Stories"
-              : "Reels"}{" "}
+            : "Stories"}{" "}
           per week
           <input
             type="number"

@@ -22,7 +22,6 @@ export function QuickActions() {
         <h2 id="dash-quick-title" className="dash-section-title">
           Snelle acties
         </h2>
-        <p>Direct aan de slag, zonder te zoeken.</p>
       </div>
       <ul>
         {ACTIONS.map(({ href, group, label, detail, Icon, tone }, i) => (
@@ -33,7 +32,6 @@ export function QuickActions() {
               </span>
               <ArrowUpRight className="dash-quick-arrow" size={16} aria-hidden="true" />
               <span className="dash-quick-text">
-                <em>{group}</em>
                 <strong>{label}</strong>
                 <small>{detail}</small>
               </span>

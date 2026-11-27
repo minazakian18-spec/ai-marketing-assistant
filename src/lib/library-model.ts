@@ -56,7 +56,7 @@ export function sampleLibraryAssets(): LibraryAsset[] {
     },
     {
       id: "lib-sample-4",
-      name: "Reel: achter de schermen",
+      name: "Achter de schermen",
       type: "video",
       dateAdded: isoDaysAgo(9),
     },

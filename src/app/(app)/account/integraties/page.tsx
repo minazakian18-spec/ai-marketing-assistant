@@ -48,7 +48,7 @@ const SCOPE_LABEL: Record<string, string> = {
   instagram_business_manage_messages: "Instagram-berichten lezen en beantwoorden",
   instagram_basic: "Basisgegevens van je Instagram-account",
   instagram_manage_messages: "Instagram-berichten lezen en beantwoorden",
-  instagram_content_publish: "Posts en Reels publiceren (binnenkort)",
+  instagram_content_publish: "Posts publiceren",
   pages_read_engagement: "Gegevens van je Facebook-pagina lezen",
   business_management: "Pagina's in je Meta Business Portfolio vinden",
   pages_show_list: "Je Facebook-pagina's bekijken",

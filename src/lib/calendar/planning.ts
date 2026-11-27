@@ -21,7 +21,6 @@ export const PLAN_OPTIONS: PlanOption[] = [
   { kind: "instagram-post", label: "Instagram-post", group: "marketing" },
   { kind: "email", label: "E-mail / nieuwsbrief", group: "marketing" },
   { kind: "instagram-story", label: "Instagram-story", group: "marketing", soon: true },
-  { kind: "instagram-reel", label: "Instagram-reel", group: "marketing", soon: true },
 ];
 
 export type PlanSlot = { date: string; time?: string };

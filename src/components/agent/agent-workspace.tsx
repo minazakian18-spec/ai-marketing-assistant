@@ -37,6 +37,18 @@ import { Markdown } from "./markdown";
 import { UpgradeNotice, usePlan } from "@/components/plan-gate";
 import { useAgent } from "./agent-provider";
 import { useWorkspace } from "@/components/workspace-provider";
+import { BrandIcon } from "@/components/brand-icon";
+import { MavixOrb } from "./mavix-orb";
+
+// The logo of the channel a suggestion is about; a spark for general advice.
+function SuggestionIcon({ prompt }: { prompt: string }) {
+  const p = prompt.toLowerCase();
+  if (p.includes("instagram")) return <BrandIcon brand="instagram" size={16} />;
+  if (/nieuwsbrief|e-mail|mail/.test(p)) return <BrandIcon brand="gmail" size={16} />;
+  if (/planning|gepland|agenda|kalender/.test(p)) return <BrandIcon brand="google_calendar" size={16} />;
+  if (/review/.test(p)) return <BrandIcon brand="google_reviews" size={16} />;
+  return <Sparkles size={15} aria-hidden="true" />;
+}
 
 // Mavix Agent workspace: conversation sidebar (folders, pinned, recent,
 // older, archive, search) and the conversation itself. Everything is stored
@@ -85,7 +97,7 @@ const sortRecent = (list: Conversation[]) => [...list].sort((a, b) => (a.last_me
 
 export function AgentWorkspace() {
   const { data: workspaceData } = useWorkspace();
-  const firstName = (workspaceData.account.firstName || "").trim();
+  const firstName = (workspaceData.account.firstName || "").trim().split(/s+/)[0] || "";
   const router = useRouter();
   const search = useSearchParams();
   const { takeHandoff, setActivity } = useAgent();
@@ -677,14 +689,13 @@ export function AgentWorkspace() {
                     {project.instructions ? " · Mavix volgt de instructies van dit project." : ""}
                   </p>
                 )}
-                <MaviMascot size={72} state="idle" className="ag-empty-mark" />
+                <MavixOrb size={104} />
                 <h2>{firstName ? `Blij je te zien, ${firstName}` : "Waar werken we vandaag aan?"}</h2>
-                <p>Je marketingassistent. Mavix kent je Brand Hub, schrijft teksten en plannen en wijst je de weg. Hij publiceert of verstuurt nooit zelf iets.</p>
                 <ul className="ag-suggestions" aria-label="Voorbeelden">
                   {AGENT_SUGGESTIONS.slice(0, 4).map((s) => (
                     <li key={s.prompt}>
                       <button type="button" disabled={sending} onClick={() => void send(s.prompt)}>
-                        <Sparkles size={15} aria-hidden="true" />
+                        <SuggestionIcon prompt={s.prompt} />
                         {s.prompt}
                       </button>
                     </li>
@@ -816,7 +827,7 @@ export function AgentWorkspace() {
                 />
               </div>
             )}
-            <p className="ag-disclaimer">Mavix kan fouten maken. Controleer feiten, prijzen en acties voordat je iets publiceert.</p>
+            <p className="ag-disclaimer">Mavix kan fouten maken. Controleer het voor je publiceert.</p>
           </div>
         </div>
       </section>
