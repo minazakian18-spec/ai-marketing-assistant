@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { platformAdmin, failure, limited, sameOrigin, HttpError } from "@/lib/server/access";
 import { adminClient } from "@/lib/server/supabase";
-import { billingState } from "@/lib/billing-state";
+import { billingState, PLANS } from "@/lib/billing-state";
 import { DIAG_PREFIX } from "@/lib/server/webhook-diagnostics";
 
 // Private beta administration (Mavix staff only, public.platform_admins):
@@ -21,14 +21,14 @@ export async function GET() {
     const db = adminClient();
     const { data: spaces, error } = await db
       .from("workspaces")
-      .select("id,name,access_status,ai_monthly_token_limit,created_at")
+      .select("*")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(500);
     if (error) throw new HttpError(503, "Werkruimtes konden niet worden geladen.");
     const ids = (spaces || []).map((s) => s.id as string);
     const none = Promise.resolve({ data: [] as Record<string, unknown>[] });
-    const [{ data: owners }, { data: usage }, { data: subs }, { data: conns }, { data: audit }, { data: diagnostics }] = await Promise.all([
+    const [{ data: owners }, { data: usage }, { data: subs }, { data: conns }, { data: audit }, { data: diagnostics }, invoiceRows] = await Promise.all([
       ids.length ? db.from("workspace_members").select("workspace_id,user_id").eq("role", "OWNER").in("workspace_id", ids) : none,
       ids.length ? db.from("ai_usage").select("workspace_id,input_tokens,output_tokens,cost_micro_usd").gte("created_at", monthStart()).in("workspace_id", ids).limit(50000) : none,
       ids.length ? db.from("subscriptions").select("workspace_id,plan,status").in("workspace_id", ids) : none,
@@ -36,7 +36,10 @@ export async function GET() {
       // Recent administrative and billing events (event names only, no content).
       db.from("audit_logs").select("workspace_id,event,created_at").order("created_at", { ascending: false }).limit(120),
       db.from("audit_logs").select("event,created_at").is("workspace_id", null).ilike("event", DIAG_PREFIX + "%").order("created_at", { ascending: false }).limit(25),
+      // Open or overdue invoices per workspace (empty until the migration ran).
+      ids.length ? db.from("workspace_invoices").select("workspace_id,status").in("workspace_id", ids).in("status", ["open", "overdue"]) : none,
     ]);
+    const unpaid = (wsId: string) => ((invoiceRows as { data: { workspace_id: string }[] | null }).data || []).filter((i) => i.workspace_id === wsId).length;
     const emails = new Map<string, string>();
     for (const o of owners || []) {
       if (emails.has(o.workspace_id as string)) continue;
@@ -54,6 +57,9 @@ export async function GET() {
           name: s.name,
           status: s.access_status,
           aiLimit: s.ai_monthly_token_limit,
+          priceCents: (s as { monthly_price_cents?: number | null }).monthly_price_cents ?? null,
+          plan: ((subs || []).find((x) => x.workspace_id === s.id) as { plan?: string | null } | undefined)?.plan || null,
+          unpaidInvoices: unpaid(s.id as string),
           createdAt: s.created_at,
           ownerEmail: emails.get(s.id as string) || null,
           tokensThisMonth: tokens.get(s.id as string) || 0,
@@ -80,6 +86,11 @@ const input = z.object({
   id: z.string().uuid(),
   status: z.enum(["approved", "pending", "suspended"]).optional(),
   aiLimit: z.number().int().min(0).max(1_000_000_000).nullable().optional(),
+  /** Monthly price in cents for this customer (null = plan price). */
+  priceCents: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  /** Manual plan: null = beta (no plan). Stripe subscriptions are changed in Stripe. */
+  plan: z.enum(PLANS).nullable().optional(),
+  note: z.string().trim().max(2000).optional(),
 });
 
 export async function PATCH(request: Request) {
@@ -91,12 +102,24 @@ export async function PATCH(request: Request) {
     const change: Record<string, unknown> = {};
     if (body.status) Object.assign(change, { access_status: body.status, access_changed_at: new Date().toISOString() });
     if (body.aiLimit !== undefined) change.ai_monthly_token_limit = body.aiLimit;
-    if (!Object.keys(change).length) throw new HttpError(400, "Geen wijziging opgegeven.");
+    if (body.priceCents !== undefined) change.monthly_price_cents = body.priceCents;
+    if (body.note !== undefined) change.admin_note = body.note || null;
     const db = adminClient();
+    if (body.plan !== undefined) {
+      const { data: sub } = await db.from("subscriptions").select("provider_subscription_id").eq("workspace_id", body.id).maybeSingle();
+      if (sub?.provider_subscription_id) throw new HttpError(409, "Dit abonnement loopt via Stripe. Wijzig het plan in Stripe; de wijziging komt dan vanzelf hier.");
+      const { error: subError } = await db
+        .from("subscriptions")
+        .upsert({ workspace_id: body.id, plan: body.plan, status: body.plan ? "active" : "incomplete", billing_interval: body.plan ? "month" : null, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" });
+      if (subError) throw new HttpError(503, "Het abonnement kon niet worden opgeslagen.");
+      await db.from("audit_logs").insert({ workspace_id: body.id, actor_id: user.id, event: "plan_set_" + (body.plan || "beta") });
+      if (!Object.keys(change).length) return NextResponse.json({ ok: true });
+    }
+    if (!Object.keys(change).length) throw new HttpError(400, "Geen wijziging opgegeven.");
     const { data, error } = await db.from("workspaces").update(change).eq("id", body.id).is("deleted_at", null).select("id").maybeSingle();
     if (error) throw new HttpError(503, "Opslaan is niet gelukt.");
     if (!data) throw new HttpError(404, "Werkruimte niet gevonden.");
-    await db.from("audit_logs").insert({ workspace_id: body.id, actor_id: user.id, event: body.status ? "beta_access_" + body.status : "ai_limit_changed" });
+    await db.from("audit_logs").insert({ workspace_id: body.id, actor_id: user.id, event: body.status ? "beta_access_" + body.status : body.aiLimit !== undefined ? "ai_limit_changed" : body.priceCents !== undefined ? "price_changed" : "admin_note_changed" });
     return NextResponse.json({ ok: true });
   } catch (e) {
     if (e instanceof z.ZodError) return failure(new HttpError(400, "Ongeldige aanvraag."));
